@@ -1,0 +1,8 @@
+https://web.archive.org/web/20210305191545/https://www.contextis.com/en/blog -* +*/www.contextis.com/* -N1005 -#p -B -%v -%k -w -s0 -F "Mozilla/5.0 (X11;U; Linux i686; en-GB; rv:1.9.1) Gecko/20090624 Ubuntu/9.04 (jaunty) Firefox/3.5" -v
+File generated automatically on Fri, 24 Feb 2023 10:30:09, do NOT edit
+
+To update a mirror, just launch httrack without any parameters
+The existing cache will be used (and modified)
+To have other options, retype all parameters and launch HTTrack
+To continue an interrupted mirror, just launch httrack without any parameters
+
