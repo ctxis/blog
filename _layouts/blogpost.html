@@ -86,7 +86,7 @@ layout: base
                     </div>
                     <div class="meta-categories-categories">
                         {% for tag in page.tags %}
-                        <a href="{{ tag.url }}">{{ tag }}</a>
+                        <a href="{{ site.baseurl}}/{{ tag.url }}">{{ tag }}</a>
                         {% endfor %}
                     </div>
                 </div>
