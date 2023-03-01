@@ -1,3 +1,5 @@
+---
+---
 @charset "UTF-8";
 
 /*!
@@ -314,8 +316,8 @@ th {
 
 @font-face {
   font-family: 'Glyphicons Halflings';
-  src: url('/assets/fonts/glyphicons-halflings-regular.eot');
-  src: url('/assets/fonts/glyphicons-halflings-regular.eot#iefix') format('embedded-opentype'), url('/assets/fonts/glyphicons-halflings-regular.woff2') format('woff2'), url('/assets/fonts/glyphicons-halflings-regular.woff') format('woff'), url('/assets/fonts/glyphicons-halflings-regular.ttf') format('truetype'), url('/assets/fonts/glyphicons-halflings-regular.svg#glyphicons_halflingsregular') format('svg')
+  src: url('{{ site.baseurl }}/assets/fonts/glyphicons-halflings-regular.eot');
+  src: url('{{ site.baseurl }}/assets/fonts/glyphicons-halflings-regular.eot#iefix') format('embedded-opentype'), url('{{ site.baseurl }}/assets/fonts/glyphicons-halflings-regular.woff2') format('woff2'), url('{{ site.baseurl }}/assets/fonts/glyphicons-halflings-regular.woff') format('woff'), url('{{ site.baseurl }}/assets/fonts/glyphicons-halflings-regular.ttf') format('truetype'), url('{{ site.baseurl }}/assets/fonts/glyphicons-halflings-regular.svg#glyphicons_halflingsregular') format('svg')
 }
 
 .glyphicon {
@@ -5983,8 +5985,8 @@ button.close {
  */
 @font-face {
   font-family: 'FontAwesome';
-  src: url('/assets/fonts/fontawesome-webfont.eot?v=4.3.0');
-  src: url('/assets/fonts/fontawesome-webfont.eot#iefix&v=4.3.0') format('embedded-opentype'), url('/assets/fonts/fontawesome-webfont.woff2?v=4.3.0') format('woff2'), url('/assets/fonts/fontawesome-webfont.woff?v=4.3.0') format('woff'), url('/assets/fonts/fontawesome-webfont.ttf?v=4.3.0') format('truetype'), url('/assets/fonts/fontawesome-webfont.svg?v=4.3.0#fontawesomeregular') format('svg');
+  src: url('{{ site.baseurl }}/assets/fonts/fontawesome-webfont.eot?v=4.3.0');
+  src: url('{{ site.baseurl }}/assets/fonts/fontawesome-webfont.eot#iefix&v=4.3.0') format('embedded-opentype'), url('{{ site.baseurl }}/assets/fonts/fontawesome-webfont.woff2?v=4.3.0') format('woff2'), url('{{ site.baseurl }}/assets/fonts/fontawesome-webfont.woff?v=4.3.0') format('woff'), url('{{ site.baseurl }}/assets/fonts/fontawesome-webfont.ttf?v=4.3.0') format('truetype'), url('{{ site.baseurl }}/assets/fonts/fontawesome-webfont.svg?v=4.3.0#fontawesomeregular') format('svg');
   font-weight: normal;
   font-style: normal
 }
@@ -8430,15 +8432,15 @@ button.close {
 }
 
 .slick-loading .slick-list {
-  background: #fff url('/assets/images/ajax-loader.gif') center center no-repeat
+  background: #fff url('{{ site.baseurl }}/assets/images/ajax-loader.gif') center center no-repeat
 }
 
 @font-face {
   font-family: 'slick';
   font-weight: normal;
   font-style: normal;
-  src: url('/assets/fonts/slick.eot');
-  src: url('/assets/fonts/slick.eot#iefix') format('embedded-opentype'), url('/assets/fonts/slick.woff') format('woff'), url('/assets/fonts/slick.ttf') format('truetype'), url('/assets/fonts/slick.svg#slick') format('svg')
+  src: url('{{ site.baseurl }}/assets/fonts/slick.eot');
+  src: url('{{ site.baseurl }}/assets/fonts/slick.eot#iefix') format('embedded-opentype'), url('{{ site.baseurl }}/assets/fonts/slick.woff') format('woff'), url('{{ site.baseurl }}/assets/fonts/slick.ttf') format('truetype'), url('{{ site.baseurl }}/assets/fonts/slick.svg#slick') format('svg')
 }
 
 .slick-prev,
@@ -8509,11 +8511,11 @@ button.close {
 }
 
 .slick-prev:before {
-  content: url(/assets/images/icon-chevron-left-dark.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-chevron-left-dark.svg)
 }
 
 .slick-prev:before[dir="rtl"] {
-  content: url(/assets/images/icon-chevron-right-dark.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-chevron-right-dark.svg)
 }
 
 .people-scroll .slick-prev {
@@ -8521,7 +8523,7 @@ button.close {
 }
 
 .people-scroll .slick-prev:before {
-  content: url(/assets/images/icon-chevron-left-lg.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-chevron-left-lg.svg)
 }
 
 .slick-next {
@@ -8534,11 +8536,11 @@ button.close {
 }
 
 .slick-next:before {
-  content: url(/assets/images/icon-chevron-right-dark.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-chevron-right-dark.svg)
 }
 
 .slick-next:before[dir="rtl"] {
-  content: url(/assets/images/icon-chevron-left-dark.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-chevron-left-dark.svg)
 }
 
 .people-scroll .slick-next {
@@ -8546,7 +8548,7 @@ button.close {
 }
 
 .people-scroll .slick-next:before {
-  content: url(/assets/images/icon-chevron-right-lg.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-chevron-right-lg.svg)
 }
 
 .slick-dotted .slick-slider {
@@ -9073,7 +9075,7 @@ body {
   body {
     margin-left: -45px;
     padding-top: 0;
-    background-image: url(/assets/images/bg.png);
+    background-image: url({{ site.baseurl }}/assets/images/bg.png);
     background-position: top center;
     background-repeat: no-repeat
   }
@@ -9336,7 +9338,7 @@ h4 {
 
 .article-content .list-arrows li:before,
 .section-vacancy__list .list-arrows li:before {
-  content: url(/assets/images/icon-arrow-brand-14-right.svg);
+  content: url({{ site.baseurl }}/assets/images/icon-arrow-brand-14-right.svg);
   padding-right: 6px
 }
 
@@ -9454,19 +9456,19 @@ h4 {
 }
 
 .icon.icon-flag.icon-flag-GB:before {
-  content: url(/assets/images/icon-flag-GB.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-flag-GB.svg)
 }
 
 .icon.icon-flag.icon-flag-DE:before {
-  content: url(/assets/images/icon-flag-DE.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-flag-DE.svg)
 }
 
 .icon.icon-flag.icon-flag-AU:before {
-  content: url(/assets/images/icon-flag-AU.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-flag-AU.svg)
 }
 
 .icon.icon-flag.icon-flag-US:before {
-  content: url(/assets/images/icon-flag-US.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-flag-US.svg)
 }
 
 .icon.icon-pdf,
@@ -10914,7 +10916,7 @@ form.mktoForm .mktoOffset {
     height: 140px;
     z-index: initial;
     background-color: #ed1b2f;
-    background-image: url(/assets/images/digital-details-header-brand-1.png);
+    background-image: url({{ site.baseurl }}/assets/images/digital-details-header-brand-1.png);
     background-repeat: no-repeat;
     background-position: bottom right
   }
@@ -10922,7 +10924,7 @@ form.mktoForm .mktoOffset {
   .page-index-blog .navbar-default,
   .page-entry-blog .navbar-default {
     background-color: #09889f;
-    background-image: url(/assets/images/digital-details-header-brand-3.png)
+    background-image: url({{ site.baseurl }}/assets/images/digital-details-header-brand-3.png)
   }
 
   .page-careers .navbar-default,
@@ -10931,7 +10933,7 @@ form.mktoForm .mktoOffset {
   .page-index-vacancies .navbar-default,
   .page-entry-vacancies .navbar-default {
     background-color: #e65c25;
-    background-image: url(/assets/images/digital-details-header-brand-7.png)
+    background-image: url({{ site.baseurl }}/assets/images/digital-details-header-brand-7.png)
   }
 }
 
@@ -11386,7 +11388,7 @@ form.mktoForm .mktoOffset {
     right: 0;
     background-color: #c71727;
     text-transform: uppercase;
-    background-image: url(/assets/images/digital-details-utility-header-brand-1.png);
+    background-image: url({{ site.baseurl }}/assets/images/digital-details-utility-header-brand-1.png);
     background-repeat: no-repeat;
     background-position: top left;
     padding-left: 60px
@@ -11536,7 +11538,7 @@ form.mktoForm .mktoOffset {
   .page-index-blog .navbar-default .navbar-nav.navbar-nav-secondary,
   .page-entry-blog .navbar-default .navbar-nav.navbar-nav-secondary {
     background-color: #006e82;
-    background-image: url(/assets/images/digital-details-utility-header-brand-3.png)
+    background-image: url({{ site.baseurl }}/assets/images/digital-details-utility-header-brand-3.png)
   }
 
   .page-index-blog .navbar-default .navbar-nav.navbar-nav-secondary a:hover,
@@ -11553,7 +11555,7 @@ form.mktoForm .mktoOffset {
   .page-index-vacancies .navbar-default .navbar-nav.navbar-nav-secondary,
   .page-entry-vacancies .navbar-default .navbar-nav.navbar-nav-secondary {
     background-color: #c44817;
-    background-image: url(/assets/images/digital-details-utility-header-brand-7.png)
+    background-image: url({{ site.baseurl }}/assets/images/digital-details-utility-header-brand-7.png)
   }
 }
 
@@ -11898,7 +11900,7 @@ form.mktoForm .mktoOffset {
 }
 
 .dropdown-menu-contact>.container {
-  background-image: url(/assets/images/map-nav.png);
+  background-image: url({{ site.baseurl }}/assets/images/map-nav.png);
   background-repeat: no-repeat;
   background-position: 0 50px
 }
@@ -12096,12 +12098,12 @@ form.mktoForm .mktoOffset {
 }
 
 .breadcrumb>li+li:before {
-  content: url(/assets/images/icon-arrow-brand-2-right.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-arrow-brand-2-right.svg)
 }
 
 .page-index-blog .breadcrumb>li+li:before,
 .page-entry-blog .breadcrumb>li+li:before {
-  content: url(/assets/images/icon-arrow-brand-4-right.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-arrow-brand-4-right.svg)
 }
 
 .breadcrumb>.last {
@@ -12187,13 +12189,13 @@ form.mktoForm .mktoOffset {
   padding-left: 40px !important;
   padding-right: 0;
   background-position: left top;
-  background-image: url(/assets/images/icon-error-red.svg)
+  background-image: url({{ site.baseurl }}/assets/images/icon-error-red.svg)
 }
 
 .callout h3.icon.icon-right {
   padding-left: 0 !important;
   padding-right: 50px;
-  background-image: url(/assets/images/icon-envelope-white-angled.svg);
+  background-image: url({{ site.baseurl }}/assets/images/icon-envelope-white-angled.svg);
   background-position: right 13px
 }
 
@@ -14336,7 +14338,7 @@ img[src*="icon-document-lg.svg"] {
 
 .footer .brand {
   display: block;
-  background-image: url(/assets/images/digital-details-logo-footer-brand-1.png);
+  background-image: url({{ site.baseurl }}/assets/images/digital-details-logo-footer-brand-1.png);
   background-repeat: no-repeat;
   background-position: left bottom;
   height: 46px;
@@ -14421,7 +14423,7 @@ img[src*="icon-document-lg.svg"] {
   padding-top: 10px;
   padding-bottom: 10px;
   padding-right: 60px;
-  background-image: url(/assets/images/icon-envelope-swoosh.svg);
+  background-image: url({{ site.baseurl }}/assets/images/icon-envelope-swoosh.svg);
   background-repeat: no-repeat;
   background-position: right 13px;
   text-align: left
@@ -14547,7 +14549,7 @@ img[src*="icon-document-lg.svg"] {
 }
 
 .footer .footer-nav .container {
-  background-image: url(/assets/images/map-footer.png);
+  background-image: url({{ site.baseurl }}/assets/images/map-footer.png);
   background-repeat: no-repeat;
   background-position: bottom center
 }
@@ -14797,7 +14799,7 @@ img[src*="icon-document-lg.svg"] {
 }
 
 .banner .logo {
-  background-image: url(/assets/images/digital-details-logo-header-brand-1.png);
+  background-image: url({{ site.baseurl }}/assets/images/digital-details-logo-header-brand-1.png);
   background-repeat: no-repeat;
   background-position: top right;
   position: absolute;
@@ -14808,7 +14810,7 @@ img[src*="icon-document-lg.svg"] {
 
 .page-index-blog .banner .logo,
 .page-entry-blog .banner .logo {
-  background-image: url(/assets/images/digital-details-logo-header-brand-3.png)
+  background-image: url({{ site.baseurl }}/assets/images/digital-details-logo-header-brand-3.png)
 }
 
 .page-index-careers .banner .logo,
@@ -14816,7 +14818,7 @@ img[src*="icon-document-lg.svg"] {
 .page-index-vacancies .banner .logo,
 .page-entry-vacancies .banner .logo,
 .page-entry-challenges .banner .logo {
-  background-image: url(/assets/images/digital-details-logo-header-brand-7.png)
+  background-image: url({{ site.baseurl }}/assets/images/digital-details-logo-header-brand-7.png)
 }
 
 @media (min-width:768px) {
@@ -15239,7 +15241,7 @@ img[src*="icon-document-lg.svg"] {
 }
 
 .highlight.highlight-brand-5 .highlight-link:after {
-  content: url(/assets/images/icon-arrow-brand-5-right.svg)
+  content: url({{ site.baseurl }}/assets/images/icon-arrow-brand-5-right.svg)
 }
 
 .highlight.highlight-brand-5.highlight-pattern {
@@ -15763,7 +15765,7 @@ img[src*="icon-document-lg.svg"] {
     position: absolute;
     top: 0;
     left: 0;
-    background-image: url(/assets/images/bg-life-at-context-left.jpg);
+    background-image: url({{ site.baseurl }}/assets/images/bg-life-at-context-left.jpg);
     background-repeat: no-repeat;
     background-position: right center;
     width: 50%;
@@ -15782,7 +15784,7 @@ img[src*="icon-document-lg.svg"] {
     position: absolute;
     top: 0;
     right: 0;
-    background-image: url(/assets/images/bg-life-at-context-right.jpg);
+    background-image: url({{ site.baseurl }}/assets/images/bg-life-at-context-right.jpg);
     background-repeat: no-repeat;
     background-position: 550px center;
     width: 50%;
@@ -15801,7 +15803,7 @@ img[src*="icon-document-lg.svg"] {
     position: absolute;
     top: 0;
     right: 58%;
-    background-image: url(/assets/images/bg-life-at-context-left.jpg);
+    background-image: url({{ site.baseurl }}/assets/images/bg-life-at-context-left.jpg);
     background-repeat: no-repeat;
     background-position: right center;
     width: 100%;
@@ -15814,7 +15816,7 @@ img[src*="icon-document-lg.svg"] {
     position: absolute;
     top: 0;
     left: 99%;
-    background-image: url(/assets/images/bg-life-at-context-right.jpg);
+    background-image: url({{ site.baseurl }}/assets/images/bg-life-at-context-right.jpg);
     background-repeat: no-repeat;
     background-position: 550px right;
     width: 100%;
@@ -16228,7 +16230,7 @@ img[src*="icon-document-lg.svg"] {
   display: table;
   height: 100%;
   width: 100%;
-  background-image: url(/assets/images/icon-magnifying-glass-box.svg);
+  background-image: url({{ site.baseurl }}/assets/images/icon-magnifying-glass-box.svg);
   background-repeat: no-repeat;
   background-position: 50% calc(60%);
   position: relative

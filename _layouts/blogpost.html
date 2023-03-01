@@ -55,9 +55,9 @@ layout: base
     <div class="hero hero-hi">
         <picture>
             <!--[if IE 9]><video style="display: none;"><![endif]-->
-            <source srcset="{{ page.hero_banner }}" media="(min-width: 768px)">
+            <source srcset="{{ site.baseurl}}/assets/banners/{{ page.hero_banner }}" media="(min-width: 768px)">
             <!--[if IE 9]></video><![endif]-->
-            <img srcset="{{ page.hero_banner }}" alt="{{ page.title }}">
+            <img srcset="{{ site.baseurl}}/assets/banners/{{ page.hero_banner }}" alt="{{ page.title }}">
         </picture>
     </div>
 
