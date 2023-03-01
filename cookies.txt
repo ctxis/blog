@@ -1,4 +1,0 @@
-# HTTrack Website Copier Cookie File
-# This file format is compatible with Netscape cookies
-.archive.org	TRUE	/	FALSE	1999999999	donation-identifier	0a46e4f779cdb196642a7b5a71c69027
-

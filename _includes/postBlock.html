@@ -1,0 +1,24 @@
+{% if forloop.first %}<div class="col-sm-12 col-md-8">{% else %}<div class="col-sm-6 col-md-4">{% endif %}
+    <a href="{{ post.url }}" style="background-image: url('{{ post.hero_banner }}');"
+        class="lazyloaded card card-blog card-img ">
+        <div class="card-header">
+            <p class="card-channel">
+                Blog
+            </p>
+            <p class="card-meta">{{ post.date | date: "%-d %B %Y" }}</p>
+            <h2>
+                {{ post.title }}
+            </h2>
+            <div class="card-summary">
+                {{ post.summary |truncatehtml | truncatewords: 15 }}
+            </div>
+        </div><!-- /card-header -->
+        <p class="card-footer">
+            Read Article
+            <svg class="icon icon-arrow-right" xmlns="http://www.w3.org/2000/svg" width="11" height="9"
+                viewBox="0 0 11 9">
+                <path d="M6.3 8.8H4.5l3.6-3.6H.3V3.9h7.8L4.5.4h1.8l4.2 4.2-4.2 4.2z"></path>
+            </svg>
+        </p>
+    </a><!-- /card -->
+</div>
