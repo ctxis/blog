@@ -1,0 +1,222 @@
+---
+layout: blogpost
+title: "Subverting the Agent on Network PATROL"
+author: "Kevin O’Reilly"
+author_role: "Principal Consultant"
+summary: "A Red Team engagement led to the team discovering unprotected credentials encrypted with an infrastructure management product from software provider BMC. The CVE identifier for this is: CVE-2016-2348."
+tags: [Vulnerabilities and exploits]
+hero_banner: Subverting_the_agent_on_network_patrol_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Opportunities multiply as they are seized.</p>
+<p>I like concise nuggets of ancient wisdom, and often old truisms of war apply to the field of cyber-security. This one seems quite apt here. Another great saying also springs to mind: know your enemy. In the realms of cyber security, it's fair to start from the assumption that your attacker will be motivated and capable. If you are to simulate an attack from such a threat, you need to have a motivated and capable party performing the attack. That's where we come in.</p>
+<p>And so began one of our Red Team engagements. We were commissioned to try and penetrate the defenses of a client, and after a successful initial incursion into the inside of their network through a carefully crafted phishing campaign, we were at the network reconnaissance stage. Upon looking around their network, it became apparent that they were using an infrastructure management tool from BMC called 'PATROL'. Now PATROL makes use of credential files containing encrypted passwords, but in a properly hardened PATROL environment these files should not be present on network shares, and should be protected by NTFS permissions. However, looking around various hosts and temporary directories on the network in question, it appeared that these password files had been placed on network shares and left unprotected. In an attack, such a resource is like a red flag to a bull, and just begs the question: can these encrypted passwords be decrypted? And will the resulting plain text passwords allow us further inroads on the client network?</p>
+<p>To answer this question, we need to hone in on the part of the product that does the decrypting (or, in the first place, the encrypting). This will hopefully allow us to work out what the encryption algorithm might be and give us a chance at decrypting the numerous encrypted passwords we had begun to collect on our way around the network. We then happened upon a command-line tool on one of the hosts that forms part of the PATROL suite: "sec_encrypt_p3x.exe". It certainly looked like what we were after, so we grabbed a copy to study offline. It turns out this tool is quite simple in that it takes one command line argument of the plain text password to be encrypted, and it prints the resulting encrypted password to the standard out:</p>
+<pre class="prettyprint">D:\sec_encrypt_p3x&gt;sec_encrypt_p3x.exe
+Usage:
+  sec_encrypt_p3x.exe  [-patrol_conf] &lt;plain text password&gt;
+  sec_encrypt_p3x.exe  -h
+  sec_encrypt_p3x.exe  -v
+  
+D:\sec_encrypt_p3x&gt;sec_encrypt_p3x.exe -v
+sec_encrypt_p3x.exe V9.0.70:Build_201208220914:20120822:nt-50-x86:Aug 22 2012
+
+D:\sec_encrypt_p3x&gt;sec_encrypt_p3x.exe context
+1516379765771364</pre>
+<p>So we know that within this executable, or the DLLs upon which it is dependent, is the encryption algorithm used to encrypt the password. If we can hone in further on the relevant code, we have a chance at working out what the algorithm is and perhaps reimplementing it for our own purposes: to decrypt the encrypted passwords we have collected. So the first thing to do is to look at the binaries involved, and see if we can start by disassembling them easily. As long as there is no executable protection in the form of a packer, then we won't have to worry about unpacking the code first before we begin looking for encryption related artifacts such as mathematical constants, tables or even strings that might be the hallmark of the encryption implementation.</p>
+<pre class="prettyprint">bmc9_t.dll
+globlc32_t80.dll
+i18n9_t.dll
+oss9_t.dll
+pcl9_t.dll
+sec_encrypt_p3x.exe
+tss9_t.dll</pre>
+<p>The first thing to do is to look at the imported functions from the main module, sec_encrypt_p3x.exe. We see that in total, it imports 67 functions from 6 DLLs. Three of these are Windows DLLs: kernel32.dll, msvcr80.dll and msvcp80.dll. The other three are DLLs that the executable is packaged with: bmc9_t.dll, i18n9_t.dll and oss9_t.dll. From these DLLs, the main executable imports the following functions:</p>
+<pre class="prettyprint">Module name: oss9_t.dll
+
+OSS_Init
+<a class="__cf_email__" data-cfemail="a19ec4cfc2d3d8d1d5f1c0d5d3cecd92d9e1eef2f2" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="7a253f141908030a0e1315143a" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="0754465849464551656a64587473756e69603f47" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="92d3d3c4a0d2" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@Z
+<a class="__cf_email__" data-cfemail="645b5b542b37373b3405100c24" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="a9f8e8ece9e8ebffe09891c7" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="1e414d6a6c7770795e" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="e7b0d3a8b4b4b8b786938fb786959394a289928aa7" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@@Z
+<a class="__cf_email__" data-cfemail="f4cb939180b4bba7a7" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="9bc4cbfaeff3db" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="98c9dadda7d9ced1a9a0f6c7cbeceaf1f6ffd8" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="1c4b28534f4f434c7d68744c7d6e686f597269715c" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@@Z
+<a class="__cf_email__" data-cfemail="754a4a443a26262a2514011d35" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="0958484c495153" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+
+Module name: i18n9_t.dll
+
+<a class="__cf_email__" data-cfemail="201f1f106911184e7f735452494e4760" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="94c5d5d1d4c4d6d0" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@Z
+<a class="__cf_email__" data-cfemail="360909077f070e58696542445f585176" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="4110000401191b" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+<a class="__cf_email__" data-cfemail="f2cd91ad818680b2bbc3ca9c" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="752a2601071c1b1235" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@QBEPBDXZ
+
+Module name: bmc9_t.dll
+
+<a class="__cf_email__" data-cfemail="3f00000f5d525c604c4b4d565158077f" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="6c3d2d292c3436" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+<a class="__cf_email__" data-cfemail="fac5c5ca989799a5898e8893949dc2ba" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="99c8d8dcd9c9dbdd" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@Z
+<a class="__cf_email__" data-cfemail="f8c7c7cc9a959ba78b8c8a91969fc0b8" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="b0e1f1f5f1f1e680f0f1f2e680" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@@Z
+<a class="__cf_email__" data-cfemail="0738385e656a64587473756e69603f47" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="6a3b2b2f2b2b3c5a2a2e" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@Z
+<a class="__cf_email__" data-cfemail="8bb4b4d2e9e6e8d4f8fff9e2e5ecb3cb" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="76273733373720463637342046" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@@Z
+<a class="__cf_email__" data-cfemail="0b34343a69666854787f7962656c334b" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="05544440455d5f" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a></pre>
+<p>The obvious function that stands out is <a class="__cf_email__" data-cfemail="7e411b101d0c070e0a2e1f0a0c11124d063e312d2d" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="9dc2d8f3feefe4ede9f4f2f3dd" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="6a392b35242b283c08070935191e1803040d522a" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="276666711567" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@Z. This has a 'mangled' function name which means a more simple function name 'encryptPatrol3x' was decorated with other information by Microsoft's C++ compiler. In this case it's apparent that the compiler used was Microsoft Visual C++ version 8 (we can tell this from the Visual C runtime library names msvcr80.dll and msvcp80.dll) which is better known as part of Visual Studio 2005. It would appear that a function with the name 'encryptPatrol3x' could be just what we are looking for. Upon disassembling sec_encrypt_p3x.exe we find that this function is only called from one place in the main executable - it has only one cross-reference in IDA, using Ctrl-X:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/CallToEncryptPatrol3x_sfsHEHa.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/CallToEncryptPatrol3x_sfsHEHa.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/CallToEncryptPatrol3x_sfsHEHa.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/CallToEncryptPatrol3x_sfsHEHa.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We see this call comes in the code at address 0x401714. Disassembling oss9_t.dll, we can examine the internals of this function. At this point, it's a good idea to see if we can find any constants or tables that might give away the encryption algorithm used. For this, I chose to use PEiD with the 'Kanal Krypto Analyzer' plugin:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/PEiD_aaWvjS1.width-800_800_356_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/PEiD_aaWvjS1.width-800_800_356_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/PEiD_aaWvjS1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/PEiD_aaWvjS1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We can see that the plugin finds quite a few cryptographic constants:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Kanal.width-800_800_658_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Kanal.width-800_800_658_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/Kanal.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/Kanal.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<pre class="prettyprint">BASE64 table :: 000D0460 :: 100D0460
+CryptGenRandom [Import] :: 00092130 :: 10092130
+CryptGenRandom [Name] :: 0009CA4C :: 1009CA4C
+DES [key schedule] [char] :: 0009E230 :: 1009E230
+MD5 :: 0006D048 :: 1006D048
+SHA1 [Compress] :: 00040505 :: 10040505
+SHA1 [Compress] :: 000418B5 :: 100418B5
+SHA1 [Compress] :: 00042EDE :: 10042EDE
+SHA1 [Compress] :: 000444FA :: 100444FA
+SHA1 [Compress] :: 0005EAB1 :: 1005EAB1
+SHA1 [Compress] :: 0005FED5 :: 1005FED5
+SHA1 [Compress] :: 0006158A :: 1006158A
+SHA1 [Compress] :: 00062C36 :: 10062C36</pre>
+<p>One really handy feature of the Krypto Analyzer plugin is the ability to export these results as an IDC file ready for direct import into IDA. Of particular note is the DES key schedule. This stands out as the only algorithm that is directly related to encryption - the others are more closely linked to hashing algorithms (MD5, SHA1) or random number generation (the Microsoft CryptGenRandom function). If we import both bookmarks and comments into IDA, we can then go the location of the DES key schedule in the binary, and work backwards in cross references to see where this key schedule is used. </p>
+<p>After finding the initial function that makes use of the table, we follow the cross references back a few levels to see if we can tie this in with the encryptPatrol3x function. By good fortune, we discover that a mere five levels up we do indeed find ourselves at the entry to encryptPatrol3x. This means that it does indeed look like we have found the code necessary for performing the encryption on the plain-text password, and we have established it is very likely to be the DES algorithm being used. </p>
+<p>We can see from the disassembly of encryptPatrol3x that the function takes two parameters: </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/EncryptPatrol3x-IDA.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/EncryptPatrol3x-IDA.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/EncryptPatrol3x-IDA.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/EncryptPatrol3x-IDA.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We can see that the first parameter is immediately dereferenced (in other words, it is a pointer) and that the result is passed to a string function '<a class="__cf_email__" data-cfemail="bc83dfe3cfc8cefcded1df" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="510e222523383f366911" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@QBEPBDXZ'. Again, this is a mangled C++ name, being derived from the simpler 'c_str' in the source code. Could it be that this function simply converts an input string to a 'C-string'? We can now quickly test our assumptions by firing up the executable in the debugger with a password to encrypt. For this we will use OllyDbg (from http://ollydbg.de). We put our test password in as the only argument and then put a breakpoint on the entry to encryptPatrol3x at 0x10034244. If we step over the call to the 'c_str' function we see that it does indeed convert our input password into a C-string. Stepping over the more interesting second function results in the following:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/EncryptedPassword.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/EncryptedPassword.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/EncryptedPassword.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/EncryptedPassword.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We see that the return value in EAX is a pointer to the encrypted password. So we have found a function that takes a C-style string as its sole input parameter and returns the encrypted string as output. We also know that the internals of this function make use of the DES encryption algorithm. We are surely honing in quite nicely on what we're interested in, so at this stage we might think about trying to identify the key used in the encryption, as well as the mode of operation: as DES is a block cipher, it might be implemented using several such modes such as cipher feedback (CFB) or cipher block chaining (CBC). If we know this and the key we could possibly implement our own DES code to try and perform the decryption. But wait. Another wise saying is 'don't reinvent the wheel'. Yet another is 'keep it simple, stupid'. Is there an even easier way of achieving our goal?</p>
+<p>An obvious idea here is to look among the other functions that oss9_t.dll exports; if it exports a decryption function to match our encryptPatrol3x we might save ourselves a lot of trouble! Looking at the functions exported by this DLL, we see that there are many - it exports 1450 functions in all. If we grep these for the string 'decrypt' we find one match:</p>
+<pre class="prettyprint"><a class="__cf_email__" data-cfemail="1b247f7e7869626b6f5b544848" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="5708123934252e27233e383917" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="e9b8abacb6a7a8abbf8b848ab69a9d9b80878ed1a9" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="37767661057707" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@Z</pre>
+<p>This looks promising at first, but we also find a corresponding encrypt function:</p>
+<pre class="prettyprint"><a class="__cf_email__" data-cfemail="ccf3a9a2afbeb5bcb88c839f9f" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a><a class="__cf_email__" data-cfemail="f2adb79c91808b82869b9d9cb2" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="570615120819161501353a34082423253e39306f17" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@<a class="__cf_email__" data-cfemail="60212136522050" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>@Z</pre>
+<p>If we look at the encryption function, it's not obvious that it has anything in common with the function used to encrypt our password; encryptPatrol3x. So unfortunately it's not going to be quite that easy. So let's drill down into encryptPatrol3x a bit to see what we can find. We know the function at 0x10034250 takes a plain-text string as input, and outputs the resulting encrypted string. Looking inside this function, we see a simple bit of code to test the pointer passed as an argument points to a valid C-string, then finally a call to another subroutine before it returns. This sub-function must lead to the actual encryption code so we drill down another level:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/KeyAndFunc.width-800_800_617_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/KeyAndFunc.width-800_800_617_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/KeyAndFunc.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/KeyAndFunc.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Here we see a sequence of bytes being copied to a buffer one by one, before a call to a further subroutine that also takes our plain text password as a parameter. These bytes look to be ASCII characters - potentially making up the string 'k$C4}@"_'. Could this be a key, hard coded into the binary, being passed to the actual encryption function? And what about the string of all the hexadecimal digits ('0123456789ABCDEF') and the call that follow - might these form a binary to hexadecimal conversion for the resulting encrypted password? The function at 0x10069B10 looks really interesting - let's go one level deeper into the rabbit hole...</p>
+<p>The internals of this next function look a good deal more complicated, with many subroutines, memory allocations and loops. Certainly it could be our encryption function. But one thing that's well worth noting is that there are two cross references to this function. One from encryptPatrol3x of course - that's how we got here. But what about the other? Let's have a look at that parent function:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/ReverseFunction.width-800_800_834_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/ReverseFunction.width-800_800_834_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/ReverseFunction.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/ReverseFunction.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Again, we can see what looks like the hard-coded key being set prior to the call. We can also see the hexadecimal character conversion function, this time preceding the function. If this is happening in reverse order here (i.e. converting from hexadecimal characters to binary), could this be an equivalent decryption function? Going up one more level from here, we see the parent function is almost identical to the equivalent in the encryption routine; it takes a single argument, tests for NULL pointer, then dereferences and looks for a NULL terminator before passing to the subroutine that we came from. This all points to this function taking a C-style string as its argument, and passing it to the encryption function, just like 'encryptPatrol3x' but hopefully working in reverse.  </p>
+<p>The proof is in the pudding, as they say, so let's test this out dynamically. We'll input the encrypted password instead of the plain text, and put a breakpoint on the 'encrypt' function at 0x1006A1A0. We'll then change the instruction pointer (using the 'New origin here' option in Olly) to our suspected 'decrypt' function at 0x1006A2F0 and see what happens!</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/Patch_Flow.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041551im_/https://www.contextis.com/media/images/content/Patch_Flow.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/Patch_Flow.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041551/https://www.contextis.com/media/images/content/Patch_Flow.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Success! We see that our plain text password is output by this function so it is indeed a decrypt function. So the next question is: is this function or a parent function exported by the DLL? If so then we can easily make use of it for our own decryption tool just by using the LoadLibrary and GetProcAddress Windows API functions. Alas the answer is no! That would perhaps be too easy. But since we know the address of this function, we can just hard code this in our code, and with a suitable declaration of the calling convention and function prototype, we can make our tool!</p>
+<pre class="prettyprint">typedef char* (cdecl *PATROLDECRYPT)(char*);
+...
+Library = LoadLibrary(TEXT("oss9_t.dll"));
+	
+//Function isn't exported so we have to hardcode its address
+Decrypt = (PATROLDECRYPT) ((DWORD)Library + 0xXXXXX); // Offset obfuscated
+	
+output = Decrypt(argv[1]);
+
+printf("Decrypted password:\n%s\n", output);</pre>
+<p>We can now use our tool to quickly decrypt any PATROL-encrypted passwords we find on this and future red-team engagements. Network defenders beware!</p>
+<pre class="prettyprint">D:\sec_encrypt_p3x\PatrolDecrypt\Release&gt;PatrolDecrypt.exe 1516379765771364
+PatrolDecrypt - Context 2015
+Decrypted password:
+context</pre>
+<h2>Epilogue</h2>
+<p>Upon discovering the presence of these unprotected credential files on this client’s network, Context informed BMC about their decryption as part of our routine responsible disclosure process. BMC have been very forthcoming and helpful in their response, and although the exploitation here did not depend on a vulnerability per se, BMC have addressed the issue by strengthening the encryption used to encrypt credential files, with updates to roll out with the next PATROL release, and an assignment of CVE-2016-2348 as reference.</p>
+<p>But most importantly, they have reiterated the security best practise which dictates that credential files should not be held on network shares and should have file-level permissions to protect them for unauthorised access!</p>
+<h2>Contact and Follow-up</h2>
+<p>Kevin O’Reilly is a Senior Consultant at Context. If you would like to find out more about Context or would like to discuss anything in this blog, please get in touch with our team via the <a href="https://www.contextis.com/en/contact">Contact page</a> or email <a class="__cf_email__" data-cfemail="2841464e47684b47465c4d505c415b064b474506" href="/web/20200424041551/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a></p>
+</article>
+{% endraw %}

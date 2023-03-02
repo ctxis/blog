@@ -1,0 +1,115 @@
+---
+layout: blogpost
+title: "The Crouching Tiger at the IHS Watering Hole | Context Information Security US"
+author: "Nick Mazitelli and Kat Demidecka"
+author_role: ""
+summary: "This blog post details the investigation of a recent watering hole attack that we observed on a number of our clients' networks in March this year. It discusses why and how we believe the watering hole site was compromised, as well as the threat actor group we suspect of being responsible for the attack."
+tags: [Incident Response]
+hero_banner: The_crouching_tiger_at_the_ihs_watering_hole_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>A "watering hole attack" is a term used to describe an age old hunting technique employed by both man and beast. A tiger lurks around a source of drinking water where it knows thirsty animals will visit; it waits until an unsuspecting antelope has its head down distracted by its thirst for water and then launches its fatal strike.</p>
+<p>In this case the tiger was a state sponsored attacker and the antelope were a variety of target companies, including two of our clients. The watering hole was the member portal of a legitimate website IHS.com, regularly accessed by staff from these target companies, which was compromised so that it infected the visitors’ computers with malware.</p>
+<h2>The best watering hole</h2>
+<p>As it turns out the IHS.com website belongs to a company called "Information Handling Services Inc.", located in Colorado, USA. While IHS itself is not a very well-known brand, it is the parent company of other, more familiar, big name companies of which you may have heard, including:</p>
+<ul>
+<li>Jane's Information Group - one of the preeminent sources of information and analysis on military and intelligence matters. Publications include "Jane's Fighting Ships", "Jane's Intelligence Review" and "Jane's Defence Weekly" amongst many others.</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_-_Janes_Information_Group_1.width-800_800_800_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_-_Janes_Information_Group_1.width-800_800_800_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/1_-_Janes_Information_Group_1.width-800_197_197_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/1_-_Janes_Information_Group_1.width-800_197_197_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<ul>
+<li>Global Insights – a well-established and respected player in financial, economic and political analysis of countries, regions and industries.</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Global_insight.width-800_800_338_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Global_insight.width-800_800_338_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Global_insight.width-800_173_73_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Global_insight.width-800_173_73_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<ul>
+<li>Cambridge Energy Research Associates (CERA) – advisers to companies and governments worldwide on the supply of energy, geopolitics and strategy.</li>
+</ul>
+<p>Aside from these there is a list as long as your arm of subsidiary companies and brands, including large holdings in the areas of scientific research, healthcare and pharmaceuticals, market research, energy, electronics, telecommunications and security. So all-in-all compromising this site was a very good piece of work from the attacker; given the likely attacker motivations and end-targets, a better watering hole probably does not exist...jackpot!</p>
+<h2>The compromise</h2>
+<p>There is little detail available on how or exactly when the attacker managed to get onto the IHS.com site, although there has been some discussion on security mailing lists that this site was compromised by more than one threat actor recently.</p>
+<p>In particular on the 22nd February 2013 there was a dump of information by "Parastoo" to Cryptome (see http://cryptome.org/2013/02/parastoo-janes-cbrn.htm).</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/parastoo_1.width-800_800_453_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/parastoo_1.width-800_800_453_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200612165217/https://www.contextis.com/media/images/content/parastoo_1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200612165217/https://www.contextis.com/media/images/content/parastoo_1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This dump purports to outline a hack of the IHS.com site and provides details on the infrastructure, technologies and vulnerabilities behind the site. It also lists account and password details and links to exfiltrated data, including dumps of customer and source databases.</p>
+<p>Parastoo is a hacktivist group that has claimed, or been implicated in, a number of other high profile attacks, with targets including the International Atomic Energy Agency (IAEA) and the US Department of Energy. Parastoo appears to be motivated by anti-Israel / anti-Zionist sentiment, and selects targets based upon perceived connections with the Israeli state. This targeting and the rhetoric surrounding some of the attacks has led some to speculate on a connection between Parastoo and the Iranian government.</p>
+<p>Given the timing of this information dump and the compromise by our attackers, it is likely that the Parastoo dump facilitated the subsequent compromise and setup of the watering hole by our attackers to a greater or lesser extent. We assess ‘probably greater’. There is no suggestion that the two groups are linked in any way.</p>
+<p>Beyond this it appears to be fairly certain that the watering hole began actively serving malware on the 12th/13th March. We have not seen any compromises earlier than this and none have been reported in open source.</p>
+<h2>The attack platform - the hunter strikes</h2>
+<p>We initially detected the attack in mid-March, when monitoring by Context’s Response Team picked up beaconing activity to the domain help.yahoo-upgrade[.]com on one of our managed service client’s network. The traffic was consistent with that of a Remote Access Trojan (RAT) known as PlugX. PlugX was the subject of a recent Context <a href="https://www.contextis.com/services/research/white-papers/plugx-payload-extraction/">white paper</a> and is strongly suspected of being attributable to one of the more aggressive and active Chinese state-sponsored groups, more details on this later.</p>
+<p>Investigation of this alert confirmed that there was indeed a host on the client network with an active variant of the PlugX implant. Through correlation with network and proxy logs the compromise was traced back to recent web browsing activity undertaken by the primary user of this host. More specifically, the host had been compromised on 14th March after the user had visited the website IHS.com.</p>
+<p>To stretch the watering hole analogy a bit further, the tiger’s teeth and claws in this instance were found to be a malicious Java archive on the IHS website. To avoid raising suspicion this used a fake, self-signed certificate, created under the legitimate name ihs.com.</p>
+<p>The JAR file re-directed the user to a second compromised domain and acted as a downloader for the malware installer on this second domain. Following the successful execution of this installer, the RAT commenced beaconing to a third, attacker controlled, domain.</p>
+<p>The stages of the compromise can be seen when looking through the network activity at that time for the identified user:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200612165217im_/https://www.contextis.com/media/images/content/network_traffic_1.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200612165217im_/https://www.contextis.com/media/images/content/network_traffic_1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200612165217/https://www.contextis.com/media/images/content/network_traffic_1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200612165217/https://www.contextis.com/media/images/content/network_traffic_1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Further investigation of proxy logs revealed that the URL had been accessed by a total of four users during the 28 hours following this initial compromise, however due to blocking by the Bluecoat proxies on the network only this single user was successfully compromised.</p>
+<p>...and so a thin film of blood spreads slowly across the surface of the water, as the dust settles and the antelope closes its eyes on the world for the last time.</p>
+<h2>PlugX - an old friend</h2>
+<p>In this instance, as you can see above, the attack resulted in the download of a malware installer file msinfo.exe. This installer was a self-extracting RAR archive, containing the files Mcvsmap.exe, McUtill.dll and McUtil.DLL.PPT. Analysis of these files using Context's <a href="https://www.contextis.com/services/research/white-papers/plugx-payload-extraction/">PlugX Decryption Tool</a> confirmed that this was a PlugX variant (version 7.0), masquerading on the victim system as the McAfee VirusMap Reporting Module.</p>
+<p>PlugX has been pretty well documented in our white paper and more widely in open source so we will not repeat that analysis in full here. In short though, PlugX is a full featured Remote Access Trojan, giving an attacker almost full control over a compromised host via functionality provided by a plugin architecture, as well as the more traditional remote interactive sessions. PlugX appears to be a Chinese home grown capability and the Response team at Context has seen it grow in prevalence over the last 18 months, being increasingly used by some attacker groups as a replacement for other RATs such as Poison Ivy.</p>
+<p>Having established that PlugX had been successfully installed on a particular host, this machine was then investigated and monitored for a short period to see whether the attackers had taken advantage of their success to consolidate their foothold on the network. Fortunately for the client no evidence of this was found, and it was concluded with fairly high confidence that the attackers had not followed up this compromise. They were most likely spending their time leveraging other successful infections on more interesting companies.</p>
+<p>When queried about the compromise, the user in question revealed that they had been recently contacted by IHS notifying them of the potential compromise and suggesting that that they undertake precautionary measures. Towards this end various security tools were run by the user without success, however the incident was not brought to the attention of the relevant client security teams and as such not cleaned-up effectively until detected by Context monitoring. User awareness training which would have informed the user how to react in such a situation would have been ideal in this instance, but fortunately no damage resulted.</p>
+<h2>Another Antelope</h2>
+<p>A couple of weeks after the IHS watering hole had come onto our radar, and this first case had been detected and dealt with, we were contacted by a global FTSE 250 firm. This firm had been notified of a potential compromise through the UK Government’s Cyber Incident Response (CIR) program; the details of the notification were limited to a source IP, destination IP and date relating to the compromise.</p>
+<p>The client shared the information they had been given and it was immediately apparent that the notification was related to the IHS attack. With our assistance the client was able to track down seven hosts spread across four countries that had been successfully compromised by the attack.</p>
+<p>Upon investigation it turned out that given the time that had elapsed since the attack, anti-virus had actually cleaned up six of the seven compromised hosts. This was interesting because initial investigation showed that the single host that hadn't been cleaned up by anti-virus was compromised by a different family of malware, while the malware that had been cleaned off the six hosts appeared to be the same PlugX variant previously seen.</p>
+<p>Prior to this there had been some reports in the security community about different malware being served from IHS.com in different instances. This reporting had indicated that some early compromises had involved the use of malware known as Preshin or ProxyDown, which while apparently being less feature rich than PlugX, included the ability to act as a proxy on a victim network, raising fear from the client that the attacker was staging for a big operation.</p>
+<p>Further analysis showed that while the basic attack remained the same (malicious JAR &gt; redirect &gt; installer download &gt; execute) the malware downloaded was indeed Preshin. Reverse engineering work was undertaken internally by our Threat Intelligence team confirming it did not include any capacity to proxy connections, although it was able to undertake basic host and network reconnaissance, as well as download and execute further executables and run ad-hoc batch commands. The fact that the functionality of this malware was relatively basic suggests that it was perhaps intended as a lightweight tool, used to facilitate further access during the first stages of an attack.</p>
+<p>Correlation across clients and time indicates that for some unknown reason the attacker originally setup the watering hole to serve Preshin, but shortly after switched to using PlugX. The PlugX variant appears to have been involved in the majority of the compromises that resulted from the attack and as a consequence was relatively quickly picked up by AV and proxy vendors; the Preshin variant does not appear to have had as much attention.</p>
+<h2>The Tiger - attribution and target</h2>
+<p>This attack was not directly targeted at our clients, but it was effectively a targeted attack against a range of industries who frequently visit the IHS site, including the military, energy, aerospace and security sectors. As part of the analysis work surrounding this incident, Context uncovered malware that is likely related to a historical IHS website compromise, dating back to 2011, attributed to the same actors.</p>
+<p>Based on this targeting, the toolsets used and details around the command and control infrastructure, this attack has been attributed to a group referred to within Context and the wider security community as ‘FlowerLady’ or ‘FlowerShow’, with moderate confidence.</p>
+<p>The FlowerLady group is believed to be Chinese in origin and is also believed to be state-sponsored as opposed to state-run (i.e. the group is not directly managed by the Chinese state). This group is not known to be attributed to any particular organisation and is likely to consist of individuals driven by nationalistic motivations, attacking Western companies on an opportunistic basis looking for information of economic, technological or military significance, which will then be passed onto the Chinese state or companies for further exploitation.</p>
+<p>Part 2 of this blog will look more into the detail of this particular group and provide indicators of compromise to aid detection. To be continued…</p>
+</article>
+{% endraw %}

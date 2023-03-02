@@ -1,0 +1,172 @@
+---
+layout: blogpost
+title: "The Emergence of Bluetooth Low Energy | Context Information Security US"
+author: "Scott Lester"
+author_role: "Principal Researcher"
+summary: "This is the first blog on our work on Bluetooth Low Energy (BLE). For an update from spring 2016, see part two.
+This blog is about BLE, which is the relatively new, lower-power version of the Bluetooth protocol. BLE was introduced in version 4.0 of the Bluetooth Core Specification, which was released in June 2010."
+tags: [Product Security]
+hero_banner: OpenDeviceBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>The idea behind it was to redesign the Bluetooth protocol for low power consumption and cost, for use in a new set of applications. Crucially, BLE is not compatible with traditional Bluetooth, although the specification does allow for devices to implement either or both of the protocols. As we’ll show, the changes made to BLE allow it to work in a very different manner to traditional Bluetooth.</p>
+<p>It’s a technology that piqued the interest of our Research team, purely because of one interesting application: iBeacons. That initial spark has resulted in a few different strands of work, all of which are covered here.</p>
+<h2 class="section-title">In the beginning - iBeacons</h2>
+<p>All of this started when Paul in our Research team read about iBeacons online, and bought two cheap ones on Amazon. After a while he brought them into the office for us to play with. An iBeacon is a BLE device with one function: to constantly broadcast BLE packets containing just a serial number that uniquely identifies the iBeacon.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/iBeacons.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/iBeacons.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/iBeacons.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/iBeacons.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As the name suggests, iBeacons are an Apple <a href="https://developer.apple.com/ibeacon/">protocol</a>, and many of the early applications are very iOS-centric.Using BLE means that they can run from a coin-cell battery for a couple of years, something that wouldn't have been possible with traditional Bluetooth.</p>
+<p>To make use of an iBeacon, you typically need a mobile application that looks for them, and knows what to do when it finds them. In the UK, both BA and Virgin have added iBeacons into their airport lounges, so the phone application that is already used to show a boarding card can detect when you walk into the lounge, and tell you the Wi-Fi password for that day.</p>
+<p>A number of companies and organisations are already using or experimenting with iBeacons, for example <a href="http://techcrunch.com/2013/09/29/mlbs-ibeacon-experiment-may-signal-a-whole-new-ball-game-for-location-tracking/">Major League Baseball</a>, <a href="http://appleinsider.com/articles/13/12/06/first-look-using-ibeacon-location-awareness-at-an-apple-store">Apple themselves</a>, <a href="http://www.retail-week.com/technology/house-of-fraser-trials-beacon-technology-in-mannequins/5063146.article">House of Fraser</a>, <a href="http://www.regentstreetlocal.info/regent-street-app.aspx">Regent Street</a> (<a href="http://www.bbc.co.uk/news/technology-28488155">the BBC have a video</a>) and <a href="http://www.theguardian.com/media-network/media-network-blog/2014/sep/04/beacon-technology-house-of-fraser-waitrose">Waitrose</a>.</p>
+<p>Whilst location-based services aren’t new, using BLE means that location-aware applications can work simply by receiving BLE packets, which have a longer range than RFID, and don’t consume as much power to scan for as Wi-Fi or GPS.</p>
+<p>Google introduced a similar mechanism in Android 5.0, with <a href="https://support.google.com/nexus/answer/6093922?hl=en-GB">Android Trusted Places and Trusted Devices</a>. This allows your Android device to automatically unlock when it’s in a trusted place, or when it is in range of a trusted device, such as a Bluetooth device.</p>
+<p>Another novel BLE application is <a href="https://github.com/google/physical-web">Google Physical Web</a>, their iBeacon-like specification to push out a URL via BLE packets. Implementing an URIBeacon, as they are called, is straightforward. This is particularly true if you make use of ARM’s mbed framework, which has sample code for many BLE applications, including <a href="https://developer.mbed.org/teams/Bluetooth-Low-Energy/code/">URIBeacons</a>. A free mbed account lets you write and compile code from the mbed web interface.</p>
+<p>Thankfully many of the initial applications of iBeacons require you to be using a specific application already. One of the first questions on the Google Physical Web <a href="https://github.com/google/physical-web/blob/master/documentation/introduction.md">introduction </a>is “will you be pestering people with alarms?” Encouragingly, they say that “a core principle of this system is no proactive notifications” (their emphasis). It wouldn't be too surprising, however, to see a handset manufacturer supplying devices with a pre-installed iBeacon app that allows its partners to push location-based adverts at people. You can at least turn off Bluetooth on your phone.</p>
+<p>Whilst iBeacons were the first BLE technology we came across, there are a surprisingly large number of devices out there that are already using it.</p>
+<h2 class="section-title">Other applications</h2>
+<p>Later sections cover the work we've done to survey BLE devices already in use, some of which are surprising, but many that people would expect. One of the most topical applications for BLE is in wearable technology and fitness trackers, about which there is a lot being written. Being small and low powered and requiring regular updates, BLE is an obviously suitable protocol for them to use.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/FitBit-and-Jawbone.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/FitBit-and-Jawbone.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/FitBit-and-Jawbone.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/FitBit-and-Jawbone.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Whilst many people are aware of fitness trackers (e.g. <a href="http://www.fitbit.com/">Fitbit</a>, <a href="https://jawbone.com/">Jawbone</a>) and heart rate monitors, and Bluetooth headsets aren't new, not many people would guess at combining the two to produce headphones that measure your pulse from insideyour ear like the <a href="http://www.jabra.co.uk/products/bluetooth/jabra_sport_pulse_wireless/jabra_sport_pulse_wireless">Jabra Pulse</a> does.</p>
+<p>The Apple Watch presumably supports it, but we can’t tell from the technical specifications as they only state that it supports Bluetooth4.0, which includes BLE but also traditional Bluetooth.</p>
+<p>And finally, if you’re looking to “enrich your sleep experience”, there’s always the <a href="http://www2.withings.com/us/en/products/aura">Withings Aura </a>.</p>
+<p>Before we cover the work we've done on BLE, it’s worth taking a look at some of the important aspects of the technology.</p>
+<h2 class="section-title">The technology and why it matters</h2>
+<h3>History</h3>
+<p>We’re currently on version 4.2 of the Bluetooth Core Specification, which means there have been two point releases since BLE was first introduced. Interestingly the recent amendments seem to be backtracking on some of the original design principals of BLE: to implement light-weight encryption and keep packet sizes down. In fact they are entirely contrary, as they introduce longer packet lengths for increased data rates, and Diffie-Hellman key exchanges.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Bluetooth-timeline.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Bluetooth-timeline.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Bluetooth-timeline.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Bluetooth-timeline.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>A point on nomenclature: devices labelled as “Bluetooth Smart” support BLE, and those labelled as “Bluetooth Smart Ready” support both traditional Bluetooth and BLE.</p>
+<h3>Spectrum</h3>
+<p>BLE runs on 2.4GHz, the same radio spectrum as Wi-Fi, regular Bluetooth and the ISM band. As we've <a href="https://www.contextis.com/resources/blog/wireless-gridlock-iot/">written recently</a>, this is a very congested section of the spectrum.</p>
+<p>BLE’s power output is only 10mw (10dBm), a tenth of the power of 802.11 Wi-Fi (100mw/20dBm) but it is able to co-exist (most of the time) in the spectrum with its more powerful neighbours through a variant of Bluetooth’s Frequency Hopping Spread Spectrum (FHSS) modulation. At that power, the range is restricted to less than 100m in an open area.</p>
+<p>The BLE spectrum is divided into 37 data channels and 3 advertising channels. Established BLE connections hop across the data channels according to the channel map, which is agreed in the handshake protocol.</p>
+<h3>Advertising packets</h3>
+<p>Crucial to the operation of BLE, and important to following sections of this blog, is the fact that most BLE devices constantly broadcast indirect advertising packets in order to advertise their presence. These packets are broadcast across the three advertising channels, and the first step of connecting two BLE devices is for one to respond to the other’s advertising packets.</p>
+<p>Sometimes the advertising packets contain the device name, which may be unique such as the “Garmin Vivosmart #12345678” or the Samsung "GALAXY Gear (1234)", or are even user-chosen such as “Jules' Watch”. The advertising packets contain fields for manufacturer-specific data, including universally-unique IDs (UUIDs) for different services. Some of these UUIDs start with a manufacturer ID. For example, Fitbit Charge HR fitness trackers all send the UUID "adabfb00-6e7d-4601-bda2-bffaa68956ba".</p>
+<p>Many of these fields can be used to identify a product from a particular manufacturer, a particular model of product, and sometimes a particular device, which negates the effort made to disguise devices by randomising the MAC address.</p>
+<h3>Identifying devices</h3>
+<p>Like other network protocols, BLE relies on identifying devices by their MAC addresses. As they broadcast advertising packets constantly, any tool that logs BLE packets could be used to track a specific device. This issue is addressed in a <a href="http://blog.bluetooth.com/bluetooth-technology-protecting-your-privacy/">blog from the Bluetooth SIG</a>.</p>
+<p>All BLE devices must have at least one public address or random address. Random addresses can be either a static address that is fixed for a power cycle, or a private address that is only resolvable with a shared key. The above blog says that random addresses mean that an attacker “…would not be able to determine that the series of different, randomly generated MAC addresses received from your device actually relates to the same physical device”.</p>
+<p>Contrary to the intentions of the SIG, most of the devices we've seen have a random MAC address, in that it’s not possible to identify the vendor from the beginning of the address, but it’s still fixed. A test Fitbit has had the same MAC address since we started this work, even though it’s completely run out of battery once. Some manufacturers have gone with public addresses that use their OUI, for example all the devices from Nike and MI that we've seen have Nike or MI MAC addresses (starting with 9C:A1:34 and 88:0F:10 respectively).</p>
+<p>We've seen some devices that are clearly changing their MAC address for successive advertising packets. They are sometimes easy to identify as they have a counter that increments the last few bytes of the address, and often send out constant identifying information.</p>
+<h3>Authentication and encryption</h3>
+<p>Like regular Bluetooth, BLE supports a number of different schemes for pairing two devices. Version 4.2 of the specification introduced Secure Connections, which supports Elliptic Curve Diffie-Hellman for key exchange. Prior to 4.2, devices can choose between Just Works, Passkey Entry and Out of Band. Just Works is effectively no authentication, which at first seems like a terrible idea, but how do you authenticate to a device that doesn't have a screen or any input mechanism? If we care about security and privacy, we have to trust that the manufacturer has implemented their own.</p>
+<p>The main purpose of pairing is to exchange encryption keys and set-up parameters. BLE does support encryption implemented in the protocol specification, but it is not always used in products that we've seen. Some vendors seem to have chosen to implement their own encryption of the underlying data, rather than rely on BLE security.</p>
+<p><a href="https://lacklustre.net/projects/crackle/">Mike Ryan’s work</a> has shown that if you can capture the initial handshake, breaking some of the authentication schemes to recover the encryption key is not too hard, nor is figuring out the channel-hopping map. The likelihood of capturing the handshake is rare, as you typically only have to pair devices once.</p>
+<h3>Support in mobile phones</h3>
+<p>BLE has been supported by the major phone operating systems for some time now, for example since iOS v5, and Android 4.3.</p>
+<h2 class="section-title">Privacy</h2>
+<p>Most of these devices, in their normal operation, broadcast constantly. The range is supposed to be around 100m in an open area, but as mentioned in the above previous research (albeit for regular Bluetooth), and from what we've seen in surveying for devices, devices can be detected at a greater range, probably due to anomalies affecting RF propagation such as <a href="https://www.eff.org/files/filenode/radio_frequency_operations.pdf">ducting</a>. As mentioned about, the random MAC addresses are still largely fixed.</p>
+<p>Whilst it was done for traditional Bluetooth, the “<a href="http://www.tomshardware.co.uk/how-to-bluesniper-pt1,review-1224-9.html">Bluesniping</a>” work showed that with a high-gain (e.g. 19dBi), directional antenna it was possible to pick up regular Bluetooth packets at distances of half a mile. The same principle would work for BLE and the potential intercept range can be calculated using a <a href="http://lm-technologies.com/wiki/display/KB/Wireless+Link-Budget+Calculator">free space loss model</a> with losses to represent window panes and walls.</p>
+<p>If I have an easy way to scan for these devices, and can attribute a device to a particular person such as a celebrity, your CEO or the police officer leading an investigation against your company, then I can easily tell when they’re nearby. Many of the available fitness trackers are waterproof and measure your sleep sleep, so there’s no need to ever take them off. Some stories are already starting to appear about organisations with concerns about wearable devices, for example the <a href="http://www.bbc.co.uk/news/technology-32718266">Chinese military</a>.</p>
+<p>Much has been written lately about the positive and negative effects or wearable technology and the “quantified self” (for example <a href="http://www.theguardian.com/lifeandstyle/2015/mar/07/fitness-addiction-ill-scarlett-thomas">here</a> and <a href="http://www.washingtonpost.com/sf/national/2015/05/09/the-revolution-will-be-digitized/">here</a>). What is obvious is that many of these devices contain very personal information about someone's health and patterns of life, which can lead to <a href="http://www.forbes.com/sites/kashmirhill/2011/07/05/fitbit-moves-quickly-after-users-sex-stats-exposed/">amusing</a> measurements, but also represent a wealth of data about an individual. Whilst many people are very happy to publish such information to social media others would be very protective of it.</p>
+<p>Much like our previous work on <a href="https://www.contextis.com/resources/blog/hacking-internet-connected-light-bulbs/">IoT devices</a>, it does seem like many manufacturers of wearable technology are keen to get their products to market as quickly as possible, with security sometimes tacked on as an afterthought. As far as fitness trackers are concerned, there has already been some good work on <a href="http://www.evilsocket.net/2015/01/29/nike-fuelband-se-ble-rotocol-reversed/">reverse engineering the protocol used by the Nike Fuelband</a>.</p>
+<h2 class="section-title">Scanning for BLE devices on a laptop</h2>
+<p>The first thing we wanted to do was to scan for devices, and have a look at the traffic. Two of the common BLE System-on-Chip products out there are the <a href="http://www.ti.com/product/cc2540">Texas Instruments CC2540</a>, and the <a href="https://www.nordicsemi.com/eng/Products/nRF51-Series-SoC">Nordic Semiconductors NRF51</a>. We went for the latter, which is available on the £30 development dongle, which comes with a free <a href="https://www.nordicsemi.com/eng/Products/Bluetooth-Smart-Bluetooth-low-energy/nRF-Sniffer">sniffing application</a>, and has APIs to develop applications in C# and Python. For £50 Nordic also produces a development kit that can accept Arduino Uno compatible shields, and can run off battery power.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Nordic-dongle.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Nordic-dongle.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Nordic-dongle.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Nordic-dongle.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Both the dongle and development kit feature Segger chips that make them appear as USB mass storage devices, so you can program them simply by copying the compiled code onto the drive, and rebooting it. Compared to developing for embedded devices that require extra hardware programmers and debuggers, this is very easy. This shows how the vendors of the chips, such as Nordic, are trying hard to help people quickly develop products and get them to market.</p>
+<p>The free Nordic sniffer lists all of the devices it can see, and allows you to launch Wireshark to collect traffic from a specific device. It doesn't log the devices seen, or store any of the data that it collects. We wrote an application in C# that scans for advertising data, and sends out scan requests to identify devices. It’s a console application that logs all the devices it sees into a database, along with all of the data from the advertising packets and scan responses. When it closes the application does some analysis on the database, to summarise the identified devices, to look for different devices that send the same field values and to look for repeated devices.</p>
+<p>We've used the scan data to improve how many devices the scanner identifies, based on unique service data or UUIDs. For example, the Garmin Vivosmart fitness trackers have a device name that contains what looks like a unique ID. TomTom’s smart watch has a name chosen by the user. Fitbit devices all transmit a services UUID that seems unique per range of models.</p>
+<h3>Survey results</h3>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/nordic_scanner_TRWMhGr.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/nordic_scanner_TRWMhGr.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/nordic_scanner_TRWMhGr.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/nordic_scanner_TRWMhGr.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The first thing to say is that there are a lot of devices out there. The Nordic dongle that we used for the survey has a short antenna-track on its PCB. Running from my desk on the fourth floor of an office on a averagely busy road on the Isle of Dogs, we were surprised at how many devices are out there, and not just amongst our geekier-than-average colleagues.</p>
+<p>It was pretty much as we'd expect, with a couple of outliers. There's a wide selection of fitness trackers out there, primarily from Fitbit, Jawbone and Garmin. There are also a lot of heart-rate monitors, a few bicycle devices and the odd Galaxy Gear. We've seen all the devices mentioned in this blog at least once.</p>
+<p>We also saw lots of iPhones (they have a field that begins with the Apple manufacturer ID), or possibly a few iPhones that change their MAC address and the data they send out very frequently. A small proportion of these advertising packets are for <a href="https://support.apple.com/en-gb/HT204144">AirDrop</a>, as we looked into the format of those packets.</p>
+<h2 class="section-title">Scanning for devices on a smart phone</h2>
+<p>Obviously the laptop isn’t entirely practical, so we also wanted an Android application to scan for devices. Some exist already (the <a href="https://play.google.com/store/apps/details?id=no.nordicsemi.android.mcp&amp;hl=en_GB">Nordic one</a> is pretty good), but we couldn’t find one that logs all the devices it sees, or tries to identify devices, or logs their location. So we decided to write our own.</p>
+<p>Helpfully, Google published a <a href="https://developer.android.com/samples/BluetoothLeGatt/project.html">sample application</a> that scans for LE devices, and requests their GATT profiles. It’s not been updated to use the latest version of the Android API for Bluetooth LE, so we had to update. To make the application that we wanted, which is a decent proof-of-concept application for surveying devices, we added functionality to make it run as a background service, to store its data in a database, to log the logging of each device it sees, to export its database to the SD card, and to plot the location of the device on a Google Maps plugin. We even made an icon, although it did lead to lots of arguments.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/App-screenshot.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/App-screenshot.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/App-screenshot.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/App-screenshot.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>Survey results</h3>
+<p>We looked for devices around our office, and on our commutes. A daily commute on the Central and Jubilee lines from Zone 4 to Canary Wharf detects around 100 devices.</p>
+<p>To give you an idea as to how many of these devices are out there, half an hour near Canary Wharf station for lunch detected 149 devices. They included 26 Fitbits, 2 Jawbones, a couple of Nike products, one Estimote iBeacon (we're not sure where) and an Alcatel Pop C5, and a lot of iPhones.</p>
+<h3>Try for yourself</h3>
+<p>This application will be available <a href="https://play.google.com/store/apps/details?id=com.contextis.android.BLEScanner">here on the Google Play Store</a> from Friday 22nd May. It works fine on our test phones (a Nexus 4 and a Sony Xperia Z3), but it’s very much a proof of concept. It requires the new BLE libraries from Android 5.0. </p>
+<p>Please let us know if you see anything interesting, or find any terrible bugs.</p>
+<h2 class="section-title">Conclusions</h2>
+<p>BLE is not a new technology, but it's adoption for certain applications is novel. Compared to traditional Bluetooth, it provides a new way for electronic devices to constantly communicate with each other. Whilst wearable technology and other applications are becoming increasingly popular, do many of the owners of these devices realise that they broadcast constantly?</p>
+<p>These broadcasts can almost always be attributed to a unique device, contrary to measures taken in the protocol to anonymise devices by randomising the MAC addresses. Depending on the product, some of these broadcasts can also be identified to a particular manufacturer, or the product model, or an individual product.</p>
+<p>Scanning for these broadcasts is easy either with cheap hardware or with a smartphone. This allows us to identify and locate particular devices, which for devices such as fitness trackers that are designed to be worn all the time, means that we can identify and locate a person, to within a limited range.</p>
+<p>There are clear implications to privacy, just as there are ways that this technology could be exploited for social engineering and crime.</p>
+<p>All of this is a work in progress - we'd like to do more on the Android application, and we're keen to write a battery-powered scanner to run from the development kit. We've had a look at the security of some of the wearable devices, and may well write a future blog on some of our findings.</p>
+<p>For a follow up  from spring 2016, see <a href="https://www.contextis.com/resources/blog/bluetooth-le-increasingly-popular-still-not-very-private/">part two</a>.</p>
+<h2 class="section-title">Contact and Follow-Up</h2>
+<p>Scott is a part of our Research team in our London office.</p>
+</article>
+{% endraw %}

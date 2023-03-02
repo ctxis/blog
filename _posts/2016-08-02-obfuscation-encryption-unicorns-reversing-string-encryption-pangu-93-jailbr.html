@@ -1,0 +1,314 @@
+---
+layout: blogpost
+title: "Obfuscation, Encryption & Unicorns… Reversing the string encryption in the Pangu 9.3 jailbreak"
+author: "Rob Fay"
+author_role: "Senior Researcher"
+summary: "Like many others I was happy to read the news that team Pangu released a jailbreak for iOS 9.3.3. A jailbroken device is especially useful in the field of security research, where we rely on root access to perform in-depth application security assessments."
+tags: [Vulnerabilities and exploits, Reverse Engineering]
+hero_banner: Obfuscation,_Encryption_and_Unicorns_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>As with previous Pangu releases, the jailbreak is offered in the form of a simple click-to-install Windows tool downloadable from <a href="http://en.pangu.io/">Pangu’s website</a>. As tempting as it is to just jump in and run the installer, I like to know how things work before I let them run 0-day kernel exploits on my test device.</p>
+<p>With that thought in mind I decided that it was time to break out IDA Pro and take a look at the PPJailbreakCarrier application that is installed on the device. This application is responsible for executing the kernel exploit and applying the relevant patches to jailbreak the device.</p>
+<p>The goal during my initial analysis was to answer the following questions, without installing the application:</p>
+<p>1.    Has the binary been obfuscated?</p>
+<p>2.    Are any URLs contained within the application?</p>
+<p>3.    Does the application contain any encrypted content, and if so can it be decrypted?</p>
+<h2>Binary Obfuscation</h2>
+<p>After loading the binary into IDA Pro it quickly becomes apparent that Pangu have chosen to obfuscate large portions of the binary. This is not a surprise, as previous Pangu releases have also used obfuscation to protect the inner workings of the jailbreak.</p>
+<p>A quick review of the functions window shows a number of functions with names that have clearly been obfuscated:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_wmMcqHg.width-800_800_683_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_wmMcqHg.width-800_800_683_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/1_wmMcqHg.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/1_wmMcqHg.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Below is the IDA graph overview of the function _____________bn. The impact of the obfuscation is immediately apparent.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/2_QNrwQFd.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/2_QNrwQFd.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/2_QNrwQFd.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/2_QNrwQFd.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>String Encryption</h2>
+<p>A quick search of the functions window for ‘encryption’ identified the function +[PPJBEncryption adjlDKlfjeodlskjflak]. Strangely the method name has been obfuscated but the class name hasn’t; Pangu’s loss is our gain. A quick check of the callers of this function identified the function -[adDKknelkdkfeknkdnfldls aEOdlksjldkfa9990ksf:], which is partially shown below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/3_YqlG2ig.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/3_YqlG2ig.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/3_YqlG2ig.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/3_YqlG2ig.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This function retrieves Base64-encoded encrypted strings and passes them to the decryption function. We will get to the strings later, but for now we need to work out how the encryption has been implemented. As we are happy that our decryption function takes a string as a parameter we rename it -[PPJBEncryption decryptString:].</p>
+<h3>Where be the keys?</h3>
+<p>Looking at our newly-renamed decryption function we quickly find it accessing the _JB_TOOLS_AES_KEY and _JB_TOOLS_AES_IV values that are located in the __const section of the binary</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/4_wMXZtc8.width-800_800_245_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/4_wMXZtc8.width-800_800_245_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/4_wMXZtc8.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/4_wMXZtc8.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Taking a look at the _kv_hash_arithmetic function we quickly determine that it is a bit of a monster, containing 768 instructions. What’s more, we see that it makes calls to nine more _kv_hash_arithmetic_n functions. In total over 6500 instructions are executed before the function returns - more on this later! The start of the first _kv_hash_arithmetic function can be seen below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/5_lu8mze8.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/5_lu8mze8.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/5_lu8mze8.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/5_lu8mze8.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Continuing through the decryption function, we see that the Base64-encoded string that was passed into the function is decoded, copied into a new buffer and passed into a function that I have named xor_buffer_withLength_keyByte (named _dxdjlkjdkfjlkwfknwlkefnkweddfdfef in the original disassembly). In addition there are several calls to a benchmark function that are not relevant for our understanding of the decryption process and can be ignored. This process can be seen in the annotated disassembly below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/6_O7vpiDE.width-800_800_592_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/6_O7vpiDE.width-800_800_592_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/6_O7vpiDE.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/6_O7vpiDE.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We can see that the XOR routine is being passed the decoded string and a key value of 0x5. Let’s take a look at the function to see how it’s implemented:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/7_wlhPznT.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226104227im_/https://www.contextis.com/media/images/content/7_wlhPznT.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/7_wlhPznT.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/7_wlhPznT.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This is a fairly simple XOR routine that XORs the first byte of the buffer with the key value 0x5, and then iterates over the remainder of the buffer, XORing the current byte with the previous byte.</p>
+<p>Now that we know how the input data, key and IV are prepared (apart from the small issue of the _kv_hash_arithmetic functions) we can continue through the decryption function to see how they are used. There are no surprises here: after converting the buffers into the required types a standard AES-128 decryption routine is called. Below is the annotated disassembly of this process:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/8_HK9tp0T.width-800_800_737_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/8_HK9tp0T.width-800_800_737_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/8_HK9tp0T.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/8_HK9tp0T.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The astute reader may notice that the branch to the location I have named free_buffers happens if decrypted_data is NULL. So what happens if we have successfully decrypted the data? Have the developers left us one final gift? Let’s take a look at the disassembly if the branch is not taken. After a quick length check that I have excluded we find the following:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/9_UwNB3Je.width-800_800_409_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/9_UwNB3Je.width-800_800_409_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/9_UwNB3Je.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/9_UwNB3Je.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Ahh our old friend xor_buffer_withLength_keyByte makes one final return, this time operating on the decrypted data with an initial keyByte value of 0x3. After this final round of XORing we finally construct our NSStrring object that will be returned as the result.</p>
+<p>At this stage we have a pretty good idea of how the string encryption has been implemented. However, we are left with those pesky _kv_hash_arithmetic functions to reverse before we can implement our decryption script. Whilst it would be possible to work through each of the routines manually reversing the functionality that seemed like a remarkably tedious exercise. Instead I decided to go for a more dynamic approach while respecting my original goal not to run the application on an iOS device. This raised the question of how can I emulate part of a binary from within IDA?</p>
+<h2>Everyone loves Unicorns</h2>
+<p>After a bit of online research I found the mythical creature that offered everything I needed to run my static IDA code. The creature in question was the excellent <a href="https://www.unicorn-engine.org/">Unicorn framework</a>.</p>
+<p>Unicorn is a multi-platform, multi-architecture CPU emulator framework based on QEMU. The project focuses on emulating CPU operation, and allows the emulation of raw assembly instructions without emulating a full runtime environment. After a brief review of the project documentation, I decided that the Unicorn-Python bindings looked like a perfect candidate to integrate into an IDA python script.</p>
+<h3>Setup</h3>
+<p>Setting up Unicorn to work with IDA is relatively simple, the only slight annoyance is that you need to compile a 32-bit version of the library, as for some reason IDA is still 32-bit only. Why IDA, why???? In order to do this I grabbed the source and added the following two lines to the Makefile to tell the compiler to build a universal (32 and 64-bit) binary:</p>
+<pre class="prettyprint">$(LIBNAME)_LDFLAGS += -m32 -arch i386 -m64 -arch x86_64
+UNICORN_CFLAGS += -m32 -arch i386 -m64 -arch x86_64</pre>
+<p>After this it was just a case of following the normal compilation and installation instructions. Once you have a working setup you should be able to import from unicorn and unicorn.arm64_const from within IDA.</p>
+<h3>IdaPython Emulator</h3>
+<p>In order to emulate the instructions within Unicorn, we need to create a Unicorn instance and then prepare the process memory. This can be achieved easily from an IDA Python script shown in the example below:</p>
+<pre class="prettyprint">#Create the Unicorn instance
+uc = Uc(UC_ARCH_ARM64, UC_MODE_ARM)
+
+
+# Find the end address of the last segment
+for s in idautils.Segments():
+    end = idaapi.getseg(s).endEA
+
+
+start = idaapi.get_imagebase()
+# Unicorn address ranges must be aligned
+aligned_size = end - start + (0x1000 - end % 0x1000)
+
+
+# Map enough memory to hold all segments
+uc.mem_map(start, aligned_size)
+
+
+# Iterate over each segment of the binary and copy the contents into the
+# mapped memory. Note the image should be rebased to 0x10000000 in order for Unicorn to 
+# successfully allocate the address ranges.
+for seg in idautils.Segments():
+    cur_seg = idaapi.getseg(seg)
+    size = cur_seg.endEA - cur_seg.startEA
+    seg_data = idc.GetManyBytes(cur_seg.startEA, size)
+    if seg_data is None:
+        continue
+    uc.mem_write(cur_seg.startEA, seg_data)</pre>
+<p>Once our binary is mapped into memory we need to prepare some memory for a stack that will be used during execution. This can be achieved by mapping another block of memory and setting the stack pointer register to a location in this range.</p>
+<pre class="prettyprint">stack_base = 0xC0000000
+uc.mem_map(stack_base, 0x10000)
+uc.reg_write(UC_ARM64_REG_SP, stack_base + 0x1000)</pre>
+<p>Now we are almost ready to run, we first need to decide where to start our execution. Our goal here is to run the minimum amount of instructions to get the output we require, avoiding any library calls as these are not going to be mapped into our process address space. If we take a look at the key derivation component of the decryption function we can see that running from the point that the stack variables are stored to the NOP following the second call to the _kv_hash_arithmetic function should suffice.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/4_wMXZtc8.width-800_800_245_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/4_wMXZtc8.width-800_800_245_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/4_wMXZtc8.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226104227/https://www.contextis.com/media/images/content/4_wMXZtc8.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We start the execution using the following Unicorn API call:</p>
+<pre class="prettyprint">uc.emu_start(start_address, end_address, count=0, timeout=100000)</pre>
+<p>If we run these instructions and read the values at SP+0x90+kv_arithmetic_iv and SP+0x90+kv_artithmetic_aes_key from our fake stack we obtain the derived key and IV values:</p>
+<p>IV = f597e12da172fcdf1d426664d418a888</p>
+<p>key = 512351fb893d24fb6e4bc199025d4daf</p>
+<p>At this stage we could just write a decryption script, but where is the fun in that? After all, we are playing with Unicorn. Instead, let’s take things a bit further and call the XOR function. But how do we do this without calling library functions I hear you say? The answer is to use our IDA python script to Base64-decode the desired input string, allocate some memory within our emulated process and store the decoded string. Unicorn then allows us to set the emulated CPU registers using the function, so we can set X0 to point to the decoded string and X1 to be the xor-key. Now we can simply call the XOR function in the same way that we called _kv_hash_arithmetic. While this is not really required for such a trivial XOR routine it shows how Unicorn can be used to manipulate memory and register values to allow many types of function to be called with arbitrary arguments.</p>
+<p>Okay, so that’s enough playing around with Unicorn, let’s get to the actual decryption script. I chose to write this in Python, for simplicity. The decryption script can be seen below. Note all error checking has been omitted for brevity.</p>
+<pre class="prettyprint">from base64 import b64decode
+from Crypto.Cipher import AES
+from sys import argv
+
+
+class PanguDecryptor:
+    def __init__( self):
+        self.iv = "f597e12da172fcdf1d426664d418a888".decode('hex')
+        self.key = "512351fb893d24fb6e4bc199025d4daf".decode('hex')
+
+
+    def xor(self, data, key):
+        data = bytearray(data)
+        for i in range(len(data)):
+            previous = data&lt;i&gt;
+            data&lt;i&gt; = data&lt;i&gt; ^ key
+            key = previous
+        return str(data)
+
+
+    def unpad(self, s):
+        length = ord(s[-1])
+        return s[:-length]
+
+
+    def decrypt( self, enc ):
+        enc = b64decode(enc)
+        enc = self.xor(enc, 0x5)
+        cipher = AES.new(self.key, AES.MODE_CBC, self.iv )
+        decrypted = self.unpad(cipher.decrypt(enc))
+        return self.xor(decrypted, 0x3)
+
+
+aes =  PanguDecryptor()
+print(aes.decrypt(argv[1]))</pre>
+<h2>Putting it all together</h2>
+<p>Before embarking on this little reverse engineering voyage of discovery I set out to answer three questions. Whilst I did not initially expect to be extending IDA functionality in the way I ended up doing, it’s always fun to try out a new technique. So back to the initial questions:</p>
+<h3>Has the binary been obfuscated?</h3>
+<p>Yes, we can clearly see that function names have been obfuscated; in addition a number of key functions have had their control flow obfuscated to make reverse engineering more difficult.</p>
+<h3>Are any URLs contained within the application? </h3>
+<p>Yes - I didn't get round to covering it in this blog, but a simple string search for “http” identifies the following URLs:</p>
+<pre class="prettyprint">https://applog.uc.cn/collect                       
+https://open.weibo.cn                              
+https://open.weibo.cn/2/                           
+https://api.weibo.com/2/statuses/update.json       
+https://upload.api.weibo.com/2/statuses/upload.json
+https://api.weibo.com/oauth2/revokeoauth2          
+https://m.api.weibo.com/2/messages/invite.json
+http://www.25pp.com
+http://image.uc.cn/s/uae/g/26/ios_yueyutool/faq.html
+http://bbs.25pp.com/forum-203-1.html
+http://bbs.25pp.com/thread-462623-1-1.html
+http://itunes.apple.com/cn/app/id350962117?mt=8
+http://app.sina.cn/appdetail.php?appID=84560
+http://www.sina.com?
+http://itunes.apple.com/cn/app/id414478124?mt=8</pre>
+<h3>Does the application contain any encrypted content, if so can it be decrypted?</h3>
+<p>Yes &amp; Yes. Throughout this blog we have identified the encrypted data, the key derivation and additional XOR routines. We’ve produced a dynamic IDA decryption plugin and a standalone Python decryption script. I will leave it as an exercise to the reader to find out how these strings are used within the jailbreak process.</p>
+<p>Below are the decrypted strings extracted from the binary:</p>
+<pre class="prettyprint">0x1000c0aed - com.apple.iokit.hid.displayStatus
+0x1000c0b35 - /tmp/.pangu93loaded
+0x1000c0b70 - 6d35d6298fd6ef4fd6af920e852c497b
+0x1000c0bba - 8a960ff9b4603ca56110e28bac827f3b
+0x1000c0c47 - /bin/launchctl unload /Library/LaunchDaemons/com.teiron.PPHelperLaunchd.plist
+0x1000c0cb4 - /bin/launchctl load /Library/LaunchDaemons/com.teiron.PPHelperLaunchd.plist
+0x1000c0d21 - /bin/launchctl unload /Library/LaunchDaemons/com.terion.jbnvwa.sprite.plist
+0x1000c0d8e - /bin/launchctl load /Library/LaunchDaemons/com.terion.jbnvwa.sprite.plist
+0x1000c0e01 - /bin/launchctl load /Library/LaunchDaemons/io.pangu93.loader.plist
+0x1000c216a - /Library/LaunchDaemons/com.apple.softwareupdateservicesd.plist
+0x1000c21c3 - /var/mobile/Library/ConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist
+0x1000c2244 - /etc/hosts
+0x1000c225d - 127.0.0.1     oscp.apple.com
+0x1000c228a - 127.0.0.1.+oscp.apple.com
+0x1000c22b7 - 127.0.0.1     ppq.apple.com
+0x1000c22e4 - 127.0.0.1.+ppq.apple.com
+0x1000c2311 - /private/var/Keychains/ocspcache.sqlite3
+0x1000c2352 - delete from ocsp;
+0x1000c237f - delete from responses;
+0x1000c23ac - /var/mobile/Library/UserConfigurationProfiles/EffectiveUserSettings.plist
+0x1000c2419 - /var/mobile/Library/UserConfigurationProfiles/PublicInfo/PublicEffectiveUserSettings.plist
+0x1000c249a - union
+0x1000c24b3 - trustedCodeSigningIdentities
+0x1000c24e0 - values</pre>
+<h2>Update (2016/08/04)</h2>
+<p>Thanks to <a href="https://twitter.com/planetbeing">@planetbeing</a> for highlighting that the binary contains a second set of strings that have been obfuscated using an different technique than the one covered in this blog.</p>
+<p>For those that are interested he has published a <a href="http://pastie.org/10927155">handy tool to decode the strings</a>.</p>
+<h2>Contact &amp; Follow-Up</h2>
+<p>Rob works in our Research team from our London office. He has a keen interest in reverse engineering and mobile device security. See the <a href="https://www.contextis.com/en/contact">contact page</a> for ways to get in touch.</p>
+</article>
+{% endraw %}

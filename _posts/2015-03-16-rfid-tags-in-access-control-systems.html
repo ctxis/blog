@@ -1,0 +1,97 @@
+---
+layout: blogpost
+title: "RFID Tags in Access Control Systems"
+author: "Christian Becker"
+author_role: "Senior Consultant"
+summary: "One of our recent engagements required us to explore an unknown RFID tag which was used as part of an access control system. The objective of this engagement was to find out how the RFID tag communicates with the reader, and if possible to clone the tag. As we did not have any further information or documentation about the access control system, we had to start from scratch."
+tags: [Security, Product Security, Vulnerabilities and exploits]
+hero_banner: RFID_tags_in_access_control_systems_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<h2>Common RFID Frequencies</h2>
+<p>Whenever it comes to testing a RFID tag we need to know on which frequency the signal between the tag and the reader is transmitted. The most common frequencies are:</p>
+<ul>
+<li>120-125kHZ (Low Frequency)</li>
+<li>13.56 MHz (High Frequency)</li>
+<li>433 MHz (Ultrahigh Frequency)</li>
+</ul>
+<p>Low frequency tags operate on a range of 10cm and are commonly used as part of animal identification, factory data collection or simple access control systems. High frequency tags operate on a range between 10cm up to 1m and are commonly used in contactless payment systems or public transport tickets (such as the Oyster card). Ultrahigh frequency are more likely to be found within warehouse logistics as those operate on  a wide range between 1m up to 100m.</p>
+<p>Additionally, RFID tags can be separated into two different groups, namely active and passive. Active means that a battery is attached to the RFID tag and a signal is transmitted all the time. Passive means that the RFID tag is only active if a RFID reader is near the tag so that it can use the energy from the radio waves of the reader.</p>
+<h2>Setup</h2>
+<p>The setup for this engagement consisted of a keyfob and a RFID reader. By having a look at the two components it was not possible to get any further information except the fact that a 10 digit HEX number was printed on top of the keyfob which is likely a unique ID and that it is probably a passive tag as we could not see any battery inside. </p>
+<p>The next step to receive further information about the tag was placing it on a high frequency and a low frequency antenna and then reading data samples from the stream. For this, we used a <a href="http://ryscc.com/products/PM3KIT/">proxmark3</a> device which can not only be used as a RFID reader and writer but also to simulate a data stream. Placing the keyfob on the high frequency antenna did not show any data transmitted, but placing the keyfob on the low frequency antenna showed that data is transmitted, and that the keyfob is therefore a low frequency RFID tag. Reading around 20000 data samples from the transmitted data stream resulted in the following graph:</p>
+<p>proxmark3&gt; data samples 20000</p>
+<p>proxmark3&gt; data plot</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424032210im_/https://www.contextis.com/media/images/content/data_plot_small.focus-none.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424032210im_/https://www.contextis.com/media/images/content/data_plot_small.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/data_plot_small.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/data_plot_small.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The graph above shows taken samples from the data stream by which each sample was taken in the same interval. The exact wave form is not needed as only 'ones' (up) and 'zeros' (down) are transmitted.</p>
+<h2>Analysis</h2>
+<p>At this point we already saw that the same signal is repeated after some time, and reading more samples from the transmitted data stream proved this. The fact that the same signal is repeated after some time means that it is very likely that no nonce is used against replay attacks and that we could just sniff the transmitted stream and then emulate it when near the reader in order to get access. Commonly, those transmitted streams are encoded and in order to decode the data stream we first had to demodulate it by using <a href="https://en.wikipedia.org/wiki/Amplitude-shift_keying">Amplitude-Shift Keying</a> (ASK), which is a form of amplitude modulation that represents digital data as variations in the amplitude of a carrier wave. The plotted graph looked liked the following:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/ask_demod_small.focus-none.width-800_800_182_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/ask_demod_small.focus-none.width-800_800_182_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/ask_demod_small.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/ask_demod_small.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>One of the most common data encoding used when transmitting data in telecommunication is the so called <a href="https://en.wikipedia.org/wiki/Manchester_code">Manchester Encoding</a> and this was our first try when it came to decoding the signal. The encoded data can be retrieved by using a XOR operation of the Clock and Manchester Value which is also shown in  the following image:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424032210im_/https://www.contextis.com/media/images/content/manchester_1.focus-none.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424032210im_/https://www.contextis.com/media/images/content/manchester_1.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/manchester_1.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/manchester_1.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>After successfully decoding the signal we retrieved the following bit stream which also showed the previously identified recurrence in the plotted graph of the transmission stream:</p>
+<p><img alt="" src="https://web.archive.org/web/20200424032210im_/https://www.contextis.com/media/images/content/trace.focus-none.width-800.png" style="width: 289px; height: 505px;"/></p>
+<p>The final bit stream consisted of 64 bits and the following assumptions were made to finally decode the stream. The keyfob had a 10 digit hex number printed on top of it, which can also be represented by its binary representation (e.g. 0000 = 0, 1111 = F, ...). Additionally, it is very likely that the 9 bits at the beginning of the bit stream are some kind of header which tells the reader about the start of the transmission. Summing up all the assumptions results in 10 * 4bit + 9 * 1 bit = 49bits. For the leftover 15 bit we assumed that those are used as checksums or parity bits - having checksums in RFID based systems is very likely as the transmitted traffic might be disrupted by other signals or by its bad transmission signal.</p>
+<p>Reading through various manuals and specifications showed that one possible protocol could be the EM4100 protocol. The EM4100 protocol consists of a 64 bit data stream, uses a 9 bit header (all set to 1), 8 bit version information, 32 Data bits and 14 parity bits and one stop bit (set to 0). Putting all information together resulted in the following table in which the parity bit was calculated by a XOR operation:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/decoded.focus-none.width-800_800_752_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/decoded.focus-none.width-800_800_752_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/decoded.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424032210/https://www.contextis.com/media/images/content/decoded.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Taking all bits from the version and data section and converting those to hex gave us the following ID 01068B6120. Unfortunately, this was not the number printed on top of the keyfob, but we were not discouraged by this and went on - as it might be that it was just changed for security purposes. The next step to clone the keyfob's ID to another tag was quite simple as we just had to take a blank T55x7 RFID tag - those support the EM4100 protocol- and write the ID to it, so that it is repeated whenever it is powered on by the electromagnetic field of a reader. </p>
+<p>Beeeeeeeeeeep - That was the sound we heard when the door finally opened.</p>
+<h2>Solution</h2>
+<p>RFID systems which use a static ID for authentication are pretty common and a cheap solution when it comes to access control systems or tracking working hours of employees in an office. However, this should not be used to protect security sensitive areas or information. A more recommended way to do this is using a RFID card which supports encryption and measurements against replay attacks - but even those might be vulnerable to other attacks such as the <a href="https://events.ccc.de/congress/2007/Fahrplan/events/2378.en.html">Mifare Classic card</a>...but this is another story.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Christian is a part of our Assurance team in Context's Essen office, Germany. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

@@ -1,0 +1,101 @@
+---
+layout: blogpost
+title: "Your car is just the casing for a complex computer"
+author: "Context Research"
+author_role: ""
+summary: "Last year, in collaboration with Consumer Magazine Which? and several of their European partners, Context Information Security evaluated the security of two of the most popular European cars."
+tags: [Product Security, Vulnerabilities and exploits]
+hero_banner: Cars_HeroBanner_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Based on their popularity in the marketplace, Which? supplied us with a Ford Focus Titanium Automatic 1.0L Petrol and a Volkswagen Polo SEL TSI Manual 1.0L Petrol. Both cars were extremely well equipped and came with the latest infotainment devices, along with mobile applications that could be used to remotely control various aspects of the vehicle.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Cars_800_265_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Cars_800_265_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Cars_700_232_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Cars_700_232_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>For this investigation we chose to focus our efforts on the following areas:</p>
+<ul>
+<li><strong>Mobile Applications.</strong> We didn’t have prior authorisation from either Ford or VW, consequently the backend servers were out of scope; nevertheless, we could still investigate what could be achieved with a lost or stolen smartphone and any associated user account.</li>
+<li><strong>Infotainment System.</strong> Although these have been the focus of a few pieces of research in recent years, infotainment systems are becoming more intricate with every new model and represent a huge attack surface. We wanted to see whether warnings about their vulnerabilities from previous research had been heeded by vehicle manufacturers. </li>
+<li><strong>Controller Area Network (CAN) Buses. </strong>The CAN buses in a vehicle are a set of communication systems between different components. We wanted to look at how these were implemented, architected and what separation of control was in place between them. We also wanted to ascertain if any of them could be accessed from outside the vehicle.</li>
+<li><strong>Radio Frequency (RF) Systems. </strong>These included keyfobs (which provided both entry and ignition) and also the Tyre Pressure Monitoring Systems.</li>
+</ul>
+<h2>So, what did we find?</h2>
+<p>We are still working though the disclosure process and so, in line with our <a href="https://www.contextis.com/en/about-us/coordinated-disclosure">policy</a> we won’t be releasing the full technical details just yet although we can share some highlights from our findings. </p>
+<h3>Infotainment Systems</h3>
+<p>We had a good look at the firmware on each of the infotainment systems. Both suffered from common issues associated with embedded systems, such as use of outdated third party libraries and unsafe native code functions.</p>
+<p>Both systems employed signatures on their update files, which should prevent loading of custom code. Unfortunately, for VW this isn’t a perfect solution and we were able to find a way around it - we’ll look to share more details once the issue has been patched and cleared by VW. In the meantime the picture below, which shows our Context logo in place of the radio station logo, will give you a flavour of what we were able to do.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Infosystem_800_400_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Infosystem_800_400_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Infosystem_1380_690_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Infosystem_800_400_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We also have a demo that causes the system to repeatedly shut down. Whilst interesting from a security perspective, it isn’t visually as appealing as a photo and makes a rather boring video.</p>
+<p>On closer inspection, the Ford’s infotainment system proved more alarming, as it appears to contain the full details for a particular Wi-Fi network. If you search the Internet for this network name, it turns up in a bunch of Ford patents related to assembly line provisioning. Moreover, if you search public lists of visible WiFi  networks (such as Wigle.net) for the SSID, produces hits around Ford facilities, particularly in the US.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Wiglemap_800_394_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Wiglemap_800_394_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200426171729/https://www.contextis.com/media/images/content/Wiglemap.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Wiglemap_800_394.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>To be able to connect and thus exploit physical proximity would be required; nevertheless, we were somewhat surprised by Ford’s reaction. Our company point of contact said:</p>
+<p><em>“In the absence of a successful connection to the network specified…we cannot comment on a hypothetical outcome.”</em></p>
+<h3>CAN Bus</h3>
+<p>Thanks to the <a href="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32011R0566" target="_blank">EU vehicle servicing law</a>, they must allow access to a vehicle’s technical manuals to support third party servicing and repairs, we were able to obtain the technical documents for both vehicles.</p>
+<p>A review of the Ford documents revealed that there were seven separate CAN buses within the vehicle. The logical data separation between the CAN buses appeared to be well thought out, with each bus having its own purpose. That said, we did find that the Ford infotainment (SYNC) Unit is connected to three separate buses, including the powertrain. To us, this doesn’t seem like a sensible design decision from a defence-in-depth point of view, as it means any successful attack against the infotainment system could give direct access to the engine controls. When Ford were asked about this, they responded that:</p>
+<p><em>“Not being able to test the required attack means we are not able to comment on a hypothetical outcome.”</em></p>
+<p>The VW, on the other hand, only had 5 CAN buses (the manuals did say 6, but in reality it appeared that two of them had been combined). The separation between these buses didn’t seem as well thought out as the Ford, but the biggest issue we found was that one bus was readily accessible from outside the vehicle. This is via the radar module, which is located just behind the VW logo, and can easily be removed with a flat head screwdriver. VW were asked about this and responded that:</p>
+<p><em>“The device is connected to an extended-CAN, which was specifically designed for devices in the outer shell of the vehicle (e.g. crash area). For this reason, this CAN is separated from the other CAN’s.”</em></p>
+<p>We did not progress the investigation of the radar module, nor undertake full probing of the CAN bus in question, but we believe there is more to analyse here.</p>
+<h3>RF Systems</h3>
+<p>We decided to take a close look at both of the cars remote key fobs. Firstly, the VW’s typical push button, wireless remote-control key. Monitoring the typical radio frequencies used to broadcast to the car, we found the signal and were able to decode it. The lack of security in the RF transmission was our first concern, suggesting that the manufacturer doesn’t see the locking system as a significant target. We continued with the cyber physical analysis and were able to both prevent reception of the keyfob signal by the car (essentially locking the user out) and also capture and replay signals to gain entry later.</p>
+<p>The Ford, on the other hand, uses a more advanced “passive key” with two-way communication between keyfob and car. This allows the user to access, without having to press a button, as long as they’re nearby. Again, we found minimal security on the transmission and were able to prevent start-up ignition of the vehicle, which required active signals from the keyfob   for authorisation. We did not repeat research into the well publicised relay attacks against this keyfob.</p>
+<p>Both of the attacks were relatively straightforward to achieve and could be undertaken using equipment purchased commercially off the shelf for less than £200. In our view, both key systems should be more tightly secured.</p>
+<h2>Response from the manufacturer</h2>
+<p>VW gave us a nicely considered technical response to our queries, explaining that they didn’t implement countermeasures such as frequency hopping due to the viability within limited frequency bands available. They also stated:</p>
+<p><em>“If a keyfob signal has been jammed by a thief (and thus the car in inhibited from being closed), a reliable and recommended option for a consumer to prevent a thief from entering the car later is to check manually if the car is locked by paying attention to the locking indications (lights flashing, closing sound, and – depending on the cars equipment – wing mirrors drawing in).”</em></p>
+<p>The equivalent response from Ford was:</p>
+<p><em>“This can be replicated on any key-free vehicle using a radio frequency jammer.  Fords have a back-up location, detailed in the handbook, where the fob can be placed to link to the car if the fob battery is flat or, in this instance, jammed.”</em></p>
+<p>Context fully encourages car users to check their vehicle manuals regarding back up physical keys and passive key locations. Furthermore, it is recommended that users perform a physical check of their vehicles to be certain that they are locked and to ensure that keyfob transmissions are kept safe from unintentional reception. This can be achieved by only pressing the keyfobs buttons when in close proximity to your vehicle and keeping a passive fob away from the outside walls of your house (where it could be detected from outside). For absolute assurance that the car is locked, and peace of mind, we suggest using the physical key, although Context notes that the manufacturers' design of the keyfob does not always make this easy (for example with the Ford Focus we studied).</p>
+<h2>Disclosure</h2>
+<p>Our research partner Which? contacted both Ford and VW to let them know about the security problems we had identified. VW were happy to accept the findings and have proactively worked with both Which? and Context to understand the issues. We are still waiting for Ford to accept delivery of our technical report.</p>
+<h3>VW Timeline</h3>
+<p>2020-01-31 Context Information Security issue technical report to Which?<br/>
+2020-02-17 Which? make contact with VW<br/>
+2020-02-18 Context Information Security issue technical report to VW<br/>
+2020-02-28 Context Information Security issue additional information on test vehicle to VW<br/>
+2020-03-06 Context Information Security start to issue PoC’s to VW<br/>
+2020-03-26 Context Information Security deliver last PoC to VW (delays due to COVID-19)</p>
+<h3>Ford Timeline</h3>
+<p>2020-01-31 Context Information Security issue technical report to Which?<br/>
+2020-02-17 Which? make contact with Ford</p>
+</article>
+{% endraw %}

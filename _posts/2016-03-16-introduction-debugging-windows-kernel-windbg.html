@@ -1,0 +1,312 @@
+---
+layout: blogpost
+title: "An Introduction to Debugging the Windows Kernel with WinDbg"
+author: "Jan Mitchell"
+author_role: "Senior Researcher"
+summary: "Being able to examine the inner workings of an operating system is a powerful ability. The kernel is a common target for advanced malware and many of the most powerful vulnerabilities manifest themselves in kernel components. The ability to utilise a debugger to explore this environment is a powerful tool in any researcher's arsenal."
+tags: [Vulnerabilities and exploits]
+hero_banner: An_introduction_to_debugging_the_windows_kernel_with_windbg_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Delving into this kind of debugging can be daunting so I have provided some examples of getting started with WinDbg. Starting with the basic commands required to get us going, we'll move through to some more advanced debugger usage. This blog uses three example activities as a way of demonstrating the capabilities of WinDbg and hopefully demonstrating how powerful this tool can be.</p>
+<h2>Setting up a kernel debug environment</h2>
+<p>All of the examples below will use WinDbg, a multipurpose debugger created by Microsoft and available through the "Debugging Tools for Windows" package available through the <a href="https://msdn.microsoft.com/en-us/windows/hardware/hh852365.aspx">Microsoft website.</a></p>
+<p>When setting up for kernel debugging you will need two machines. One will host the debugger and the other will be the debugee. The easiest way to set up an environment to explore is to use virtual machines and a piece of software called VirtualKD. VirtualKD allows you to debug over a named pipe as though it were a serial interface, greatly speeding up the connection. It also provides a Virtual Machine (VM) monitor which automates starting a debugger whenever you boot your VM.</p>
+<p>VirtualKD works well with either VMWare or VirtualBox. Installation is simple and the instructions can be found at the <a href="http://virtualkd.sysprogs.org/tutorials/install/">SysProgs website</a>. If all goes well you should be presented with a frozen VM and a debugger broken into the kernel, much like this:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_Ze9r9Gi.width-800_800_278_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_Ze9r9Gi.width-800_800_278_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_Ze9r9Gi.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_Ze9r9Gi.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We're now all set to start debugging. At any point you can resume execution of the VM with the "g" (Go) command. Likewise you can break into a running VM by using the Ctrl+Break keyboard shortcut in WinDbg at any time.</p>
+<h2>Setting up symbols</h2>
+<p>One important aspect of debugging is setting up the correct symbols for your target system. Symbols allow a debugger to match addresses in a compiled binary to function or variable names or the source file and line of code. To show how important symbols are have a look at these two identical stack traces:</p>
+<p>Without symbols:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/2_ZJqDpYL.width-800_800_144_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/2_ZJqDpYL.width-800_800_144_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/2_ZJqDpYL.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/2_ZJqDpYL.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>With symbols:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/3_jbEqwta.width-800_800_141_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/3_jbEqwta.width-800_800_141_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/3_jbEqwta.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/3_jbEqwta.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Fortunately Microsoft provides public symbols for most of its binaries. Public symbols typically contain definitions for all functions, static and global variables. They also provide a symbols server so that your debugger can query for the correct symbols for your binaries. The simplest way to set up symbols is to set the "_NT_SYMBOL_PATH" environment variable. This is the standard environment variable that WinDbg and other programs, such as IDA, will query for symbol locations. You can use the following setting for the symbol path which connects to the Microsoft symbol server and caches the symbols locally to c:\symbols. A local cache speeds up future symbols accesses:</p>
+<pre class="prettyprint">srv*c:\symbols*http://msdl.microsoft.com/download/symbols</pre>
+<p>Once the symbol path is set, restart WinDbg and it should correctly pick up the new symbol path. You can type ".sympath" into WinDbg to confirm the symbol path it is using. At this point you can run the command ".reload -f" which will force all of the symbols for your target system to be downloaded, cached and loaded for each module.</p>
+<h2>Getting started with some basic debugging</h2>
+<p>WinDbg is a powerful tool but is not especially user friendly to someone who has done little debugging before. There are numerous cheat sheets of WinDbg commands available and it is worth having a look at some of the commands available. A good listing can be found <a href="http://windbg.info/doc/1-common-cmds.html">here</a>. Also helpful is the command ".hh <cmd>" which opens up the WinDbg help file for the specified command. We'll take a look at some of the basic functionality that WinDbg offers by debugging some system calls. All of the examples below were performed on a 64-bit install of Windows 7.</cmd></p>
+<p>First, let's have a look at what modules are currently loaded on the target system. If you have setup your symbols correctly you can now run your first WinDbg command. Issue the "lm" (List Modules) command and you should see a list of modules which are currently loaded. You should get information for the module name and the address at which it is loaded. Here is a truncated list from my VM.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20201108125238im_/https://www.contextis.com/media/images/content/4.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20201108125238im_/https://www.contextis.com/media/images/content/4.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/4.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/4.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The interesting module in the listing above is the "nt" module. This is the module name for the Windows Kernel Executive. It is within this module that the main Windows kernel functionality exists and it is responsible for I/O, object management, security and process management. Let's use another command to delve a bit deeper into the kernel and find what interesting functions it exports. The WinDbg command "x" (Examine) lets us query the symbols for a given module. It can be invoked as "<module>!<symbol>" and accepts wildcards. All the accessible system calls start with the letters Nt. Let's get a list of system calls related to file operations that the kernel supports with "x nt!Nt*File*:</symbol></module></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/5_FsDxJPi.width-800_800_190_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/5_FsDxJPi.width-800_800_190_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/5_FsDxJPi.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/5_FsDxJPi.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This has returned a selection of function names and where that function is located in memory. Let's take a look at one of these functions in memory using "u" (Unassemble). The "u" command takes a memory address and returns a disassembly of the instructions at that address. We can disassemble the start of NtCreateFile function using either the memory address from the listing of the examine command or the symbol nt!NtCreateFile which WinDbg will kindly resolve to an address for us:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_i8FUSiM.width-800_800_212_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_i8FUSiM.width-800_800_212_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_i8FUSiM.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_i8FUSiM.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If you wanted to disassemble the whole function the unassemble command can be instructed to do just that using "uf". We can now also try adding a breakpoint on NtCreateFile and examine some of the calls. The command to add breakpoints is "bp" and it also takes a memory address (or a valid symbol) as a parameter. Once you have set the breakpoint resume execution of the VM with "g". After a short while you should hopefully hit your breakpoint.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/7_wHoZBaV.width-800_800_229_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/7_wHoZBaV.width-800_800_229_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/7_wHoZBaV.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/7_wHoZBaV.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In the screenshot above I have hit a breakpoint and then issued the "k" (Stack) command to display the call stack leading up to this function call. Towards the bottom of the call stack WinDbg has failed to resolve some symbols. This is because we have broken into a user mode process context which we have no loaded symbols for yet. We can load these missing user mode symbols by reissuing ".reload /user". When debugging from the kernel you must always be mindful of which user mode process is mapped into memory at any time. Because Windows uses virtual address spaces, user mode addresses are only valid for the process context in which they were allocated. When the user process context is switched, symbols will need to be reloaded for that user context. A good description of virtual addressing can be found <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/hh439648(v=vs.85).aspx">here</a>. Once we have reloaded the symbols we can then get a complete call stack:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/8_YtHcJ0N.width-800_800_202_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/8_YtHcJ0N.width-800_800_202_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/8_YtHcJ0N.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/8_YtHcJ0N.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We can query the currently mapped in process (and therefore the process ultimately calling NtCreateFile) with "!process -1 0"; the first parameter (-1) requests information for the current process only, the second (0) is the amount of data to display. A setting of 0 means minimal information.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_t64jIL9.width-800_800_97_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_t64jIL9.width-800_800_97_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_t64jIL9.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_t64jIL9.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In this case we were called by SearchIndexer. Finally we can find out which file on disk the NtCreateFile call was being directed at. To help us find this information we need to know a little bit about the arguments that NtCreateFile takes. MSDN has documentation for most syscall functions. NtCreateFile looks like this:</p>
+<pre class="prettyprint">NTSTATUS NtCreateFile(
+  _Out_    PHANDLE            FileHandle,
+  _In_     ACCESS_MASK        DesiredAccess,
+  _In_     POBJECT_ATTRIBUTES ObjectAttributes,
+  _Out_    PIO_STATUS_BLOCK   IoStatusBlock,
+  _In_opt_ PLARGE_INTEGER     AllocationSize,
+  _In_     ULONG              FileAttributes,
+  _In_     ULONG              ShareAccess,
+  _In_     ULONG              CreateDisposition,
+  _In_     ULONG              CreateOptions,
+  _In_     PVOID              EaBuffer,
+  _In_     ULONG              EaLength
+);</pre>
+<p>(From <a href="https://msdn.microsoft.com/en-us/library/bb432380(v=vs.85).aspx">here</a>)</p>
+<p>In the kernel API the file name is a field of the OBJECT_ATTRIBUTES structure which is passed to NtCreateFile as a pointer. In this case it is the third argument and so will be passed in the R8 register. It is worth reading the <a href="https://msdn.microsoft.com/en-us/library/ms235286.aspx">documentation</a> on the x64 calling convention to understand how functions are invoked. With this knowledge we can display the contents of this structure as it is passed into our breakpointed function. The command "dt" (Display Type) does this; we just need to give it a memory address and a data type. For our purposes we will use "dt _OBJECT_ATTRIBUTES @r8" to display the memory referenced in the r8 register as though it were an OBJECT_ATTRIBUTES structure.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/9.width-800_800_122_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/9.width-800_800_122_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/9.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/9.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Note: When dealing with structures they are generally proceeded by a leading underscore. This is because most Microsoft structures are named with a leading underscore and then typedef'd to the same name omitting the underscore.</em></p>
+<p>Excellent. Now that we're done we can remove the breakpoint we set at the start. You can use "bl" (Breakpoint List) and "bc" to remove a breakpoint:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_qv0DmUa.width-800_800_127_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_qv0DmUa.width-800_800_127_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_qv0DmUa.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_qv0DmUa.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We've now been through the basic tools and techniques required for debugging further. You should now be able to examine structures in memory, breakpoint functions, query symbols and view call stacks. Combining these abilities you should be able to start exploring the system. When you feel confident with using the techniques above continue on to the next sections where we will take a look at expanding into some more advanced debugging techniques.</p>
+<h2>Tracing data with breakpoints</h2>
+<p>Breakpoints are usually used to stop code execution at points of interest such as when a certain function is called. We can also use WinDbg to trace information using breakpoint command strings. Here we will look at an example of tracing interesting information for a specific user mode process, namely the specific data that notepad.exe writes to disk. To start off we need to open an instance of notepad within our VM. We can now go about creating a breakpoint to intercept filesystem writes from notepad and display the data which is destined for disk.</p>
+<p>As a first step we need find some information about the notepad.exe process to ensure that we break only for this process and not any others. The information we are looking for is a pointer to an EPROCESS structure. The EPROCESS structure is the main kernel data structure to represent a process. You can see what information it contains by doing "dt _EPROCESS" (Dump Type on _EPROCESS struct). To find the EPROCESS structure for a given process we can invoke the !process extension. This extension prints information on the currently active processes in the target system. We will filter the results to just the notepad process and display just the minimum information:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_fZG5gmM.width-800_800_117_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_fZG5gmM.width-800_800_117_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_fZG5gmM.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/1_fZG5gmM.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The EPROCESS pointer is highlighted in blue as the "PROCESS" field. We will need this value shortly.</p>
+<p>We want to set a breakpoint on NtWriteFile in the kernel. This is the system call which all user mode disk writes will go through. By setting a breakpoint here we can see all of the disk writes going through the system. This will be very noisy so we are going to use our EPROCESS value to only break for NtWriteFile calls which happen from our chosen process context. The command we can use is shown below:</p>
+<pre class="prettyprint">bp /p fffffa800295d060 nt!NtWriteFile "da poi(@rsp+30); g"</pre>
+<p>This sets a breakpoint on nt!NtWriteFile (nt is the module name for the kernel) only for our process (by using /p with our EPROCESS value). When the breakpoint hits, the commands in quotes will be run, with each command separated by a semi-colon. The command I have used displays that the data notepad is writing, then restarts execution of the VM with "g". But why does "da poi(@rsp+30)" display the write buffer?</p>
+<p>To understand this part we need to look at the function prototype of NtWriteFile:</p>
+<pre class="prettyprint">NTSTATUS NtWriteFile(
+  _In_     HANDLE           FileHandle,
+  _In_opt_ HANDLE           Event,
+  _In_opt_ PIO_APC_ROUTINE  ApcRoutine,
+  _In_opt_ PVOID            ApcContext,
+  _Out_    PIO_STATUS_BLOCK IoStatusBlock,
+  _In_     PVOID            Buffer,
+  _In_     ULONG            Length,
+  _In_opt_ PLARGE_INTEGER   ByteOffset,
+  _In_opt_ PULONG           Key
+);</pre>
+<p>(From <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff567121(v=vs.85).aspx">here</a>)</p>
+<p>In this function prototype the argument we are interested in is the Buffer argument. This will be a buffer of data that the caller wishes to write to disk. In the Microsoft x64 calling convention the first four arguments are passed by registers (RCX, RDX, R8 and R9 respectively) whilst the remaining parameters are passed on the stack. Even though the first 4 parameters are passed in registers the calling convention requires that space is allocated for them on the stack (this is called the Home Space). As Buffer is the 6th parameter it will be on the stack behind the home space and the 5th argument. This means that as the breakpoint is hit our stack looks like this:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/10.width-800__800_568_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/10.width-800__800_568_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/10.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/10.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>So the command "da poi(@rsp+30)" takes the value in the RSP register, adds 30h to point us at the 6th parameter and then uses poi() to dereference the value (think of poi() as the * dereference operator in C, returning a pointer sized value). Finally we pass this address to da (Display ASCII). We can treat the buffer here as ASCII as we know that notepad will be saving plain text as opposed to binary. Running this breakpoint and saving some text in notepad gives this output in WinDbg:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/11.width-800__800_207_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/11.width-800__800_207_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/11.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20201108125238/https://www.contextis.com/media/images/content/11.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Using this technique it is possible to trace all sorts of interesting information through the kernel.</p>
+<h2>More advanced command usage</h2>
+<p>It is often useful to manipulate data available from the debugger in order to get more meaningful results. A good example to show some of these techniques is the System Service Descriptor Table (SSDT). The SSDT forms the system call table through which all syscalls take place. The kernel exports the SSDT as the symbol KeServiceDescriptorTable a structure with the following format:</p>
+<pre class="prettyprint">typedef struct _KSERVICE_DESCRIPTOR_TABLE {</pre>
+<pre class="prettyprint">PULONG ServiceTableBase;         // Pointer to function/offset table (the table itself is exported as KiServiceTable)
+    PULONG ServiceCounterTableBase; 
+    ULONG  NumberOfServices;         // The number of entries in ServiceTableBase
+    PUCHAR ParamTableBase; 
+} KSERVICE_DESCRIPTOR_TABLE,*PKSERVICE_DESCRIPTOR_TABLE;</pre>
+<p>On 32-bit versions of Windows, ServiceTableBase is a pointer to an array of function pointers. On 64-bit it is slightly more complicated, with ServiceTableBase pointing to an array of 32-bit offsets, all relative to KiServiceTable, the location of the table in memory. This makes visualising the table using the usual memory display commands (e.g. dds) impossible. Instead we will have to use some of the more advanced commands of WinDbgs to iterate through the list, manipulating the data into a more suitable format as we go.</p>
+<p>Let's first take a look at how the offsets look in memory, we can use the dd (Display DWORD) command to list the array of offsets. The /c 1 option instructs the debugger to display one dword per line:</p>
+<pre class="prettyprint">kd&gt; dd /c 1 KiServiceTable
+fffff800`02692300  040d9a00
+fffff800`02692304  02f55c00
+fffff800`02692308  fff6ea00
+fffff800`0269230c  02e87805
+fffff800`02692310  031a4a06
+fffff800`02692314  03116a05</pre>
+<p>...</p>
+<p>Each of these values is an offset left-shifted by 4-bits with some extra data encoded into the least significant nibble. To form an absolute memory address we need to take each value, right shift it by 4-bits and add it to the address of KiServiceTable. We want to do this for each entry in the table and output the symbol associated with the absolute address. To do this we can use the .foreach command for the iteration and .printf to display the symbol. Below is a command to achieve these steps along with an explanation of each section:</p>
+<pre class="prettyprint">.foreach /ps 1 /pS 1 ( offset {dd /c 1 nt!KiServiceTable L poi(nt!KeServiceDescriptorTable+10)}){ .printf "%y\n", ( offset &gt;&gt;&gt; 4) + nt!KiServiceTable }</pre>
+<p>.foreach - This steps through each token specified (in our case we use the dd commands to provide tokens). The arguments /ps 1 and /pS 1 cause foreach to skip every second token. We do this as the dd command outputs &lt;address&gt; &lt;value&gt; <value>and we are only interested in the value. These options skips the address token each time.
+<p>offset - This declares a variable called offset which holds the current token of the foreach iteration (in our case the offset values)</p>
+<p>dd - Run the dd command to display a list of the dword offsets, these will be iterated over by the .foreach. /c 1 ensure that only a single dword is output per line, nt!KiServiceTable is the address we will display from (it is the offset array). "L poi(nt!KeServiceDescriptorTable+10)" describes how many values to display. In this case we take the value 16 bytes (10h) from the start of KeServiceDescriptorTable which points us at the NumberOfServices field of the structure, poi() then dereferences this address to give us the actual value stored at the address i.e. the number of valid entries in the table.</p>
+<p>.printf - The printf command lets us perform a formatted print. Here we use the format string %y to print a symbol for the given memory address. As a parameter we pass "( offset &gt;&gt;&gt; 4) + nt!KiServiceTable" which is the current offset value right shifted by 4 and added to the address of KiServiceTable. We use the &gt;&gt;&gt; operator as opposed to the &gt;&gt; operator in order to preserve the sign bit of the offset as some of the values represent negative offsets.</p>
+<p>If symbols are correctly set up you should get output like this on running the command:</p>
+</value></p>
+<pre class="prettyprint">kd&gt; .foreach /ps 1 /pS 1 ( offset {dd /c 1 nt!KiServiceTable L poi(nt!KeServiceDescriptorTable+10)}){ .printf "%y\n", ( offset &gt;&gt;&gt; 4) + nt!KiServiceTable }
+nt!NtMapUserPhysicalPagesScatter (fffff800`02a9fca0)
+nt!NtWaitForSingleObject (fffff800`029878c0)
+nt!NtCallbackReturn (fffff800`026891a0)
+nt!NtReadFile (fffff800`0297aa80)
+nt!NtDeviceIoControlFile (fffff800`029ac7a0)
+nt!NtWriteFile (fffff800`029a39a0)</pre>
+<p>The result should be a properly resolved SSDT function list showing the main kernel system calls available to userland code. </p>
+<h2>Summary</h2>
+<p>Hopefully you should now feel confident dropping into a debugger and begin exploring your OS. By combining the techniques and commands outlined in this blog it is possible to begin to tease apart the inner workings of Windows, which can be used to help find bugs and vulnerabilities as well as understand security mitigations. To complement your newfound debugger knowledge it is important to understand the wider view of how Windows is structured, the API layers that are available and how user mode and kernel mode interact. The journey or an average system call is a topic large enough for its own blog and perhaps something I will blog about next time…</p>
+<h2>Contact and Follow-Up</h2>
+<p>Jan works in our Research team in our Cheltenham office. See the <a href="https://www.contextis.com/en/contact">contact</a> page for how to get in touch.</p>
+<p>Prior to joining Context, Jan has been an IT tutor for a college and worked as a software developer for the Windows platform, specialising in security. His background is primarily in C development with a focus on debugging, reverse engineering and some assembly.</p>
+<p>When he's not got his nose in a debugger he can usually be found in one of his other interests, running, reading or gaming.</p>
+</article>
+{% endraw %}

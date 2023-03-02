@@ -1,0 +1,340 @@
+---
+layout: blogpost
+title: "Lateral movement: A deep look into PsExec"
+author: "Daniel Muñoz"
+author_role: "Security Consultant"
+summary: "PsExec was originally conceived as a sysadmin tool. It quickly turned into the de facto standard for network pivoting. This article will explain how it works and give you the background to understand under which conditions it can be used."
+tags: [Vulnerabilities and exploits]
+hero_banner: ScreenTouchBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Moving laterally during an engagement is a common practice which consists in accessing or controlling other systems on a network after compromising a machine. For this purpose, the ability to execute code on a remote host is really useful. There are many techniques available and the landscape keeps evolving as monitoring and defence mechanisms improve. Although you may be familiar with them or even used them quite often, there is a chance you are not entirely aware of the underlying mechanisms supporting it.</p>
+<p>This is an in-depth analysis that will hopefully help having a clear picture of one of the best-known techniques, which has been around for long time now: PsExec. </p>
+<h2>What is PsExec?</h2>
+<p>As you probably know, PsExec is a tool included in the <a href="https://docs.microsoft.com/en-us/sysinternals/downloads/sysinternals-suite">Sysinternals Suite</a> created by Mark Russinovich. Originally, it was intended as a convenience tool for system administrators so they could perform maintenance tasks by running commands on remote hosts.</p>
+<p>By providing the address of a target host, a valid user and a password, you can get control of a machine remotely.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec1.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec1.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec1.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>What is happening under the hood? In a nutshell: </p>
+<ul>
+<li>Uploads PSEXESVC.exe to the $ADMIN shared folder. </li>
+<li>Remotely creates a service that will run PSEXESVC.exe.</li>
+<li>Remotely starts the service.</li>
+</ul>
+<p>The PSEXECSVC service acts as a wrapper. It runs the specified executable (cmd.exe in our example) on the remote system (note that whatever you want to run must exist already on the remote system) while it redirects the input/output of the process back and forth between the hosts via named pipes. In other words, the PsExec tool running on the sysadmin´s computer writes to <em>\\client\pipe\PSEXESVC-stdin</em> and reads from <em>\\client\pipe\PSEXECSVC-stdout</em> and <em>\\client\pipe\PSEXECSVC-stderr</em>, while the process running on the remote machine has its output redirected to <em>\\client\pipe\PSEXECSVC-stdout</em> / <em>\\client\pipe\PSEXECSVC-stderr</em> and gets its input from <em>\\client\pipe\PSEXESVC-stdin</em>. <br/>
+Let us see the process in detail:</p>
+<p>1. Open an SMB session using the supplied credentials to authenticate. It doesn´t matter here if it uses NTLM or Kerberos.</p>
+<p>2. Access the default shared folder $ADMIN (alias for C:\Windows) over SMB and upload an executable: PSEXESVC.exe.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec2.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec2.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec2.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec2.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>3. Open handle to <em>\\client\pipe\svcctl</em> to talk to the Service Control Manager (SCM), which gives us the ability to create and start/stop services remotely, among other things. It uses the SVCCTL protocol which goes on top of DCE/RPC calls sent to the svcctl pipe, i.e., DCE/RPC goes on top of SMB. </p>
+<p>4. Call the CreateService function, using the recently uploaded PSEXESVC.exe as service binary.</p>
+<p>5. Call the StartService function.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec3.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec3.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec3.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec3.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec4.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec4.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec4.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec4.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As you can see in the following Wireshark capture, it creates the named pipes to redirect stdin, stdout, stderr.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec5.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec5.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec5.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec5.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In total, there are 4 named pipes created, one for the service itself, and the pipes to redirect the process´ stdin/stdout/stderr.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec6.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec6.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec6.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec6.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>What is pass-the-hash?</h2>
+<p>Pass-the-hash is a technique which takes advantage of the constant fight between security and usability. Windows implements single-sign-on for users’ convenience, without it, every time a user accessed, e.g., a network share, it would have to prompt him for the password. To be able to do this, the “key” must be stored in memory. At some point the designers must have thought “well, we don´t want to have cleartext passwords laying around in memory. Let´s just keep its hash”. The problem then is that applications only rely on the password´s hash to authenticate against remote services. As a result, many authentication protocols in the Windows ecosystem end up using the NTLM hash of the password as the “key”, instead of the password itself. The consequence is that the hash is often enough to authenticate.</p>
+<p>In the first step described before, PsExec authenticates to SMB. Oddly enough, the authentication process itself only requires the user´s NTLM hash. If we are using NTLM authentication the hash will be used to encrypt the challenge or nonce. If it is Kerberos, we will be able to get a Service Ticket from the KDC only using the hash (pass-the-ticket). This means that remote code execution can be achieved without knowing the password itself. </p>
+<h2>Does PsExec pass the hash?</h2>
+<p><strong>Sysinternal</strong>´s PsExec <strong>does <u>NOT</u> pass the hash</strong>. There are other tools, such as <strong>Metasploit´s PsExec module</strong>, which use the same technique and <strong>do pass the hash</strong>. Unfortunately, this has led to confusion and you´ll see misleading articles about this on the web.</p>
+<p>If you do want to pass the hash using Sysinternal´s PsExec, from a windows box, you can do so with the aid of Mimikatz. </p>
+<p>First, let´s lay out some facts:</p>
+<ul>
+<li>To be able to access resources locally, the Windows kernel checks if the user SID contained in the Process´ AccessToken has permission to access such resource.</li>
+<li>To access resources remotely, the credentials from the logonSession are used to authenticate with the remote system.</li>
+<li>AccessTokens are linked to a logonSession, specified in the AccessToken´s logon SID field.</li>
+<li>Mimikatz can create a forged logonSession using any user, domain and NTLM hash you provide it with.</li>
+<li>Mimikatz can make a process´ AccessToken point to a forged logonSession.</li>
+<li><strong>Sysinternal</strong>´s PsExec will authenticate to a remote system using the credentials of the current process if no credentials are given as an argument.</li>
+</ul>
+<p>Hence you can execute <strong>Sysinternal</strong>´s PsExec in such conditions that when it tries to authenticate, it will be using the stolen NTLM hash. In the picture below, you can see the steps taken:</p>
+<ul>
+<li>Spawn cmd.exe with cooked logonSession using Mimikatz</li>
+<li>Run PsExec within that cmd.exe to connect to the remote computer with the stolen hash</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec07.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec07.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec07.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec07.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This is only one of many ways you could do this. If, instead of having GUI access to this pivoting machine, you only had a Meterpreter session you could use the Mimikatz module to spawn a hidden bogus process instead of cmd.exe and make your session impersonate its token using the Meterpreter´s steal_token command.</p>
+<p>It’s worth noting the following:</p>
+<ul>
+<li>In these examples it’s being assumed that you already have a valid NTLM hash. Typically, to obtain them, you would need to have compromised a host and have a privileged account to extract the hashes. This would not be possible at all in newer versions of Windows 10 and Windows Server 2016 with isolated lsass (see references for more information).</li>
+<li>Again, even if you already had the NTLM hash, if you want to use Mimikatz to forge a logonSession to pass-the-hash, you’ll need admin privileges on the attacker machine.</li>
+</ul>
+<h2>Minimum requirements to use the PsExec method</h2>
+<p>These are the bare minimum requirements:</p>
+<ol>
+<li>Port 139 or 445 open on the remote machine, i.e., SMB.</li>
+<li>Password or NTLM hash of the password (*)</li>
+<li>Write permissions to a network shared folder (**). It doesn´t matter which one (***).</li>
+<li>Permissions to create services on the remote machine: SC_MANAGER_CREATE_SERVICE (Access mask: 0x0002). </li>
+<li>Ability to start the service created: SERVICE_QUERY_STATUS (Access mask: 0x0004) + SERVICE_START (Access mask: 0x0010).</li>
+</ol>
+<p>Notes:</p>
+<ul>
+<li>*: Remember that NTLM ≠ NTLMv1/v2, so captured hashes over the network are not valid, unless you crack them or use an NTLM relay technique, but that´s another story.</li>
+<li>**: Bear in mind that NTFS permissions ≠ Share permissions. It´s not enough to have permissions to write locally.</li>
+<li>***: Note that if you are using Sysinternal´s PsExec, it will try to copy PSEXESVC.exe to ADMIN$ (alias for C:\Windows), so you need access to it, not to just any folder.</li>
+</ul>
+<p>In most scenarios, your stolen account won´t be able to comply with requirements 4 &amp; 5 unless it is a privileged account (read the FAQ for more information on what type of privileged accounts would work). Mainly because, even if you had the ability to create services (SC_MANAGER_CREATE_SERVICE), the default DACL template (Discretionary Access Control List) will be applied to the service you just created. As you can imagine, this template won´t allow your user SERVICE_QUERY_STATUS + SERVICE_START access unless it belongs to an administrators group. In short: with a normal account you won´t have the permissions to start the service you just created, provided you could create one in the first place.</p>
+<p>As a proof of concept, we are going to follow the steps manually. We are going to use Alice´s hash again. For the sake of simplicity in this scenario she belongs to the local <strong><em>Administrators</em></strong> group. </p>
+<h3>Step 1: Impersonate user</h3>
+<p>Again, we impersonate the user.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec8.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec8.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec8.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec8.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3> <br/>
+Step 2: Upload the executable</h3>
+<p>First, create a simple Meterpreter executable. Don´t forget to build it with the <em>exe-service</em> format.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec9.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec9.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec9.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec9.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Within the cmd.exe running with the forged token, copy the executable to the remote share.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec10.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec10.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec10.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec10.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3> <br/>
+Step 3: Start the service</h3>
+<p>Start the service remotely</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec11.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec11.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec11.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec11.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>When the service starts, it launches a reverse shell back to our Kali box.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/PsExec12.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/PsExec12.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/PsExec12.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/PsExec12.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Differences with this approach:</p>
+<ul>
+<li>Note that you need to either know the local path of the network share or use the UNC path (as seen in the screenshot).</li>
+<li>The session is running as NTAUTHORITY\System. That is because, by default, all services run as SYSTEM, not as the user who created the service. Despite that, Sysinternals´PsExec runs as the user whose credentials you are using.</li>
+<li>In this case, the executable is a Meterpreter payload, not PSEXECSVC.exe. Thus, communication happens over TCP session, instead of over named pipes.</li>
+</ul>
+<h2>FAQ about token filtering and local users</h2>
+<h3>Q: Can I use this method against non-domain-joined hosts?</h3>
+<p>A: Yes, but be aware that local users will fail trying to do so, even if they belong to the local “Administrators” group. The reason for this is that their AccessToken on the victim´s system will be filtered to a medium-integrity level by UAC and, as such it won´t be able to write to disk or to control the SC Manager, as those require a high-integrity token. This is an intentional security measure. There is an unadvisable workaround to prevent this which consists in editing/creating the registry key <strong>HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\LocalAccountTokenFilterPolicy</strong> and set it to ‘1’.</p>
+<p>On the other hand, this policy does not apply to the <u><strong>built-in</strong></u> local Administrator account (read, the one with RID 500), who is not enrolled in UAC by default. This account is disabled by default, but if you enable it you can test it yourself.</p>
+<h3>Q: What about domain-joined hosts?</h3>
+<p>A: <u>Local</u> users belonging to the <em><strong>Administrators</strong></em> group will only get a medium-integrity token as well. Nonetheless, <u>domain</u> users belonging to the local <em><strong>Administrators</strong></em> group will receive a full-fledged high-integrity token and will be able to perform this technique.</p>
+<h3>To wrap things up:</h3>
+<p>Remember that you need to write to network share and control the SC Manager and a service. You could write to the network share with a medium-integrity token, but to create and start a service, you do need to be running with a high-integrity level. Regardless of whether the victim is part of a domain or not, local users will be constrained to a medium-integrity level, domain users (if that applies) and the built-in Administrator account will not.</p>
+<table border="1" cellpadding="5" cellspacing="1" style="width: 500px;">
+<tbody>
+<tr>
+<td style="width: 100px;"> </td>
+<td>Admin-like permissions</td>
+<td style="width: 100px;">Domain/Non-domain-joined</td>
+<td style="width: 100px;">Will it work?</td>
+<td style="width: 100px;">Why?</td>
+</tr>
+<tr>
+<td>Domain member</td>
+<td>Y</td>
+<td>Domain</td>
+<td>Yes</td>
+<td style="width: 50px;">Not affected by token filtering.</td>
+</tr>
+<tr>
+<td>Domain member</td>
+<td>N</td>
+<td>Domain</td>
+<td>No</td>
+<td>Not enough permissions.</td>
+</tr>
+<tr>
+<td>Local user</td>
+<td>Y</td>
+<td>Doesn't matter</td>
+<td>No</td>
+<td>Token filtered down to medium-integrity level. </td>
+</tr>
+<tr>
+<td>Built-in administrator user (RID 500)</td>
+<td>Y (implicit)</td>
+<td>Doesn't matter</td>
+<td>Yes</td>
+<td>Not affected by token filtering.</td>
+</tr>
+</tbody>
+</table>
+<h2><br/>
+Reading list and references</h2>
+<p>Access tokens:</p>
+<ul>
+<li>Microsoft – Access tokens: <a href="https://msdn.microsoft.com/en-us/library/aa374909(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/aa374909(v=vs.85).aspx</a>. </li>
+<li>Book: Windows Internals – Part 1, Chapter 6, Security Descriptors and Access control (page 522 in the 6th edition). ISBN: 978-0-7356-4873-9</li>
+</ul>
+<p>UAC Token filtering and remote access:</p>
+<ul>
+<li><a href="https://support.microsoft.com/en-us/help/951016/description-of-user-account-control-and-remote-restrictions-in-windows">https://support.microsoft.com/en-us/help/951016/description-of-user-account-control-and-remote-restrictions-in-windows</a></li>
+</ul>
+<p>Service security and access rights:</p>
+<ul>
+<li>Microsoft – Service security and access rights: <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms685981%28v=vs.85%29.aspx">https://msdn.microsoft.com/en-us/library/windows/desktop/ms685981%28v=vs.85%29.aspx</a></li>
+<li>You can find the definition of the access rights masks for services either in the Windows winsvc.h header file or at <a href="https://rapid7.github.io/metasploit-framework/api/Msf/Exploit/Windows_Constants.html">https://rapid7.github.io/metasploit-framework/api/Msf/Exploit/Windows_Constants.html</a>.</li>
+</ul>
+<p>ACL and SDDL: </p>
+<ul>
+<li>Microsoft – Access Mask Format: <a href="https://msdn.microsoft.com/en-us/library/aa374896(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/aa374896(v=vs.85).aspx</a>. </li>
+<li><a href="https://blogs.technet.microsoft.com/askds/2008/04/18/the-security-descriptor-definition-language-of-love-part-1/">https://blogs.technet.microsoft.com/askds/2008/04/18/the-security-descriptor-definition-language-of-love-part-1/</a>.</li>
+<li><a href="https://blogs.technet.microsoft.com/askds/2008/05/07/the-security-descriptor-definition-language-of-love-part-2/">https://blogs.technet.microsoft.com/askds/2008/05/07/the-security-descriptor-definition-language-of-love-part-2/</a>.</li>
+<li>Book: Windows Internals – Part 1, Chapter 6, Security Descriptors and Access control (page 522 in the 6th edition). ISBN: 978-0-7356-4873-9</li>
+</ul>
+<p>Windows security model:</p>
+<ul>
+<li>Book: Windows Internals – Part 1, Chapter 6 – Security. ISBN: 978-0-7356-4873-9</li>
+<li>Microsoft – Parts of the Access Control Model: <a href="https://msdn.microsoft.com/en-us/library/aa374862(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/aa374862(v=vs.85).aspx</a>. </li>
+</ul>
+<p>Isolated Lsass, Secure Kernel Mode and Isolated User mode:</p>
+<ul>
+<li>Microsoft Technet Blog – Windows 10 Device Guard and Credential Guard demystified: <a href="https://blogs.technet.microsoft.com/ash/2016/03/02/windows-10-device-guard-and-credential-guard-demystified/">https://blogs.technet.microsoft.com/ash/2016/03/02/windows-10-device-guard-and-credential-guard-demystified/</a></li>
+<li>Alex Ionescu (Black Hat USA 2015) - Battle Of The SKM And IUM: How Windows 10 Rewrites OS Architecture: <a href="https://www.youtube.com/watch?v=LqaWIn4y26E">https://www.youtube.com/watch?v=LqaWIn4y26E</a></li>
+</ul>
+</article>
+{% endraw %}

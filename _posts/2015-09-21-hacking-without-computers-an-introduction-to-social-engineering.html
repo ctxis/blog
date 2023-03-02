@@ -1,0 +1,71 @@
+---
+layout: blogpost
+title: "Hacking without Computers – An Introduction to Social Engineering"
+author: "Owen Wright"
+author_role: "Global Director of Assurance"
+summary: "The concept of manipulating people and processes for some benefit pre-dates the invention of computers and the concept of cyber security, and goes well beyond the realms of IT and computing. Recently however, social engineering has come to be closely associated with cyber security."
+tags: [Security]
+hero_banner: Hacking_without_computers_an_introduction_to_social_engineering_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Social engineering can provide an attacker with a route to the core of an organisation, bypassing layers of technical or procedural security in a single step. As organisations improve their network perimeter security, the ‘people factor’ is now often a weak link in the controls organisations use to protect information and assets.</p>
+<p>This post will outline some techniques common to all <a href="https://www.contextis.com/en/services/simulated-targeted-attacks-red-teaming">social engineering attacks</a>, examples of where these have been used in recent cyber-attacks, and suggest some ways to defend against them. As with other posts in this series it draws upon the work we did on the IET Engineering and Technology Reference.</p>
+<h2>Definition of social engineering</h2>
+<p>Noted social engineer Christopher Hadnagy defines social engineering as ‘the art, or better yet, science, of skilfully manoeuvring human beings to take action in some aspect of their lives’. In the context of ‘cyber’, or information security-related attacks, this usually involves the social engineer gaining access to sensitive data or other information assets held by their target and its’ employees.</p>
+<h2>Social engineering techniques and methods</h2>
+<h3>Information Gathering</h3>
+<p>The more information available to the attacker, the higher their chance of success. In the context of an online cyber attack, this information can be gathered from a range of sources, including:</p>
+<ul>
+<li>Open-source research against internet-facing systems.</li>
+<li>Email addresses gathered from corporate websites, social media or dumps of credentials from compromised companies.</li>
+<li>Unprotected files and file metadata available on the internet.</li>
+<li>Website ownership information.</li>
+<li>Email bounce-back responses, such as error messages in response to invalid email addresses and information revealed in out of office auto-replies.</li>
+<li>System configuration and patch level information sent by users’ browsers to websites they visit.</li>
+</ul>
+<h3>Pretexting</h3>
+<p>Most social engineering attacks use an invented scenario, or pretext, to establish a requirement for the target to perform an action for the attacker. A convincing pretext is often the difference between a successful or failed attack.</p>
+<p>For example, a social engineer may attempt to gain access to a senior user’s email account via the IT support helpdesk. Simply phoning up and asking for their password is very unlikely to be successful.</p>
+<p>The amount of information that a social engineer has about their target is crucial to the success of such an attack. The social engineer might know their target’s work mobile phone number from an out of office reply, as well as the fact that they are currently on holiday, and have gathered information about their clients from social media. Perhaps they have identified some information about the IT helpdesk support processes from documents that have been inadvertently made public on the internet.</p>
+<p>Armed with this information, the attacker could impersonate their target based on a pretext that they are responding to an urgent client request, but have forgotten their password and cannot log into their web email account. The company’s procedure may be to SMS a password reset link to their work phone, but they are on holiday and do not have their work mobile phone with them (although they can quote the number).</p>
+<p>This may allow them to persuade the helpdesk user to bypass the usual process and SMS a new password to the attacker’s phone, allowing them to reset their target’s password and log in to their account.</p>
+<p>No pretext is fool-proof and the attacker must be able to adapt their scenario on the fly in response to the interactions with the target. In this case, the more information the attacker has, the more options are open to them.</p>
+<h3>Influence, persuasion and rapport</h3>
+<p>The success rate of any social engineering attack depends on how well the attacker can persuade the victim to perform some action on their behalf. The psychologist and author Robert Cialdini defines a number of influencing techniques through which social engineers can affect their targets[ii]:</p>
+<ul>
+<li>Reciprocation – the instinct that ‘one good turn deserves another’.</li>
+<li>Obligation – The natural compulsion to respond to certain actions and social norms – for example answering a leading question with the expected response.</li>
+<li>Concession - By conceding on a minor issue, a social engineer can gain sympathy and increase the likelihood of reciprocal concessions from the target.</li>
+<li>Scarcity - Many social engineering attacks invoke scarcity of a resource such as time or money to influence their targets.</li>
+<li>Authority - Studies such as the ‘Milgram experiment’[iii] have shown people’s willingness to submit to authority figures, even when they know the action they are asked to perform is contrary to their beliefs.</li>
+</ul>
+<p>Commitment and Consistency - Once people start saying ‘yes’, they have a tendency to continue to do so. It is often difficult to accept that a previous decision or action performed was incorrect, particularly if this decision was made publicly.</p>
+<h3>Rapport</h3>
+<p>If a social engineer is able to build rapport with their target, they are much more likely to achieve their goal. Social engineers use many techniques also used by successful salespeople and executives in order to achieve this. These include active listening, effective questioning and elicitation techniques, and a good knowledge of their targets’ interests. More subtle techniques can include matching the dress or appearance of the target or mirroring their speech patterns and body language.</p>
+<p>Consensus or Social Proof<br/>
+Multiple studies have demonstrated the ‘halo effect’, where an individual’s social attractiveness results in a bias in their favour in other areas of the observer’s feelings[iv]. This is most often demonstrated by peoples' tendency to approve more of people they find attractive or who look like them, regardless of their empirical performance. By presenting themselves visually and behaviourally as appealing to their targets, social engineers can gain credibility and increase their chance of success.</p>
+<h2>Mitigating the threat</h2>
+<p>The tools and techniques of social engineers can be used to disrupt the organisations and people that they target. The following actions may help reduce the exposure to these attacks.</p>
+<h3>Policies and procedures</h3>
+<p>Measured and considered security procedures can go a long way to prevent social engineering attacks, by providing examples of good behaviour to follow. For example, if call centre operators are trained to follow a prescribed, secure and considered process for resetting user passwords then an attacker will find it much more difficult to persuade them to deviate from this process. If users are advised not to use their work email addresses or passwords when registering for websites, then they are less likely to be disclosed to an attacker.</p>
+<p>However, policies and procedures can only ever be part of the solution. Social engineering by its very nature elicits users to step outside normal procedures, so no matter how robust a policy is, it is unlikely to be followed in all cases.</p>
+<h3>Staff awareness</h3>
+<p>Staff awareness forms the second pillar of a defence against social engineering. By making users aware of the threats and risks that they face, they can make decisions that are more informed and will be less likely to fall for well-known ruses.</p>
+<p>Many organisations now run <a href="https://www.contextis.com/en/services/phishing">phishing awareness exercises</a>, where users are sent <a href="https://www.contextis.com/en/services/phishing">simulated phishing emails</a> and educated about the risks of malicious emails and websites. Some organisations perform wider <a href="https://www.contextis.com/en/services/user-awareness-training">security awareness training</a>, for example around the risks associated with unknown USB devices.</p>
+<h3>Technical prevention and detection controls</h3>
+<p>Some users are inherently at risk of social engineering, regardless of their level of security awareness and the policies and procedures in place. The job function of HR and recruitment staff often involves receiving emails from strangers and opening attachments sent with the email. Accounts payable staff must deal with invoices, often in electronic formats, on a daily basis. Regardless of the other controls in place, these users can often be easily compromised if their workstation software contains exploitable weaknesses.</p>
+<p>Traditional IT security activities such as patch management and system hardening therefore remain essential to prevent such attacks. Whilst the patch management of operating system software by most organisations is improving, the updating of web browsers and their plugins within corporate environments is often slow and frequently facilitates access to the internal network environment via a crafted email or website-based attack.</p>
+<p>Workstation and device hardening are also highly important. A user may be tempted to plug in a USB key placed by an attacker, but this will not achieve its desired effect if USB access is blocked on their workstation. Malicious executables may bypass many anti-virus technologies, but will not run if the user’s workstation is configured to only run a whitelist of approved programs. Lastly, establishing a capability to identify and respond to security breaches as they occur is essential.</p>
+<h2>Conclusion</h2>
+<p>Social engineering can take many forms, and is an increasingly common attack vector. A targeted social engineering attack can bypass the procedural, people and technical controls deployed by many organisations, and often forms the initial compromise in a wider attack.</p>
+<p>By understanding the techniques and scenarios deployed by attackers, organisations can better defend themselves against this threat.</p>
+<h2>References</h2>
+<p>Christopher Hadnagy, The Art of Social Engineering, p10.</p>
+<p>[ii] Influence: The Psychology of Persuasion by Robert B. Cialdini PhD 1st Collins Business Essentials Ed edition (1 Feb 2007) .</p>
+<p>[iii] http://www.simplypsychology.org/milgram.html</p>
+<p>[iv] For example Dion, K; Berscheid, E; Walster, E (December 1972), "What is beautiful is good", Journal of personality and social psychology 24 (3): 285–90, doi:10.1037/h0033731, PMID 4655540.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Owen heads up our Assurance team and is based in Context's London office. See the <a href="https://www.contextis.com/en/contact">Contact</a> page for how to get in touch.</p>
+</article>
+{% endraw %}

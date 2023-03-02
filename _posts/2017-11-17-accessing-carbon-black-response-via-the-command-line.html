@@ -1,0 +1,24 @@
+---
+layout: blogpost
+title: "Accessing Carbon Black Response via The Command Line"
+author: "Russell Hole"
+author_role: ""
+summary: "Carbon Black Response is our preferred tool for performing live analysis of activity occurring on hosts on a network. As well as a fully functional web interface for analysis, Carbon Black Response also provides a comprehensive API that can be leveraged to automate anything that can be achieved with the web interface, as well as building completely new tools."
+tags: [Incident Response, Tools]
+hero_banner: CbRCLI_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>This blog post details one such tool developed by our <a href="https://www.contextis.com/en/services/incident-response-and-planning">Response team</a>, which aims to provide a feature-rich interface for quickly performing searches and retrieving the information you’re interested in. This tool has been used internally for the past couple of months on live response jobs and incidents with a lot of success. Now that it has been thoroughly tested by our team, we are planning to release the source code publically so other users of Carbon Black Response can also benefit.</p>
+<h2>Why was CbRCLI developed?</h2>
+<p><a href="https://www.contextis.com/en/">Context</a> has found that the web interface provided with Carbon Black Response is very useful when you have identified suspicious behavior and want to investigate the associated processes or binaries in detail. This method of investigation is very effective when looking at a small quantity of events, however it can become time consuming to look at large amounts of data. To improve the efficiency of some analysis tasks, Context analysts often move to using the API to pull back data in bulk so that it can be processed programmatically before being displayed to the analyst. CbRCLI was developed to consolidate most of the functionality of these scripts into a consistent and easy-to-use tool that requires no coding ability to extract valuable data. Since the internal release of version 1.0 of CbRCLI, our analysts have worked hard to add features and fix bugs to make it a fully featured analysis tool, which can now perform almost all the same functionality as the web interface. That said, is designed to work alongside the web interface, rather than replace it, and provides various commands for integration between the two analysis interfaces.</p>
+<h2>A command line tool? Isn’t that just for nerds?</h2>
+<p><img alt="" src="https://web.archive.org/web/20200424032240im_/https://i2.wp.com/gifrific.com/wp-content/uploads/2012/04/Homer-yells-nerd.gif?ssl=1" style="width: 328px; height: 240px;"/></p>
+<p>Hopefully not! Context has worked hard to make this tool accessible to people of all technical capabilities and backgrounds. While anybody familiar with command line applications will be able to pick up and use the tool effectively from the start, built in help, suggestions and autocompletion functionality should allow people of all technical abilities to quickly learn how to use it.</p>
+<h2>Can I see it in action?</h2>
+<p>The recording below will give an idea of what can be achieved using CbRCLI. As a short demo it only gives a basic overview of some of the functionality, but should give an idea of the workflows involved in using the tool as well as what can be achieved using it. More thorough documentation as well as examples can be found on the project’s <a href="https://github.com/ctxis/cbrcli">github page</a>.</p>
+<script data-cfasync="false" src="/web/20200424032240js_/https://www.contextis.com/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script async="" id="asciicast-5CY3XJLHPjvxlFfYL63KYX48D" src="https://web.archive.org/web/20200424032240js_/https://asciinema.org/a/5CY3XJLHPjvxlFfYL63KYX48D.js" type="text/javascript"></script>
+<h2>Ok, I’m convinced. How can I try it out?</h2>
+<p>Head over to <a href="https://github.com/ctxis/cbrcli">our github page</a> to grab the tool. The readme displayed on this page will provide you with installation instructions as well as documentation on the main features as well as example commands. If you have any feedback or feature/bug reports please create an issue on the github page.</p>
+</article>
+{% endraw %}

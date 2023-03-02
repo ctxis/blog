@@ -1,0 +1,198 @@
+---
+layout: blogpost
+title: "WAP just happened to my Samsung Galaxy?"
+author: "Tom Court and Neil Biggs"
+author_role: ""
+summary: "This is the third in a series of blogs about how, even in 2017, SMS-based attacks on Android phones are still viable. In part one, Al described how to set up infrastructure to launch potential attacks. In part two, we described how to identify your attack surface. This blog completes the journey (for now) and describes some of the bugs that we found, potential attack scenarios and the process of responsible disclosure that we followed to get the bugs fixed."
+tags: [Mobile, Product Security, Vulnerabilities and exploits]
+hero_banner: WAP_just_happened_to_my_Samsung_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>TL;DR: We found bugs in Samsung Galaxy phones that can be triggered remotely via SMS, which when combined provide opportunities for ransomware peddlers. Samsung Mobile Security Team were quick to fix the issues, providing a decent example of how coordinated disclosure should happen.</p>
+<h2>What is WAP Push?</h2>
+<p>According to the link, the Wireless Application Protocol (WAP) suite has been in public operation since 1999. The Wireless Datagram Protocol (WDP) which forms part of the WAP suite provides a UDP-like layer to transport data between two endpoints on specific ports. WDP itself can be transported over many protocols, including SMS (the focus of this blog).</p>
+<p>WAP Push is transported on WDP and allows content to be pushed to the device with minimal (or no) user intervention. The data is encoded using WAP Binary XML (WBXML).</p>
+<h2>Bugs</h2>
+<p>Reading the last two paragraphs should awaken your inner vulnerability researching senses, given we are talking about a 17-year old technology transporting arbitrary data, which is potentially received and processed without user interaction. Add to that the fact that the specification for the WBXML encoding standard runs to <a href="http://www.openmobilealliance.org/tech/affiliates/wap/wap-192-wbxml-20010725-a.pdf">30 pages</a> and you have a target that begs to be investigated.</p>
+<p>On the downside, this stuff has been around for 17 years, surely all the bugs have been found and fixed by now…right?</p>
+<p>WAP Push can be used to transport data for a multitude of applications. One application that caught our eye was the <a href="http://technical.openmobilealliance.org/Technical/technical-information/release-program/current-releases/client-provisioning-v1-1">Open Mobile Alliance Client Provisioning</a> (OMA CP) protocol that allows remote device provisioning and configuration. This sounds like a powerful capability, so let’s dig deeper!</p>
+<p>The devices we had to hand for our research were a series of Samsung Galaxy devices and so the remainder of this blog will be Samsung-centric. It is left as an exercise for the reader to investigate how this technology is handled by other vendors!</p>
+<h3>Authentication</h3>
+<p>Given the potential power of the OMA CP protocol, you would hope and expect that there is some level of authentication built in to stop the device blindly accepting configuration messages from anyone. Indeed, contained within the OMA CP spec is the following:</p>
+<p><i>“The connectivity media type may contain security information, which is transported as parameters to the media type application/vnd.wap.connectivity-wbxml. The security information consists of the message authentication code and the security method. The parameters MAC and SEC have been defined for this purpose and these MUST be supported by the WAP client.” - </i>OMA-WAP-TS-ProvCont-V1_1-20090728-A,Section 4.3</p>
+<p>Now let’s see if it works in practice. On Samsung Galaxy devices, including the S7 which was the newest device at the time, OMA CP messages are handled by the ‘omacp’ app. We used <a href="/web/20210226101549/https://www.contextis.com/resources/blog/binary-sms-old-backdoor-your-new-thing/">our SMS test rig</a> to craft some custom OMA CP SMS messages and send them to the devices.</p>
+<p>As it turns out, our rig was able to send these messages to these devices and they were received and duly processed, despite no authentication details being present in the message. May we introduce CVE-2016-7991. It appears as though the ‘omacp’ app completely ignores the security field of the message!</p>
+<h3>Silent Service</h3>
+<p>In the previous scenario, the user would be presented with a prompt before the OMA CP message was acted upon. Whilst we can assume that many (most?!) users would blindly click accept just to get rid of the message, it is at least one barrier against unauthorized configuration change. The question is: are there any message types that get processed <i>without</i> the user being notified?</p>
+<p>We analysed the omacp app to identify any code flows where configurations are accepted without any user interaction. There were some clues that this may be possible, such as a check for “xcpSetBgInstall” which hints towards a possible background install. A function called xcpInstallWifiSetting also appeared to always be called if there were settings within the configuration message. This seemed very interesting, as we hoped that it would allow us to create a trusted Wi-Fi network profile on the phone with credentials we select, thus allowing us to stand up an access point which the phone would automatically connect to.</p>
+<p>The app makes use of a native C library "libomacp", which handles the parsing of configuration messages. This would requirea bit of reversing time to understand the message format, but as we’re lazy weideally want a quick test to see what this did. Once the app has parsed the message and established the Wi-Fi networks to create it fires off an intent to the Wi-Fi-service in the Android framework. Fortunately for us there were no permissions defined on the BroadcastReceiver in Wi-Fi-service, which meant we could ignore the WBMXL format for now and create a test app to send an intent to see what this does….. the phone then proceeded to crash, reboot, crash, repeat…</p>
+<p>With our phone now enacting groundhog day we took a closer look at what was actually happening. It appears that when the ‘omacp’ app receives an OMA CP message for setting Wi-Fi access point credentials, it fires off an intent without any user interaction that is received by the WifiServiceImpl (WifiServiceImpl.jar) code that resides within the Android framework. This then goes ahead and updates a config file(/data/misc/wifi/default_ap.conf) with the new settings. Fortunately we were able to get an adb connection to the phone, which had previously been rooted,and moved the dodgy file which stopped the phone from crashing. But what exactly in this default_ap.conf file was causing the device to crash so terribly?</p>
+<p>Here is an example of a validdefault_ap.conf, it gets written when the SET_WIFI intent is received and read by the framework every time the Wi-Fi state changes, including on boot.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/samsung_sms_1.width-800_800_159_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/samsung_sms_1.width-800_800_159_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The code that parses this file is contained within the WifiServiceImpl.jar, specifically within the getVendorApInfoFromFile() function.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_2.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This code expects each line of the config file to contain a key (ssid, password etc) and a value that is interpreted as a comma-separated list, which is parsed immediately after:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_3.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_3.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_3.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_3.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As you can see from this code, the “networkCount” is derived from the number of comma-separated SSIDs, and then an assumption is made that the same number of elements are included in all other comma separated lists in the file. Given that an attacker can control the contents of this file, this assumption can easily be exploited, causing an ArrayIndexOutOfBounds exception to be thrown.</p>
+<p>This in itself would not be the end of the world if it were not for the fact that this code is not wrapped in an exception handler, meaning that when the exception occurs, it crashes the entire Android runtime and the phone reboots. As the runtime comes up again it reads the config file once more and the same happens, causing a boot-loop condition of the android runtime.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_4.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_4.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_4.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_4.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This was clearly dangerous, as given the lack of permissions on the WifiService BroadcastReceiver, any app could send the com.android.intent.action.SET_WIFI  intent and modify the default access point settings which causes the phone to continually crash.</p>
+<p>We confirmed that this worked on an S4, S4 Mini, S5 and Note 4, but it did not initially work on an S6 or S7. We later confirmed it was possible on these newer models (more details later). These issues have since been registered as CVE-2016-7988 (WifiService permissions) and CVE-2016-7989 (unhandled exception in Android runtime).</p>
+<p>The question then was could we trigger this over-the-air (OTA) and if so, which devices did it affect?</p>
+<h3>OTA</h3>
+<p>In order to trigger the bug over the air we now need to go back to the omacp app and work out the message format. The app makes use of a native C library "libomacp", which handles the parsing of configuration messages – it’s finally time to crack open IDA and do some properreversing.</p>
+<p>After a bit of IDA Pro magic we identified how to construct a WBXML encoded WAP-Push message to set some Wi-Fi settings. In the process we also found a WBXML parsing bug that is registered as CVE-2016-7990.</p>
+<h3>Side Track: Bonus Bug CVE-2016-7990 - Integer Overflow inlibomacp.so</h3>
+<p>Luckily, libomacp.so ships with debug symbols which makes analysis in IDA Pro *much* easier…</p>
+<p>The parser has two important primitives to understand. The first and simplest is the <i>wssClientProvWbxmlDecoderBufferReadByte(doc,dest)</i> function, which as the name suggests reads a byte into a destination buffer and increments the <i>read (src)</i>pointer. It returns <i>success or fail (0,1).</i></p>
+<p>The second is the <i>wssClientProvWbxmlDecoderBufferReadUint32(doc)</i> function that unpacks a <i>uint32 </i>from a variable length field. It reads up to a total of 5 bytes using the <i>wssClientProvWbxmlDecoderBufferReadByte()</i> function described above, which may seem strange given a uint32 can be a maximum of 4 bytes. It reads a fifth due to the way the variable length encoding works.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/samsung_sms_5.width-800_800_1122_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/samsung_sms_5.width-800_800_1122_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_5.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_5.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Having read a byte, the function treats the lower 7 bits as part of the uint32, and only if the top (8th) bit is set proceeds to read the next byte. Therefore values of &lt; 128 can be represented in only one byte. Assuming that the number is &gt;=128, the current cumulative value of the integer is logically shifted left 7 bits and OR’d with the 7 bits of this new byte. Again, if the top bit is set, another byte is read and the process is repeated. If the top bit is set on the 5th byte, the function returns an error and stores NULL in the return value.</p>
+<p>The bug can be found in the <em>wssClientProcWbxmlDecoderMakeStrTable()</em> function that is called as the final act of reading the wbxml header. This function uses the <em>wssClientProvWbxmlDecoderReadUint32()</em> function to read a length field from the input WBXML. It then adds 2 to this and performs a malloc(length+2). Following this it then enters a loop, calling <em>wssClientProvWbxmlDecoderReadByte()</em> length times or until there is no more data to read in the WBXML input.</p>
+<p>If the user-controlled length field is sufficiently large, the addition of 2 extra bytes before the <em>malloc() </em>will cause an integer overflow and will result in a very small number of bytes being allocated. Following this allocation, a copy is performed using length rather than <em>length+2</em> or until the end of the source buffer is reached. This would result in a heap buffer overflow for <em>length &gt;= 0xfffffffe</em>.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_6.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_6.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_6.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_6.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In order to exploit this bug, the WBXML header must end with <em>0xffffffff</em> encoded in the variable length format as 5 bytes, becoming:</p>
+<p>0xff 0xff 0xff 0xff 0x7f</p>
+<p>Any bytes appearing in the file after this will get written into a heap allocation of 1 byte causing an arbitrary-length heap overflow. In testing, this has overwritten a variety of things including function pointers, giving the potential for remote code execution on devices up to the S5 model. The S6 and S7 models are only vulnerable to attacks via a locally installed malicious app, as explained below.</p>
+<h3>Back on track: Exposure</h3>
+<p>The only minor piece of good news is that initially our SET_WIFI bug did not appear to work on the most recent Samsung Galaxy devices, the S6 or S7. The S4, S4 Mini, S5 and Note 4 are pretty old, surely nobody uses them anymore? Hmmmmm.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/samsung_sms_7.width-800_800_580_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/samsung_sms_7.width-800_800_580_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_7.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_7.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Let’s look at why this doesn’t work on the S6 and S7. As mentioned earlier, when a Wi-Fi configuration update message is received, the ‘omacp’ app fires off an intent that is picked up by a BroadcastReceiver set up by the WifiServiceImpl module within the Android runtime.</p>
+<p>On all the devices we tested, the ‘omacp’ app sent the SET_WIFI intent to:</p>
+<p>com.android.intent.action.SET_WIFI</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_8.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210226101549im_/https://www.contextis.com/media/images/content/samsung_sms_8.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_8.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101549/https://www.contextis.com/media/images/content/samsung_sms_8.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It turns out that the reason why the crash wasn’t happening with our app on the S6 and S7 was that intentionally or not, the BroadcastReceiver within WifiServiceImpl.jar is listening for com.<b>samsung</b>.android.intent.action.SET_WIFI but the app is still sending the older intentcom.android.intent.action.SET_WIFI. A quick tweak of the app to send this intent and our S6 and S7 are now also continually crashing. However, from a remote vulnerability perspective there would be no way to trigger this on the S6 and S7 as the omacp app will always send the old intent into the ether.</p>
+<h3>Remote DoS</h3>
+<p>The complexity of exploiting an Android device in recent years has escalated to the point that more often than not a chain of bugs is required to achieve the desired effect. This case is no different and we have shown here that it took two bugs to produce a viable attack vector, combined with some in-depth knowledge of the bespoke message format.</p>
+<p>If you have a rooted device, a fix for thisis to simply use adb as the phone is coming up and delete the default_ap.conffile. If your device is not rooted, the only two solutions are to factory reset the phone (losing all your data) or hope that the attacker is kind enough to send you another OMA CP message containing a valid configuration.</p>
+<h3>Fixes are available</h3>
+<p>Given the reversible nature of this attack (a second SMS could be sent that restored the device to its unbroken state) it does not require much imagination to construct a potential ransomware scenario for these bugs. Samsung have now released a security update that addresses these amongst other vulnerabilities and as is our usual advice, it is recommended that users prioritise the installation of these updates.</p>
+<h2>Disclosure</h2>
+<p>On discovering the bugs, we contacted Samsung Mobile Security and privately notified them of the issues, including proof-of-concepts where necessary. Over the course of the next three months, we worked with a very pro-active team at Samsung to help them understand the issues and get them fixed.</p>
+<h4>Timeline:</h4>
+<p>17<sup>th</sup> June 2016 – Issues disclosed to vendor<br/>
+21<sup>st</sup> June 2016 – Received acknowledgement from vendor<br/>
+28<sup>th</sup> June 2016 – Received request for further details on one of the bugs<br/>
+14<sup>th</sup> July 2016 – Received notification that all but one bug had been fixed<br/>
+23<sup>rd</sup> August 2016 – Received notificationfrom vendor that all issues are fixed and that patch would be released in October<br/>
+7<sup>th</sup> October 2016 – Received notification from vendor that patch is delayed until Nov 7<sup>th</sup>.<br/>
+7th November 2016 – Patches released</p>
+<h4>Bug IDs:</h4>
+<ul>
+<li><a href="http://security.samsungmobile.com/smrupdate.html#SMR-AUG-2016">SVE-2016-6542 (Samsung-specificvuln-id)</a></li>
+<li>CVE-2016-7988 – No Permissionson SET_WIFI Broadcast receiver</li>
+<li>CVE-2016-7989 – Unhandled ArrayIndexOutOfBounds exception in Android Runtime</li>
+<li>CVE-2016-7990 – Integer overflow in libomacp.so</li>
+<li>CVE-2016-7991 – omacp app ignores security fields in OMA CP message</li>
+</ul>
+<h4>Video: </h4>
+<div class="video-wrapper">
+<iframe allowfullscreen="" frameborder="0" height="315" src="https://web.archive.org/web/20210226101549if_/https://www.youtube.com/embed/hL3gA8IMO-w?rel=0&amp;showinfo=0?ecver=1" width="560"></iframe>
+</div>
+</article>
+{% endraw %}

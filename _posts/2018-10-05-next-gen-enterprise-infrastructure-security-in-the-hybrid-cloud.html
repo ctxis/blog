@@ -1,0 +1,42 @@
+---
+layout: blogpost
+title: "Security in the (Hybrid) Cloud: Next Gen Enterprise Infrastructure"
+author: "Ranulf Green"
+author_role: "Technical Lead, North America"
+summary: "Context are increasingly seeing our clients moving services into cloud offerings. The conditions and maturity of offering are now right for large business to shift core business functions to the next generation of IT hosting and application delivery, and this has big implications for information security. If left unchecked this move could result in a very bad day for the CISO."
+tags: [Security, Security assessment and testing]
+hero_banner: Security_of_the_hybrid_cloud_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>This is the first of a series of three blog posts looking at how we are evolving our penetration testing techniques to work with hybrid cloud solutions and some of the main points that we often identify issues with. These are key points that you can solve at design or configuration time if identified.</p>
+<h2>Why move to the cloud</h2>
+<p>The pull of cloud hosting is extremely strong, to name a few benefits:</p>
+<ul>
+<li>Compliance with <strong>SOC2</strong>, <strong>PCI-DSS Level 1</strong>, <strong>HIPAA</strong> and <strong>ISO27001</strong></li>
+<li>Rapid deployment (CloudFormation, Terraform)</li>
+<li>Reduced costs</li>
+<li>Improved scalability</li>
+</ul>
+<p>All these forces added up seem now to be sufficient enough to shift not just brochure-ware website into the cloud but also core internal and customer facing systems. If the panel discussion from the CISO summit we attended in New York last year is anything to go on, I would be surprised if there are many large organizations that haven’t at least considered the idea.</p>
+<h2>What are the security implications?</h2>
+<p>When applications are deployed into the cloud, in an organization where the cloud infrastructure is managed separately from the deployed applications, the configuration of the underlying operating system is usually not visible to the developer / application owner.</p>
+<p>Many organizations have adopted a “DevOps” approach and toolset to manging cloud IT infrastructure. A plethora of DevOps tools exist now: <strong>CloudFoundry</strong>, <strong>Docker Swarm</strong>, or <strong>Kubernetes</strong> to name but a few. These tools bring great flexibility and speed but are also widely understood by attackers.</p>
+<h4><strong>Instances – the basic security premise</strong></h4>
+<p>The configuration of each instance or node is commonly defined from a “gold” standard build or based on a pre-existing configuration used for all available nodes. In some circumstances, this level of abstraction can lead to security weaknesses where application components rely on OS level security controls that are not implemented in the gold build.</p>
+<p>The attack surface is also increased by the presence of<strong><em> cloud management</em></strong> <strong><em>tools</em></strong> and <strong><em>internal network services</em></strong> that are related to management of the infrastructure available from within deployed container or compute instances (i.e. local loopback interface, overlay networks and internal cloud networks).</p>
+<h4><strong>How do you pentest it?</strong></h4>
+<p>The standard method and means by which penetration testing is conducted certainly needs to be updated. Traditionally, assessed systems are denominated by their IP address, DNS or NetBIOS name. In a cloud environment a transient host may only exist for a few weeks and so by the time the pentest report is delivered, the identified vulnerabilities have been moved onto a different system.</p>
+<p>Vulnerability scanning and application layer penetration testing is certainly still required; however, to establish the root cause problem the responsible component must be identified, be it a deployed application, shared service or cloud management tool. For example, during an application penetration test Context may identify an internet accessible Kubernetes API service which can be accessed by modifying the HTTP “Host” header in requests to the application. This particular exploit targets vulnerabilities within the deployed reverse proxy. In order to fix the issue, a change must be made to the deployment scripts rather than the application codebase to ensure the reverse proxy is deployed without the vulnerability in future iterations. This would require those responsible for managing cloud infrastructure to work closely with the application teams.</p>
+<p>Whilst the goal posts have certainly shifted, not considering a full penetration testing lifecycle could leave your organization vulnerable to attacks including threats that were not a consideration in the traditional managed or on-site datacenter approach.</p>
+<p>A comprehensive penetration testing program will not only provide a point-in-time assessment of security posture but will also help resolve questions such as:</p>
+<ul>
+<li><strong><em>“How much do I have to trust my cloud service provider?”</em></strong></li>
+<li><strong><em>“How is my code and data protected against attacks from the hosting provider, container breakout or other tenants of the same cloud environment?”</em></strong></li>
+<li><strong><em>“If and when one of my apps is compromised, will the attacker be able to traverse the cloud and gain access to other compute nodes / applications / resources in the cloud?”</em></strong></li>
+<li><strong><em>“If the cloud is compromised, will the attacker be able to traverse to my company’s internal infrastructure?”</em></strong></li>
+</ul>
+<p>Defining the scope of an end-to-end penetration test can be difficult with multiple stake holders and third parties involved. The difficulty is further increased where network segregation as well as access / automation controls prevent hands-on access to the underlying systems, forcing the tester to use alternative streams of communication such as web shells to gain access to components.</p>
+<p>This series of blog posts aims to highlight how and when penetration testing can be included from the design to the on-going upkeep of hybrid cloud and containerization deployments. In the next post we delve in to the potential weak points in the connectivity between corporate network and the cloud.</p>
+</article>
+{% endraw %}

@@ -1,0 +1,82 @@
+---
+layout: blogpost
+title: "Ransomware - First steps to take after identifying an infection"
+author: "Context"
+author_role: "Leading cyber security consultancy"
+summary: "This is Part 3 of our Ransomware series (read Part 1, Part 2 and Part 4 here), in which we’ll outline the first steps you need to take after identifying ransomware on your systems."
+tags: [Incident Response, Malware]
+hero_banner: Ransomware_What_is_it_how_can_I_defend_against_it_and_what_do_I_do_if_my_business_has_been_hit_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Whether it is yourself finding that nasty ransom note on your computer or it’s your employees reporting a suspected infection – there are a few first steps you can take in order to contain and remediate the infection and make sure the incident causes as little harm as possible. </p>
+<p>This post is split into two sections, one aimed at the C-Level within businesses seeking general advice on which first steps they need to take in order to minimise the consequences of an attack and one aimed at internal IT teams having to deal with the infection. </p>
+<p>You can jump to either one of the sections by clicking the links below: </p>
+<ul>
+<li><a href="#Advice for the C-Level">Advice for the C-Level</a></li>
+<li><a href="#Technical guidance for IT teams">Technical guidance for IT teams</a> </li>
+</ul>
+<h2><a id="Advice for the C-Level" name="field_id_257[blocks_block_id_3843][values][field_id_257][blocks_block_id_3843][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][Advice for the C-Level]"></a>Advice for the C-Level </h2>
+<h3>Don’t panic and don’t pay </h3>
+<p>Our first piece of advice for when you find that your systems have been infected with ransomware is to not panic and take a deep breath – it has happened to many organisations before and it doesn’t mean your business is going to make the headlines in tomorrow’s news. <br/>
+If you have received a ransom note, be careful not to let threats or accusations shame you into paying the ransom and don’t contact any numbers or follow any links displayed in the note that are offering to resolve the problem. In many cases, these links and numbers are often just alternative money making phishing mechanisms. </p>
+<h3>Notify your IT team and consider getting external help</h3>
+<p>Notify your IT team immediately (if this hasn’t been done already) to make sure any actions to consolidate the infection can be taken as soon as possible. See our technical guidance for IT teams <a href="#Technical guidance for IT teams">here</a>. <br/>
+If you have the resources to do so, you may also want to consider calling an external expert as well. In many cases, a specialist security firm with experience in cyber incident response will be far more adept at dealing with this kind of incident than your internal IT teams may be. They will be able to investigate the extent of the problem and determine what next steps will need to be taken.</p>
+<h3>Act quickly and  have a PR plan</h3>
+<p>A swift response is crucial to minimising the potential impact of an attack. The longer it takes to identify the source of infection and contain its movement across your networks the worse could the potential consequences be. In addition to that, the ransom could just be a cover for another attack seeking to exfiltrate your client data. It is recommended that organisations have a rehearsed response plan in place for such an attack to ensure effective action.</p>
+<p>Try to keep knowledge of the ransomware infection to limited parties within the organisation to reduce the chance of information being leaked to the press. To prepare for the possibility of news of the infection spreading to the press or other external parties, it is recommended that a suitable communications template or statement be created which can then be released accordingly.</p>
+<h3>Make sure to comply with regulatory and legal requirements</h3>
+<p>Be aware that ransomware can potentially affect some of your client data in which case you will need to comply with regulatory and legal requirements, such as the Data Protection Act (DPA) and especially the upcoming General Data Protection Regulation (GDPR), which comes into effect at the end of this month. In some cases, this means you will have to notify authorities and any affected individuals within 72 hours of first becoming aware of the breach to avoid penalties<a href="#GDPR"><sup>1</sup></a>.</p>
+<h2><a id="Technical guidance for IT teams" name="field_id_257[blocks_block_id_3843][values][field_id_257][blocks_block_id_3843][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][Technical guidance for IT teams]"></a>Technical guidance for IT teams</h2>
+<p>Much of the steps to contain ransomware and general malware are similar. However, unlike general malware, ransomware leaves victims with encrypted files, or data in an unusable state, and they usually cannot be easily recovered, if at all.</p>
+<h3>Primary Tasks</h3>
+<p>The following points are a list of recommendations that can be applied to ransomware infections:</p>
+<ol>
+<li>Physically isolate and shutdown the identified host from the network<br/>
+<br/>
+	This is a critical step, and one that should be completed as soon as possible. Given the prevalence of worming ransomware recently (as with WannaCry exploiting a vulnerability in a core Windows component), without this step, the business could be faced with a magnitude of systems becoming infected.<br/>
+<br/>
+	To accomplish this, well-tested procedures should be implemented (that may include technical elements, such as a Network Access Control (NAC) solution) that would disconnect hosts from the network when required, and include alerting users to the current situation (for example why they may not be able to connect to certain shares).<br/>
+	 </li>
+<li>Disconnect shares being encrypted via the network, or disable write access<br/>
+<br/>
+	Do this if possible; this will limit any new files from becoming encrypted. This is a business decision that should be considered, and could be influenced by the number of users accessing the file share, the time of day, and any number of service level agreements.<br/>
+<br/>
+	If the network share cannot be disconnected, limit access by revoking permissions to the shares based on the findings of the investigation as much as possible, this may include disabling write permissions so users can still access files by limits further encryption.<br/>
+<br/>
+	The next step is to make sure the encryption process has stopped. If it has not, the infection is most likely on the server, and so should be shut down to stop the encryption process.<br/>
+	 </li>
+</ol>
+<h3>Secondary Tasks </h3>
+<p>With the spread of infection limited and the source host isolated, the following tasks can be taken at a slower pace:</p>
+<ol>
+<li>Identify the ransomware family<br/>
+<br/>
+<strong>Analyse with a sandbox</strong>; Identifying the strain or type of ransomware can be a complex process, however, there are lots of tools and information to assist in this. These can include sandboxes such as Context’s own CAPE (<a href="https://cape.contextis.com/">https://cape.contextis.com/</a>) which provides detailed technical analysis of the malware sample, or a more general overview with Chronicles’ Virus Total (<a href="https://www.virustotal.com/">https://www.virustotal.com/</a>).<br/>
+<br/>
+<strong>Check the file extension using Google</strong>: As simple as it may seem, if it’s been around for a while, it’s likely that there’s a wealth of information that’s already readily available. File extensions alone can be an identifier of the type of ransomware family, and in many cases this is the intended effect. It makes it easier for a victim to pay up (which we do not recommend! <a href="https://www.contextis.com/en/blog/ransomware-what-is-it-and-why-should-i-care">Why paying up, doesn’t pay off</a>).<br/>
+<br/>
+	Third-party websites such as <a href="https://id-ransomware.malwarehunterteam.com/">https://id-ransomware.malwarehunterteam.com/</a> provide a quick way to identify what type of infection you have by providing the ransom note, a sample encrypted file, or address found in the ransom note.<br/>
+	 </li>
+<li>Clean-up<br/>
+<br/>
+	Recovery of the host back to a clean state before being reconnected back to the network is a must. This usually consists of completely wiping the system and restoring from a gold image, rather than removing the files known to be associated with the infection. Reimaging is becoming a faster process than it has in the past, and is the preferred reliable method of clean-up, especially given the growing prevalence of malware affecting hard drive boot sectors which means malicious code persists even if the operating system is rebuilt.<br/>
+	 </li>
+<li>Recover encrypted files from a known safe date<br/>
+<br/>
+	The company backup strategy influences the recovery process. Hopefully a well implemented (and well tested) backup process will be the key to retrieving lost files, but if not, tools exist which could assist in decrypting files from certain ransomware families. Whilst this is sometimes an option, <strong>this should not be relied upon</strong> as more often than not, a tool does not exist, as encryption implementations within ransomware are getting stronger.<br/>
+<br/>
+	There are several tools like this that are free to download and run, check with your AV vendor as they may already have one.<br/>
+<br/>
+	The link below provides a 3rd party tool that supports decryption of several ransomware families. These tools exploit weaknesses in the encryption mechanisms that have been identified by security researchers, which may allow decryption of the files without paying the ransom: <br/>
+<a href="https://success.trendmicro.com/solution/1114221-downloading-and-using-the-trend-micro-ransomware-file-decryptor">https://success.trendmicro.com/solution/1114221-downloading-and-using-the-trend-micro-ransomware-file-decryptor</a><br/>
+<br/>
+	If the backup process fails or there is not a backup process available, files may also be transferred to a clean system with an up-to-date antivirus. Files should be scanned upon copy to the new system, and avoid moving files that are no longer required.</li>
+</ol>
+<p>Once you have contained and remediated a ransomware infection it is important to take any lessons you have learned from this experience and use them to prepare for the future. Steps that can be taken to prepare for the next ransomware attack or minimise the possibility of being hit by one will be discussed in our next and <a href="https://www.contextis.com/en/blog/ransomware-minimising-the-threat-to-your-business">final part of our ransomware series</a>.</p>
+<h2>References </h2>
+<p><a id="GDPR" name="field_id_257[blocks_block_id_3843][values][field_id_257][blocks_block_id_3843][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][field_id_257][blocks_block_id_3498][values][GDPR]"></a>1) GDPR: <a href="https://gdpr-info.eu/art-33-gdpr/">https://gdpr-info.eu/art-33-gdpr/</a></p>
+<p>Cape sandbox: <a href="https://cape.contextis.com/">https://cape.contextis.com/</a></p>
+</article>
+{% endraw %}

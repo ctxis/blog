@@ -1,0 +1,87 @@
+---
+layout: blogpost
+title: "KGDB on Android - Debugging the kernel like a boss"
+author: "Andy Monaghan"
+author_role: "Principal Researcher"
+summary: "A few months back I purchased the Android Hacker's Handbook. For those of you who haven't got a copy and are interested in the Android security landscape, I'd highly recommend it."
+tags: [Security, Product Security]
+hero_banner: kgdb_on_android_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>The authors are all well-respected researchers, such as Josh Drake, who you can thank for a slew of updates to your Android devices in the near future to tackle the incredibly wide-reaching <a href="https://www.theregister.co.uk/2015/07/27/android_phone_text_flaw/">Stagefright bug</a> which he presented on at Black Hat a couple of weeks back. Needless to say, these guys know their stuff and therefore I have a copy on my desk for reference. </p>
+<p>One chapter is titled 'Hacking and Attacking the kernel', which sounds fun as we all know the kernel is king and an exploitable vulnerability in this space still pretty much means it's game over for the target. The Android kernel is based on the Linux kernel, which means a large portion of the code base is shared between the two. The upside of this is that Android's kernel, is <a href="https://source.android.com/">open source</a> - you can obtain, modify, build and boot your own kernel on most Android devices, which is a great way of learning how things tick.</p>
+<p>For security researchers, code auditing is a valuable weapon in our arsenal - the ability to look through source code and spot subtle, but vulnerable lines of code that busy developers sometimes miss is often vital in the battle for more secure software. However, sometimes static analysis just isn't enough and you want to see the effect of that overflow/underflow/whatever, in gory detail. This is where having a debugger, such as the <a href="https://www.gnu.org/software/gdb/">GNU Debugger</a> (GDB), attached to your target can help.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/book.focus-none.width-500_800_1004_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/book.focus-none.width-500_800_1004_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/book.focus-none.width-500_337_423_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/book.focus-none.width-500_337_423_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>So when I came across a section on 'Live Debugging with KGDB' I was intrigued. <a href="http://elinux.org/Kgdb">KGDB</a> is the Linux Kernel Debugger and it allows you to attach to a remote Linux machine and debug the kernel just like you can debug a normal process. Unfortunately, the book (published early in 2014), focused on the Galaxy Nexus and required a serial debug cable, whereas I wanted to play along with my Nexus 6 and use USB. Unperturbed, I lazily turned to Google fully expecting to find a simple step-by-step guide on how to achieve this. I found one... sort of. This <a href="http://bootloader.wikidot.com/android:kgdb">post from 2010</a> was exactly the sort of thing I was looking for. It talked about how KGDB can be connected over a number of different media such as Ethernet, USB, serial, etc. In this case, the author chose to use serial over USB, which meant that he needed to add support for atomic character operations, specifically poll_init, poll_get_char, and poll_put_char, to the TTY driver on Android. He then made a few mods to the kernel config, loaded up a USB serial driver on his host machine, and voilà - he could remotely connect via GDB on his Linux machine. Happy days. </p>
+<p>Unfortunately, five years is a long time in the mobile world. The instructions on the blog were based on older source files that had either undergone wide-ranging changes or disappeared altogether. I spent a few days trying to replicate the work on the Nexus 6 (Shamu) kernel, by messing about with the USB drivers, with no success. Then I got distracted with several urgent priorities (walking the dog, catching up on Game of Thrones, etc.) and my pet project started to gather dust. </p>
+<p>A couple weeks ago I was once again focussing on some Android work, when I came across <a href="http://www.accuvant.com/blog/building-a-nexus-4-uart-debug-cable">this 2013 post</a> from the guys at Accuvant on building a Nexus 4 debug cable. This is pretty cool. It turns out that the designers of the Nexus 4 decided to put a UART in the headphone jack to allow debugging whilst avoiding interfering with the USB. A regular user would never be aware of this because the circuitry behind the jack has a comparator that checks the voltage of one of the pins. If the voltage is above 2.8V then the UART is activated, and with a simple circuit and an inexpensive UART to USB converter you can access this.</p>
+<p>I primarily wanted to use this for console output which I thought would be useful in the case of a kernel panic (as I was having some issues with /proc/last_kmsg), but as the Accuvant (now called Optiv) post suggested, this could also be used for interactive kernel debugging. Never one to leap before I've looked, I contacted a friend at Google to check if he thought the same hidden UART might be present on all Nexus devices. He couldn't see why not so I went ahead and ordered the parts and after a few days I had my debug cable. The next step is to modify your kernel boot parameters to redirect the console to a serial line like so:</p>
+<pre class="prettyprint">cmdline = androidboot.hardware=shamu msm_rtb.filter=0x37 ehci-hcd.park=3 utags.blkdev=/dev/block/platform/msm_sdcc.1/by-name/utags utags.backup=/dev/block/platform/msm_sdcc.1/by-name/utagsBackup coherent_pool=8M debug ignore_loglevel log_buf_len=10M LOGLEVEL=8 sched_debug console=ttyHSL0,115200,n8 androidboot.console=ttyHSL0 kgdboc=ttyHSL0,115200 kgdbretry=4</pre>
+<p>Finally, on later Nexus devices you need to enable console output in the bootloader with the following fastboot command:</p>
+<pre class="prettyprint">fastboot oem config console enable</pre>
+<p>At this point, you can get kernel debug, after a fashion, simply by putting lots and lots of 'printk' commands in your kernel source. However, you don't need a serial cable for that (use dmesg) and it feels a bit dirty, so I decided to plough on. I now had a working serial connection from my Linux machine to my Nexus 6. I still had KGDB support compiled into the kernel from my previous efforts so I felt I was pretty much there. Then I recalled that KGDB requires those atomic operations in the TTY driver. Damn. </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/IMG_20150805_203916-nopm-.focus-none.width-500_800_1066_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/IMG_20150805_203916-nopm-.focus-none.width-500_800_1066_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/IMG_20150805_203916-nopm-.focus-none.width-500_500_666_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/IMG_20150805_203916-nopm-.focus-none.width-500_500_666_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It turns out that having Android based on the Linux kernel is incredibly useful for pulling through enhancements that thousands of contributors and maintainers are putting in to the mainline Linux kernel every day. The serial drivers are no different. I started looking through the git commit logs for the Qualcomm (MSM) serial driver. It turns out that back in early 2014 Stephen Boyd, of the <a href="https://codeaurora.org/projects/all-active-projects/android-msm">Code Aurora project</a> added <a href="https://lkml.org/lkml/2014/1/14/569">support for KGDB to msm_serial.c</a>. Unfortunately, it wouldn't just be a case of good old cut 'n' paste as the Nexus 6 has its own serial driver, based on msm_serial.c, called msm_serial_hs_lite.c. However, it was a good start and with a little bit of porting I was able to add support for atomic character I/O. </p>
+<p>With slightly more excitement than was strictly necessary, I triggered KGDB on the phone (echo -n g &gt; /proc/sysrq-trigger), fired up GDB on my Linux box and connected. </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/gdb_fail.focus-none.width-800_800_476_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/gdb_fail.focus-none.width-800_800_476_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226103117/https://www.contextis.com/media/images/content/gdb_fail.focus-none.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210226103117/https://www.contextis.com/media/images/content/gdb_fail.focus-none.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Rage. I suspected the problem here was to do with a disagreement between my host machine and the Nexus 6 over whether or not to use hardware flow control (Ready To Send/Clear To Send RTS/CTS commands).  I disabled this within GDB and tried connecting again:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/gdb_win.focus-none.width-800_800_785_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/gdb_win.focus-none.width-800_800_785_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226103117/https://www.contextis.com/media/images/content/gdb_win.focus-none.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210226103117/https://www.contextis.com/media/images/content/gdb_win.focus-none.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>At last! We have remote kernel debugging on the Nexus 6 and all it took was a bit of patience, some simple hardware and a lot of work from other people... Now we can start attacking the kernel in earnest.</p>
+<p>If you'd like to get this working you're welcome to download my <a href="https://github.com/ctxis/kgdb-android">kernel patches</a>. I've not tried it on any other Nexus devices so would be interested to hear if it 'just works'™. Also if anyone wants to spend some time getting this working over USB that might be useful for those who can't be bothered to build the cable. </p>
+<h2>Contact and Follow-Up</h2>
+<p>Andy is a part of our Research team in Context's Cheltenham office. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

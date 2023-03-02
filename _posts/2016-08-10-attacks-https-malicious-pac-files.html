@@ -1,0 +1,52 @@
+---
+layout: blogpost
+title: "Attacks on HTTPS via malicious PAC files"
+author: "Alex Chapman and Paul Stone"
+author_role: ""
+summary: "In our last blog post, Sniffing HTTPS URLS with malicious PAC files, we described issues identified in the implementation of PAC files in various web browsers and operating systems. In this post we outline the risk of these issues, and proof of concept source for others to replicate this work."
+tags: [Vulnerabilities and exploits, Web applications]
+hero_banner: Attacks_on_Https_via_malicious_pac_files_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>TL;DR: </p>
+<ul>
+<li>Updated slides: <a href="/web/20200424041318/https://www.contextis.com/documents/189/Toxic_Proxies_-_Bypassing_HTTPS__VPNs_to_pwn_your_online_identity_v1.1.pdf">Toxic Proxies - Bypassing HTTPS and VPNs to Pwn Your Online Identity</a></li>
+<li>DefCon talk: <a href="https://www.youtube.com/watch?v=juYinPkmYrU">YouTube</a></li>
+<li>Video demonstration: <a href="https://www.youtube.com/watch?v=z1XOCYV9jMQ">YouTube</a></li>
+<li>Source code: <a href="https://github.com/ctxis/pac-leak-demo">GitHub</a></li>
+</ul>
+<h2>Presentation and Demonstations</h2>
+<p>These materials were first presented at our DEF CON presentation <a href="https://www.defcon.org/html/defcon-24/dc-24-speakers.html#Chapman">Toxic Proxies - Bypassing HTTPS and VPNs to Pwn Your Online Identity</a> at DEF CON 24.</p>
+<p>In our talk, we demonstrated several different attacks that are possible as a result of the PAC HTTPS leak. These include:</p>
+<ul>
+<li>Passively monitoring the user's encrypted search queries and visited websites</li>
+<li>Actively probing social media sites to discover the user's online identities and other information</li>
+<li>Forcing OAuth authentication requests and stealing the resulting tokens, taking control of several user accounts</li>
+<li>Stealing Google SSO tokens to gain partial access to the user's photos, email, calendar, and location history</li>
+<li>Stealing files from the user's Google Drive account.</li>
+</ul>
+<p>We have released a video demonstrating these attacks on <a href="https://www.youtube.com/watch?v=z1XOCYV9jMQ">Youtube</a>. Updated slides from our talk are also <a href="/web/20200424041318/https://www.contextis.com/documents/189/Toxic_Proxies_-_Bypassing_HTTPS__VPNs_to_pwn_your_online_identity_v1.1.pdf">available</a>.</p>
+<h2>Implementation</h2>
+<p>To demonstrate our attacks, we wrote a Python script that runs a combined web server and DNS server. The architecture creates a Command &amp; Control (C2) loop between the attacker's server and the user's browser.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041318im_/https://www.contextis.com/media/images/content/cycle.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041318im_/https://www.contextis.com/media/images/content/cycle.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041318/https://www.contextis.com/media/images/content/cycle.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041318/https://www.contextis.com/media/images/content/cycle.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As shown above, there are two components on each side. On the attacker's side are a web server and DNS server.</p>
+<p>In the user's browser are both malicious JavaScript running on a webpage (for example a fake captive portal page) and a separate malicious PAC script. These have different capabilities - the web page can fetch commands from the attacker's server, force 3rd party URLs to load and control the PAC script (e.g. giving it rules about which URLs to block or leak). The PAC script encodes HTTPS URLs and command responses and leaks them to the attacker via DNS. The attack server can then use this data to make decisions and pass further instructions onto the JavaScript in the user's browser.</p>
+<p>We have released the source code for our demo server, which is <a href="https://github.com/ctxis/pac-leak-demo">available on GitHub</a>.</p>
+<h2>Contact and Follow-up</h2>
+<p>Alex and Paul both work in Context's Research team from their London office. See the <a href="/web/20200424041318/https://www.contextis.com/contact/">c</a><a href="https://www.contextis.com/en/contact">ontact page</a> for how to get in touch.</p>
+</article>
+{% endraw %}

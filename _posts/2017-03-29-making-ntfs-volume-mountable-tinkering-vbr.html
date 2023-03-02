@@ -1,0 +1,128 @@
+---
+layout: blogpost
+title: "Making an NTFS Volume Mountable by Tinkering with the VBR"
+author: "Adam Bridge"
+author_role: "Head of Response"
+summary: "We recently had to do disk forensics of 10 disks, each of which had a BitLocker encrypted C volume. We were working with E01s, but no real problem, the organisation's IT department provided us with recovery keys, so we mounted the E01s via Arsenal Image Mounter (AIM), unlocked the BitLocker volume and then used X-Ways Forensics (XWF) to image the un-BitLocker-ed logical volume. We could then load the images into XWF and off we go."
+tags: [Forensics]
+hero_banner: Making_an_NTFS_volume_mountable_by_tinkering_with_the_VBR_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>There are a couple of operations that we might do in a typical analysis that just work a bit better (and often faster) if the disk is mounted into the examination OS, rather than trying to use forensics software. An AV scan is one of them (IMHO). (Booting the machine is another, as my colleague Matt <a href="https://www.contextis.com/en/blog/overcoming-problems-within-forensic-analysis">blogged about recently</a>.)</p>
+<h2>Raw deal</h2>
+<p>So, back to trusty AIM, select the E01 of the un-BitLocker-ed volume and hit mount. Unexpectedly, Windows Explorer showed that slightly terrifying icon of a drive with no recognisable file system:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-ntfs-vbr-10-nofilesystem.width-800_800_236_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-ntfs-vbr-10-nofilesystem.width-800_800_236_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-10-nofilesystem.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-10-nofilesystem.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The 'Disk Management' snap-in showed us why. Windows had been unable to find a file system which it understood on the media, hence it was shown as RAW:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-ntfs-vbr-15-RAW.width-800_800_168_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-ntfs-vbr-15-RAW.width-800_800_168_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-15-RAW.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-15-RAW.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>A quick aside: when you attach a volume to Windows it uses the various drivers it has to interpret the file system. Obviously there are many file systems it supports OOTB such as FAT, NTFS, and exFAT. If you install a third-party driver, it will understand ext2 as well. So, if it tries all its available drivers and can't find one that understands the volume it defaults to RAW.</p>
+<p>But why is this volume shown as RAW? We know it's NTFS! Our forensics software happily parses the MFT and shows us the correct file system. So what's going on?</p>
+<p>If all we'd been interested in was getting the AV scan done there are at least a couple of ways we could've done that. We could've mounted the E01 as a File System using <a href="http://accessdata.com/product-download">FTK Imager</a>, or used the AV scan functionality built-in to XWF. But we're forensic analysts - we want to know <i>why</i> Windows wouldn't mount the volume.</p>
+<h2>Tinkering</h2>
+<p>My first thought was that as the image was of a volume rather than of a disk, Windows was unhappy about the lack of MBR and MPT. So I consulted the developers of AIM via <a href="https://github.com/ArsenalRecon/Arsenal-Image-Mounter/issues/3">an issue</a>, but we soon demonstrated that the combination of an E01 of a volume (not disk) and AIM and Windows works just fine. So there was something "wrong" with the image. I tried a few of the other E01s of un-BitLocker-ed volumes and all presented the same way: RAW volumes.</p>
+<p>Solving these kinds of problems is one of the many things I like about my job. The volume MUST be mountable so we MUST be able to get Windows to mount it - just as long as we can figure out what it is Windows is objecting to. One of System Admins I work alongside suggested that maybe the answer was in the Volume Boot Record (VBR). Perhaps as it is (or was) inside a BitLocker container, the VBR has some kind of flag which prevents mounting if its not via the BitLocker environment.</p>
+<p>Although this wasn't the case, it did lead us to the right place: verifying the values in the VBR. There are many excellent articles on the NTFS VBR, but the one that proved the most useful was from <a href="http://thestarman.pcministry.com/asm/mbr/NTFSBR.htm">Sedory</a>. By the time you've ignored the boot code, serial numbers, the values ignored by NTFS and the ones that must have specific values, there aren't too many bytes left in the 512-byte VBR to check. But working our way slowly through them, I found the one I was sure was going to be the answer:</p>
+<p>At offset 0x1C: Number of Hidden Sectors</p>
+<p>The following screenshot shows the first 0x50 bytes of the VBR of the un-BitLocker-ed volume:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-ntfs-vbr-20-hidden-sectors.width-800_800_219_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-ntfs-vbr-20-hidden-sectors.width-800_800_219_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-20-hidden-sectors.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-20-hidden-sectors.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In red we can see the current value, as a little-endian int32, of 'Number of Hidden Sectors':<br/>
+0x000FA800 = 1,026,048</p>
+<p>The name 'Number of Hidden Sectors' is a little scary. What it actually means is "number of sectors on the physical disk before the first sector of this volume". Of course we had taken the BitLocker volume from a Windows 7 disk which had a MBR and a hidden System partition before the BitLocker volume, but we were now treating this volume as if it was the only thing on the disk. It needed to be changed to zero.</p>
+<p>Fortunately, AIM has a mount with temporary write, so I could open the disk in <a href="https://mh-nexus.de/en/hxd/">HxD</a> and easily make the change.</p>
+<p>Feeling quietly confident, I hit refresh in the Disk Management snap-in and expected the disk to be reevaluated and presented as a lovely accessible NTFS volume. It didn't. It was still RAW.</p>
+<p>Back to Sedory's NTFS VBR guide and there was another value that stood out:</p>
+<p>At offset 0x28: Total Sectors (in the volume)</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-ntfs-vbr-30-total-sectors.width-800_800_219_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-ntfs-vbr-30-total-sectors.width-800_800_219_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-30-total-sectors.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-30-total-sectors.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In blue we can see the current value, again as a little-endian int32:<br/>
+0x1DBF7FFF = 499,089,407</p>
+<p>Of course that number is larger than the number we can see above in green, which is the total number of sectors on the volume. Windows was likely objecting to this number not working out. As commented in Sedory's guide:</p>
+<p>"[T]his value will always be 1 sector less than the total number of sectors in the volume's partition table entry, because the NTFS 'Backup Sector' is not considered part of the NTFS Volume."</p>
+<p>So, 499,089,400 - 1 = 499,089,399 == 0x1DBF7FF7, update in HxD:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-ntfs-vbr-40-changes.width-800_800_218_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-ntfs-vbr-40-changes.width-800_800_218_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-40-changes.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-40-changes.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>And back to the Disk Management snap-in to hit refresh:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-ntfs-vbr-95-NTFS.width-800_800_168_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-ntfs-vbr-95-NTFS.width-800_800_168_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-95-NTFS.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412132718/https://www.contextis.com/media/images/content/blog-ntfs-vbr-95-NTFS.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Voila! This was a good feeling. We could now run the AV scan and any other operations on the mounted disk we so wished and knew the very simple process to follow for the rest of the un-BitLocker-ed E01s.</p>
+<p>My colleague Matt asked the very astute question as to whether we needed to change both values, 'Number of Hidden Sectors' AND 'Total Sectors', or would just 'Total Sectors' suffice? It was a good question, and a quick check revealed that actually, we only had to change 'Total Sectors' - that was enough for Windows to mount the volume.</p>
+<p>The remaining question is why is there a difference in the total number of sectors? Why is it 499,089,399 rather than 499,089,407? Where did those 8 sectors go? It's probably something to do with BitLocker, but that's a question for another time.</p>
+<h2>Contact and Follow Up</h2>
+<p>Adam is part of our Response team in Context's Cheltenham office. Prior to Context, Adam has been a Lecturer in Computing and ICT, worked in the SOC of a large organisation, and supervised a Law Enforcement digital forensics team. He can often be found contributing to Volatility, posting to the X-Ways Forensics forum, learning Kung Fu, and trying not to fall off a mountain bike. See the <a href="https://www.contextis.com/en/contact">Contact page</a> for how to get in touch.</p>
+</article>
+{% endraw %}

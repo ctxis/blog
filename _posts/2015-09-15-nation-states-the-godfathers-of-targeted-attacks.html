@@ -1,0 +1,50 @@
+---
+layout: blogpost
+title: "Nation States: The Godfathers of Targeted Attacks"
+author: "Kat Demidecka"
+author_role: "Senior Consultant"
+summary: "For many years the world of targeted cyber attacks was limited to nation states; few others had the understanding, resources or much to gain from carrying out such an attack."
+tags: [Security]
+hero_banner: Nation_States_the_godfathers_of_targeted_attacks_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>However our increased dependence on the internet for personal and business activity along with the availability of ‘hackers for hire’ and downloadable hacking tools has led to a wide range of cyber threat actors, all seeking to compromise networks to achieve their goal - be it criminals looking for financial gain, organisations for commercial advantage, hacktivists for political reasons, or nation states continuing their espionage.</p>
+<p>The types of attack and attacker can be categorised in many different ways, but we find that dividing them up by the level of sophistication and targeting provides a common sense breakdown of the threat landscape.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Threat_Landscape-Large.focus-none.w.focus-none.width-800_BeCfgV5_800_398_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Threat_Landscape-Large.focus-none.w.focus-none.width-800_BeCfgV5_800_398_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041406/https://www.contextis.com/media/images/content/Threat_Landscape-Large.focus-none.w.focus-none.width-800_BeCfgV5.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041406/https://www.contextis.com/media/images/content/Threat_Landscape-Large.focus-none.w.focus-none.width-800_BeCfgV5.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This blog post will look at the Targeted/Sophisticated category with a particular focus on the attacks from nation states that were the early prototype for this category of attacks and continue to form a significant part of the threat landscape. As with the previous blogs in this series we draw on the article titled '<a href="http://digital-library.theiet.org/content/reference/10.1049/etr.2014.0025">Advanced Persistent Threat</a>' which we contributed to the IET.</p>
+<h2>Motivation</h2>
+<p>Targeted cyber attacks against government and commerce have been on-going since at least 2003 and possibly some time before that.  Security companies have tracked many attack campaigns highlighting infrastructure and threat actors and published the war-stories, yet the attacks have continued unabated. This is not a new problem; it is simply espionage.</p>
+<p>The motive for these attacks is the same as any act of espionage: gaining an advantage. Whether the advantage is military, political, commercial, economic or intelligence (in the case of spying on dissidents, separatists or journalists), the sponsor of the attack is seeking to use the information gathered to fulfil a clear set of requirements.</p>
+<p>Perhaps the most well-known nation state for conducting large scale and coordinated cyber espionage is China, believed to have at least one military unit (PLA Unit 61398) dedicated to gaining intelligence that may be of use to the Chinese state. Operators are tasked with gaining specific information from specific organisations. This information and list of targets is carefully and clearly identified, shared with a number of government departments and constantly updated. Once the required information is extracted, it is processed, analysed and then disseminated to the relevant department to which it is considered to be most valuable.</p>
+<h2>Targets</h2>
+<p>It is important to understand that although foreign governments are often behind targeted and sophisticated attacks, the victims of such attacks are far from limited to government departments. Victims range from the perhaps less surprising defence and critical infrastructure industries, through to the pharmaceutical, finance, legal and educational sectors.</p>
+<p>Organisations within the <a href="https://www.contextis.com/resources/blog/breaking-the-law-the-legal-sector/">legal</a> and <a href="https://www.contextis.com/resources/blog/cruel-interest-attacker-motivations-targeting-fina/">finance</a> sectors store detailed information about patents and funding for new investments, as well as mergers and acquisitions, and aggregate a wealth of information  on other organisations. Similarly educational institutions such as universities research and develop new technologies, which are often sensitive and sponsored by government or industry. If an attacker can gain access to a university network (typically very large, accessible remotely by a large number of people and difficult to secure), they can steal new developments in technology that have taken years to develop, enabling them to produce the same product for a fraction of the cost.</p>
+<h2>Methodology</h2>
+<p>Most sophisticated targeted attacks follow a similar pattern, though while a generalisation is necessary, we must bear in mind that every network is unique and the skills and tools of attacking groups vary quite widely.</p>
+<p>Similar to the more common and less targeted cyber attacks, attackers usually begin by seeking to install malware on a computer within the victim’s network. Typically this will be via a malicious attachment in an email or by compromising a legitimate webpage, with the aim of downloading malware onto the victim’s machine. The difference with more advanced attacks is that the recipients of such an email are likely to have been carefully selected for their role within the organisation and researched so that the email and attachment are likely to be of interest to them; the compromised website may be one that is likely to be visited by the target employees, for instance an industry forum or even the website for a restaurant that is local to the organisation’s office.</p>
+<p>Following the compromise of a single machine, attackers will carry out some basic reconnaissance to understand where the machine is located, what privileges it has, what network resources it has access to, and what is required to escalate privileges. Once the attackers have local administrator privileges they will move laterally within the network, looking for information to achieve their goal. With access to the target data established, attackers will compress and exfiltrate the data to their servers.</p>
+<p>Depending on the goal of the attack, the attacker may choose to ‘clean up’ and delete evidence of the intrusion, or look to consolidate their access to facilitate future intelligence gathering. In the case of the latter, the attacker may install stealthier malware on to an interesting part of the network, or compromise account credentials to enable authentication to the network as a legitimate user, thus avoiding suspicion.</p>
+<h2>Best approach</h2>
+<p>It is not possible to stop sophisticated attacks. Traditional security tools such as anti-virus, IDS/IPS and firewalls offer very little protection from this sort of attack, though they are invaluable for defending against other threats. If an attacker has sufficient resources, skill and time they will be able to successfully compromise a network. If an organisation generates or stores data which would be of value to third parties, particularly foreign states, that organisation should accept there is a heightened risk of attack.</p>
+<p>The approach to counter these attacks is not to expect to stop them before they happen. Organisations with high value data should expect to be compromised, regularly, and accept that this is simply a risk of being connected to the internet. To achieve a ‘business as usual’ state, the organisation must prepare for these compromises and adopt a cyber security strategy, following the guidelines provided by a standard or framework such as the <a href="https://www.cesg.gov.uk/News/Pages/10-Steps-to-Cyber-Security.aspx">CPNI 10 Steps to Cyber Security</a> or the <a href="https://www.sans.org/critical-security-controls/">SANS Critical Security Controls</a>.</p>
+<p>The organisation should implement network monitoring to identify any malicious activity, which offers the best chance of detecting the attack in its initial stages. Following this it is essential that clear and effective incident response procedures are followed, in order to act quickly and limit the impact of the attack.</p>
+<p>If the compromise is discovered at a later stage, retrospective incident response is fundamental in securing the network in order to understand what data was taken and whether the attacker still has remote access. For this to be effective the right information sources and capability must be available, and so an organisation should take steps to ensure it is ready for an attack well before identifying its first incident.</p>
+<p>While these attacks are all too familiar to information security professionals and certainly not a new development, organisations are still regularly compromised and the majority find themselves poorly prepared to deal with the incident; the risk is still very real and worthy of on-going focus.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Kat is a part of our Response team in Context's London office. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

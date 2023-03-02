@@ -1,0 +1,62 @@
+---
+layout: blogpost
+title: "Top Findings from Red Team Engagements"
+author: "Andrew Scott"
+author_role: "Assurance Regional Lead, Scotland"
+summary: "Following on from our previous post about common Red Team findings we now look at the top 3 most common findings our consultants find in our Red Team engagements."
+tags: [Security assessment and testing]
+hero_banner: Sign_up_for_our_red_team_fundamentals_training_course_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<h3>3rd place – lack of patching and unsupported software</h3>
+<p>This probably isn’t a surprise to anyone reading this, yet it continues to be a thorn in system administrators' sides and a huge opportunity for attackers. Even in the enterprises that have the basics fixed, such as a successful windows update cycle setup, there is always other vulnerable software running that can be leveraged to increase access, attack other users or particular systems.  </p>
+<p>The most common areas that we find opportunities to dig deeper into an organisation are:</p>
+<ul>
+<li><strong>3rd party software</strong>. All software installed on a system needs to be maintained and new versions and patches applied. Whether it’s FileZilla, the organisation’s management instrumentation or Chrome, all software needs to be considered as part of a patching cycle.</li>
+<li><strong>Applications.</strong> Usually business applications exist on the network, and we find they are not well maintained and patched. Or there are no patches but the application relies on outdated software (Apache Struts anyone?) and no mitigating actions have been taken.</li>
+<li><strong>OS updates.</strong> Although in a better place than 3rd party and hosted application patching, operating system patches are still not consistently and ubiquitously applied. Although a core server and desktop build may be well taken care of, often we find other systems that are not as well cared for, or where a ‘risk based’ choice of patches to apply is not considering the attacker perspective completely.</li>
+<li><strong>Outdated OS's.</strong> Yes, we still find Windows 2003 and XP in organisations. Everyone knows they are bad, but they have not successfully eradicated them from their estates. Not only are these old systems outdated and vulnerable, they can also hold back connected modern systems from being able to use some of the latest security settings available.</li>
+<li><strong>Out of support hardware. </strong> As with software, hardware goes out of support, gets vulnerabilities and needs patching. Not supported but often not replaced, these can also be a treasure trove for attackers looking to gain additional access to a network. Finally;</li>
+<li><strong>Browser plugins. </strong>With the use of a modern browser this is becoming less of a problem. However our Red Teams do still find an installed base of Flash, old versions of Java and Adobe products which mean that they are usually able to find a reliable way to gain access to people's desktops if needed. Specifically, vulnerable Java versions are often a business requirement for back end applications which will only work with the given version. If these plugins cannot be eliminated they need to be contained to prevent attackers leveraging them.</li>
+</ul>
+<h3>2nd place – lack of network segregation</h3>
+<p>In 2/3rds of our Red Team engagements we find that we can jump straight from our initial point of compromise and start interacting with the targeted Crown Jewel. 10 years ago we used to talk about the crunchy exterior of networks and the soft squishy interiors and this seems to still be very much in evidence. When any connected device can connect to any system, eventually one <em>will.</em> With the rise of VDI based infrastructures, new software tools and advanced host based firewalls available in most operating systems, organisations have the opportunity to address this problem without necessarily re-architecting like it once would have meant.</p>
+<p>The more layers of defence that stand between an attacker and their target, the harder it is for them to achieve their target, the longer it will take them and the more likely they are to give up or get noticed by a SOC. Without any network segregation this chain of activity is reduced to identifying a user with access and finding a way to take over their account.</p>
+<h3>1st place – poor credential handling</h3>
+<p>This was by far the biggest surprise for most of our team when compiling the stats. We all knew informally that ‘getting Domain Admin’ is required on some tests and there is usually one or two ways to achieve it when needed, but no one imagined that this would be the key to as much as 85% of our engagements, a full 20% up on 2nd place.</p>
+<p>So what do we mean by poor credential handling? Delving into the results more deeply reveals a number of ways that credentials are exposed to a Red Team. We are going to split these into two types for discussion: Those that increase risks, and those that result in instant failure. Let’s first look at the instant failure modes we have seen.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Single_points_of_failure_red_team_test_800_467_75_s_c1.JPG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Single_points_of_failure_red_team_test_800_467_75_s_c1.JPG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Single_points_of_failure_red_team_test_691_403_75.JPG"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Single_points_of_failure_red_team_test_691_403_75.JPG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The most common point of failure we see is that of passwords, for powerful domain administrator level accounts, added to logon scripts, or saved on a file share ‘in case someone forgets’. Often these repositories allow everyone on the network to read them, compromising the credentials. Sharing administration credentials, either between users or between accounts, makes compromising them much easier for the Red Team or an attacker to gain access to them. The other problems are all common things which every system administrator knows they shouldn’t do, yet the need comes up sometimes and perhaps doesn’t get fixed. This is the point where an attacker can move in and take advantage.</p>
+<p>Our other category here is of items that increase risks, rather than acting as single points of failure. They mostly feature account configuration options, often with administrative accounts excluded from all the requirements of normal users, or all the accounts on the network having lax controls:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Risk_factors_red_team_800_270_75_s_c1.JPG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Risk_factors_red_team_800_270_75_s_c1.JPG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Risk_factors_red_team_560_189_75.JPG"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Risk_factors_red_team_560_189_75.JPG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It is common for us to find high power accounts with passwords which have not changed for more than 5 years, or the local administrator across a whole organisation to have the same password on every PC. But the standout is simply that passwords used on important accounts are too easy to guess, or crack because they are not complex enough.</p>
+<p>So how do we address the problem? The first point of call for any organisation has to be to understand the problem facing them, and to help with this Context are introducing a new service: Active Directory Attack Resistance testing. We take a closer look at what this is and how it can benefit an organisation in our next post.</p>
+</article>
+{% endraw %}

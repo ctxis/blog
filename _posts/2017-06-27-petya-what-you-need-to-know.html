@@ -1,0 +1,18 @@
+---
+layout: blogpost
+title: "Petya: What you need to know"
+author: "Kevin O’Reilly"
+author_role: "Principal Consultant"
+summary: "Context has become aware of a new self-propagating variant of the “Petya” ransomware which spreads using the EternalBlue SMB exploit made famous by WannaCry."
+tags: [Incident Response, Malware]
+hero_banner: WannaCryWhat_you_need_to_know_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Like WannaCry, this malware variant contains an embedded payload which is automatically extracted by Context’s malware configuration and payload extraction system, CAPE. </p>
+<p>We have added a signature to CAPE to allow detection of the extracted payload, which can be seen in the following CAPE analysis: <a href="https://cape.contextis.com/analysis/1548">https://cape.contextis.com/analysis/1548</a></p>
+<p>Our advice with this malware variant is the same as that for the earlier WannaCry outbreak. Read our blog post here: <a href="https://www.contextis.com/resources/blog/wannacry-what-you-need-know/">WannaCry: What you need to know</a></p>
+<p>In addition to its ability to spread as a network worm, we believe the initial infection vector to be via email. So the usual advice with regard to caution opening email attachments or links applies here. In addition, please upload attachments you may be suspicious of to our public CAPE instance: <a href="https://cape.contextis.com/submit">https://cape.contextis.com/submit</a>, and keep an eye on further submissions for any other variants that we come across.</p>
+<p>If you are interested in having your own instance of CAPE to help in the fight against malware, you may find it on Context’s github at <a href="https://github.com/ctxis/CAPE">https://github.com/ctxis/CAPE </a></p>
+</article>
+{% endraw %}

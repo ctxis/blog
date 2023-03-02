@@ -1,0 +1,185 @@
+---
+layout: blogpost
+title: "Über die Schwierigkeiten von Antragsstrecken"
+author: "Michael Skiba"
+author_role: "Security Consultant"
+summary: "In diesem zweiteiligen Blogpost werden wir Antragsstrecken diskutieren. In Teil 1 befassen wir uns damit, wie Antragsstrecken die Aufwandsabschätzung („Scoping“) beeinflusst. In Teil 2 (Englisch) werden wird anhand eines einfachen praktischen Beispiels ein mögliches Testvorgehen aufzeigen."
+tags: [Web applications, US Excluded]
+hero_banner: Multi_Step_forms_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Bevor es ins Detail geht, zuerst eine kleine Einführung:</p>
+<h2>Was ist ein Web-Formular?</h2>
+<p>Ein Formular wird auf Webseiten eingesetzt, um es einem Benutzer zu ermöglichen, Daten an die Anwendung zu schicken und so mit ihr zu interagieren. Die Gründe dafür sind vielfältig und ihre Benutzung ist entscheidend für ein interaktives Internet: Sei es die online Pizzabestellung, das Schreiben eines Forenbeitrags oder das Nachschauen des Wetters für eine bestimmte Postleitzahl. Das alles benötigt Benutzereingaben, die üblicherweise durch Formulare geschehen. Nachfolgend ist ein Beispiel für ein einfaches Kontaktformular, das den Anwender eine Kontaktanfrage verschicken lässt. Alle benötigten Daten werden in einem Formular auf Seite 1 (S1) gesammelt und werden anschließend in einer einzelnen weiteren Anfrage (S2) verschickt, verarbeitet und ausgegeben.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424030508im_/https://www.contextis.com/media/images/content/Forms_1.width-800_.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424030508im_/https://www.contextis.com/media/images/content/Forms_1.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_1.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_1.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Bild 1: Ein einseitiges Kontaktformular mit 13 Eingabefeldern</em></p>
+<h2>Was ist eine Antragsstrecke? </h2>
+<p>Bei Antragsstrecken handelt es sich um Formulare, die sich über mehrere Seiten verteilen und bei denen der Benutzer einen bestimmten Pfad ablaufen muss (z.B. indem er auf die ‚Weiter‘ Schaltfläche drückt) der wiederum aus mehreren Schritten besteht, bevor die Daten verarbeitet werden. Solche Antragsstrecken finden sich oft bei Versicherungs- oder Bankenseiten, z.B. wenn es um die Beantragung einer Versicherungspolice oder eines Kredits geht. Aber auch auf Shopping-, Auktionsseiten, Quiz-Anwendungen, etc. Sie werden verwendet um eine Vielzahl an Daten abzufragen (Persönliche Daten, Finanzielle Daten, Grundstücksdaten, …).</p>
+<p>Nachfolgend ist ein Beispiel für eine einfache Antragsstrecke, auf der Benutzereingaben auf Seite 1 (S1) und Seite 2 (S2) gesammelt und jeweils zum Server geschickt werden. Mit der Anfrage für Seite 3 werden die zuvor gesammelten Daten vom Server verarbeitet und das Ergebnis ausgegeben.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424030508im_/https://www.contextis.com/media/images/content/Forms_2.width-800_.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424030508im_/https://www.contextis.com/media/images/content/Forms_2.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_2.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_2.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Bild 2: Antragsstrecke mit zwei Eingabeseiten (8 + 5 = 13 Eingabefelder) und einer Ergebnisseite</em></p>
+<h2>Teil 1 – Stolperfallen beim Scoping</h2>
+<p>Beim Scopen (d.h. dem Abschätzen des Zeitaufwands für einen Test) von Anwendungen können Antragsstrecken einen großen Teil des Gesamtaufwands für ein Projekt darstellen. Aber warum ist das so?<br/>
+Der Grund dafür liegt in der verschachtelten Struktur den diese Formulare aufweisen und die verschiedenen Kombinationsmöglichkeiten von Ein- und Ausgabe, die zu einer Vielzahl an Möglichkeiten führt. Aber eines nach dem anderen:</p>
+<h3>Was ist „fuzzing“? </h3>
+<p>Ein wesentlicher Bestandteil eines Penetrationstests („Pentest“) ist die Überprüfung der Ein- und Ausgabe. Dies wird üblicherweise sowohl manuell als auch automatisiert durchgeführt und überprüft, ob potenziell schädliche Eingaben ordnungsgemäß abgesichert (im Jargon: „Escaped“) werden, bevor diese weiterverarbeitet, gespeichert oder angezeigt werden. Typische Beispiele für Schwachstellen dieser Art beinhalten Cross-Site-Scripting (XSS), SQL-Injection, Local- und Remote-File-Inclusion sowie Remote Code Execution.</p>
+<p>Während eines durchschnittlichen Tests wird ein einzelnes Eingabefeld mit ca. 1000 verschiedenen Testfällen („Payloads“) getestet. Jeder abgeschickte Payload muss überprüft werden, um zu sehen ob das Verhalten der Anwendung vom Sollzustand abweicht. Wird z.B. die Eingabe auf einer anderen Seite „reflektiert“ (d.h. irgendwo auf der Seite angezeigt)? Falls ja, ist die Ausgabe sicher escaped oder bricht sie aus der normalen Syntax der Seite aus und erlaubt damit das Ausführen von Skriptcode? Eine andere Metrik könnte die Zeit sein, die es braucht, um die Antwort der Seite auszuliefern, um festzustellen ob der Payload irgendwo im Hintergrund irgendwelche Prozesse angestoßen hat, auch wenn der Payload selbst gar nicht auf der Seite ausgegeben wird.</p>
+<p>Natürlich werden diese Checks komplizierter, wenn die Ein- und Ausgabe über mehrere Seiten verteilt ist.</p>
+<h3>Beispielrechnung (vereinfacht)</h3>
+<p>Lassen Sie uns annehmen, dass wir den Zeitaufwand abschätzen um das Kontaktformular aus Abb. 1 zu testen. Es ist ein einzelnes Formular mit 13 Eingabefeldern, die auf Seite 1 eingegeben und sofort verarbeitet werden, wenn die „Send message!“ Schaltfläche gedrückt wurde. Lassen Sie uns außerdem der Einfachheit halber annehmen, dass es keine Sitzungsdaten und keine komplexen Backendfunktionen gibt. Daraus ergibt sich eine Rechnung von 13*1000 = 13‘000 Anfragen.</p>
+<p>Bei einer Antragsstrecke gestaltet sich das Ganze etwas schwieriger, weil:</p>
+<ul>
+<li>Die Eingabe an verschiedenen Stellen des Prozesses reflektiert werden kann.</li>
+<li>Ein Benutzer sich innerhalb der Antragsstrecke vor- und zurückbewegen kann (evtl. sendet der Server bereits getätigte Eingaben wieder an den Benutzer zurück).</li>
+<li>Der Server die Sitzung des Benutzers verwalten muss (z.B. mit einem Cookie).</li>
+</ul>
+<p>Deshalb gibt es statt eines Workflows plötzlich mehrere „Durchläufe“ (Beispiel Abb. 2). Ein häufiger Fehler, der in der Wildnis beobachtet werden kann, ist, dass Eingabeüberprüfungen, die automatisiert mit einem Werkzeug (z.B. Burp) durchgeführt werden, nur einen einzelnen Schritt testen, ohne die komplette Antragsstrecke von Anfang bis Ende zu durchlaufen. Dabei handelt es sich um ein Problem beim Testansatz, anstatt einer technischen Limitierung des Werkzeugs selbst. Mit einem solchen Ansatz sieht ein Tester nur einen sehr kleinen Teil des Gesamtbildes und übersieht möglicherweise kritische Informationen.</p>
+<h3>Naiver Ansatz</h3>
+<p>Betrachten wir die Antragsstrecke aus Abb. 2, diese ist in drei Seiten aufgeteilt: „Personal Details“ (Persönliche Details), „Payment Details“ (Zahlungsdetails) und „Summary“ (Zusammenfassung). Ein naiver Tester, der nur die einzelnen Schritte prüft wird in einem ersten Schritt die 8 Eingabefelder auf Seite 1 mit 1000 Payloads testen. Als Antwort wird er vom Server jedes Mal die „Payment Details“ Seite erhalten. Diese wird aber weder die Eingabe verarbeiten noch irgendetwas von ihr reflektieren, sie zeigt lediglich 5 weitere Eingabefelder an. Der naive Ansatz wird aus diesem Grund keine XSS-Lücke finden, die möglicherweise vorhanden ist, z.B. im Adressfeld.</p>
+<p>In einem zweiten Schritt dürfte der Tester die Eingabefelder des zweiten Schrittes prüfen wollen. Dabei begegnen ihm aber möglicherweise folgende zwei Show-Stopper: Erstens kann es sein, dass der Server seine Sitzung entwertet („invalidiert“), falls dieser nachhält welche Eingaben der Benutzer zuvor getätigt hat. Dies geschieht häufig wenn jemand versucht eine Antragsstrecke in einer anderen als der vorgesehenen Reihenfolge aufzurufen, z.B. durch den direkten Zugriff auf Seite 2 ohne vorher auf Seite 1 gewesen zu sein.</p>
+<p>Zweitens ist es möglich dass die Eingabefelder auf Seite 1 und Seite 2 unterschiedlich verarbeitet werden. In unserem Beispiel werden viele Eingaben von Seite 1 auf der Zusammenfassungsseite reflektiert, wohingegen die Eingaben von Seite 2 nur stark maskiert angezeigt werden.</p>
+<p>Der naive Ansatz, in dem Seite 1 und Seite 2 individuell getestet werden, benötigt ungefähr 8*1000 (Seite 1) + 5*1000 (Seite 2) = 13‘000 Anfragen.</p>
+<h3>Gründlicher Ansatz</h3>
+<p>Wir haben einen naiven Ansatz gesehen, aber wie würde ein gründlicher, ‚richtiger‘ Ansatz funktionieren?</p>
+<p>Man würde immer vom Anfang der Antragsstrecke anfangen und zu der Stelle ‚laufen‘ an der das fuzzing stattfinden soll und anschließend bis zum Ende der Antragsstrecke gehen. Es ist wichtig zu betonen, dass das Ende der Antragsstrecke nicht unbedingt die letzte Seite der Antragsstrecke ist, sondern an der Stelle an der man eine mögliche Reflektion prüfen möchte.</p>
+<p>Wo könnten diese Stellen sein? Es ist nicht nur die offensichtliche Zusammenfassungsseite, welche die Informationen von Seite 1 und Seite 2 anzeigt. Es könnte auch sein, dass der Server versucht uns einen Gefallen zu tun und beim Navigieren zwischen den Seiten die bereits abgeschickten Daten erneut in die Eingabefelder einfüllt. Schauen wir uns also die Fuzzing-Workflows für unser Beispiel aus Abb. 2 an, eine einfache Antragsstrecke mit acht Eingabefeldern auf der ersten und fünf weiteren Eingabefeldern auf der zweiten Seite. Am Ende der Antragsstrecke ist eine einzelne Zusammenfassungsseite.</p>
+<p>1) Gehe zu Seite 1; Führe Eingabeüberprüfung für die Felder auf Seite 1 durch. Gehe weiter zu Seite 2. Gehe zum Ende.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Forms_3.width-800__800_249_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Forms_3.width-800__800_249_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_3.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_3.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>2) Gehe zu Seite 1; Führe Eingabeüberprüfung für die Felder auf Seite 1 durch. Gehe weiter zu Seite 2. Gehe zum Ende. Von hieraus, gehe zurück zu Seite 1.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Forms_4.width-800__800_307_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Forms_4.width-800__800_307_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_4.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_4.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>3) Gehe zu Seite 1; Führe Eingabeüberprüfung für die Felder auf Seite 1 durch. Gehe weiter zu Seite 2. Gehe zum Ende. Von hieraus, gehe zurück zu Seite 2.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Forms_5.width-800__800_323_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Forms_5.width-800__800_323_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_5.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_5.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>4) Gehe zu Seite 1; Gehe weiter zu Seite 2. Führe Eingabeüberprüfung für die Felder auf Seite 2 durch. Gehe zum Ende. </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Forms_6.width-800__800_258_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Forms_6.width-800__800_258_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_6.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_6.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>5) Gehe zu Seite 1;  Gehe weiter zu Seite 2. Führe Eingabeüberprüfung für die Felder auf Seite 2 durch. Gehe zum Ende. Von hieraus, gehe zurück zu Seite 2.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Forms_7.width-800__800_316_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Forms_7.width-800__800_316_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_7.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_7.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>6) Gehe zu Seite 1;  Gehe weiter zu Seite 2. Führe Eingabeüberprüfung für die Felder auf Seite 2 durch. Gehe zum Ende. Von hieraus, gehe zurück zu Seite 1.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Forms_8.width-800__800_304_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Forms_8.width-800__800_304_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_8.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_8.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>7) Gehe zu Seite 1;  Führe Eingabeüberprüfung für die Felder auf Seite 1 durch. Gehe zu Seite 2. Von hieraus, gehe zurück zu Seite 1.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Forms_9.width-800__800_410_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Forms_9.width-800__800_410_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_9.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424030508/https://www.contextis.com/media/images/content/Forms_9.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Wie wir sehen können kommen beim vollständigen durchfuzzen aller logischen Workflows einiges an Anfragen zusammen. In unserem Beispiel braucht es 167‘000 Anfragen, dies entspricht fast einem Faktor 13x gegenüber dem naiven Ansatz der für einfache Formulare reicht. Wichtiger ist jedoch noch, dass diese Zahl exponentiell mit der Anzahl der Schritte steigt. </p>
+<h2>Fazit</h2>
+<p>Benötigen Antragsstrecken also immer deutlich mehr Aufwand? Nicht unbedingt. Es kommt sehr stark auf die individuelle Ausprägung der Antragsstrecke an und wie/wann Daten verarbeitet werden, sowie welche logischen Abläufe erlaubt sind. Ein gutes Verständnis über die möglichen und erlauben Arbeitsabläufe auf beiden Seiten ist essentiell für eine zufriedenstellende Aufwandsabschätzung.</p>
+<p>Für einen Tester ist wichtig zu wissen, dass diese Abläufe existieren und wie die vorhandenen Werkzeuge richtig eingesetzt werden können um diesem Workflow gerecht zu werden. Aber dies ist eine Geschichte für einen anderen Blogbeitrag …</p>
+<h2>Kontakt und weitere Informationen</h2>
+<p>Michael arbeitet in unserem Assurance team in Essen. Haben Sie Fragen? Kontaktieren Sie uns <a href="https://www.contextis.com/en/contact">hier</a>. </p>
+</article>
+{% endraw %}

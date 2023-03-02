@@ -1,0 +1,747 @@
+---
+layout: blogpost
+title: "Manually Testing SSL/TLS Weaknesses 2016 Edition | Context Information Security US"
+author: "Michael Skiba"
+author_role: "Security Consultant"
+summary: "In 2015 Jay Kalsi and Daniel Mossop released a blogpost for Context that explained how one can manually test for the most common SSL/TLS weaknesses. This post has since been one of the most frequently visited blogpost on the Context site. This update aims to make sure that you are up to date with the latest SSL/TLS issues."
+tags: [Vulnerabilities and exploits]
+hero_banner: ComputerRackBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>The Transport Layer Security (TLS) protocol and its better known predecessor Secure Socket Layer (SSL) are still the pillars for public facing secure transportation of web services, such as HTTPS, SMTPS, IMAPS, etc. It might be the revelations of mass interception of internet traffic by various agencies or a general increase in security awareness that has led to an increase in TLS/SSL deployment (<a href="https://www.schneier.com/blog/archives/2013/09/how_to_remain_s.html">Schneier on Security</a>). The site <a href="http://trends.builtwith.com/ssl/SSL-by-Default">builtwith</a>, which monitors trends for different web technologies, has registered an increase in the proportion of the top 1 million websites that use HTTPS by default from 22831 (2.2%) in August 2015, to 83951 (8.4%) by July 2016. This represents an increase of a little over 3.5. However, the increasing prevalence of TLS/SSL makes it an interesting target for both hackers and national agencies alike that both try to weaken or break the encryption. As a result, new weaknesses are frequently published, which require an equally frequent update of a server’s TLS/SSL configuration. With this updated blogpost we try to show you more ways to manually test your TLS/SSL configuration.</p>
+<p>On a brighter note: The proportion of sites with an insecure SSL/TLS configuration (according to SSL Pulse) has dropped from about 75% in June 2015 to 59.5% of the ~140,000 sites surveyed in July 2016. This indicates that the overall security of SSL/TLS configurations has increased. Another noteworthy thing is that the number of sites utilising the HTTP Strict Transport Security header has doubled in size from ~5,300 to 12,500 for the same reporting period, though this still only represents about 8.7%). For more information about this and other HTTP headers, have a look at our blog post about ‘<a href="/web/20220507202421/https://www.contextis.com/resources/blog/security-http-headers/">The Security of HTTP-Headers</a>’.</p>
+<p>This blog post covers the following topics:</p>
+<ul>
+<li>DROWN <sup><b>NEW Aug 2016</b></sup></li>
+<li>TLS_FALLBACK_SCSV <sup><b>NEW Aug 2016</b></sup></li>
+<li>LOGJAM <sup><b>NEW Aug 2016</b></sup></li>
+<li>SSLv2 Support <sup><b>Updated Aug 2016</b></sup></li>
+<li>SSLv3 Support</li>
+<li>Cipher Suites <sup><b>Updated Aug 2016</b></sup></li>
+<li>SSL/TLS Certificates <sup><b>Updated Aug 2016</b></sup></li>
+<li>Renegotiation <sup><b>Updated Aug 2016</b></sup></li>
+<li>Compression</li>
+<li>Implementation Issues</li>
+<li>Cipher Order Enforcement <sup><b>NEW Dec 2016</b></sup></li>
+</ul>
+<h2 class="section-title">DROWN</h2>
+<p>Drown stands for <strong>D</strong>ecrypting <strong>R</strong>SA with <strong>O</strong>bsolete and <strong>W</strong>eakened e<strong>N</strong>cryption and is yet another SSLv2 vulnerability.</p>
+<p>SSLv2 was discussed in the previous version of this blog post, so why do we mention it again? DROWN is different from merely using old and broken SSLv2 ciphers. DROWN enables an attacker to decrypt, otherwise totally secure, TLS sessions via SSLv2 handshakes. This vulnerability is not limited to a specific SSL implementation. However, OpenSSL, probably the most commonly used SSL implementation, suffers from a bug (<a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-3197">CVE-2015-3197</a>) that makes it vulnerable even if no SSLv2 ciphers are offered, but SSLv2 is not explicitly disabled (affected versions are OpenSSL &lt;1.0.1r and &lt;1.0.2f).</p>
+<p>Another tricky little detail is that if you have several SSL/TLS services running on your server that share the same key material (e.g. because they serve the same certificate), then a single service being vulnerable makes every SSL/TLS connection to your server vulnerable. So an old mail server that supports SSLv2 can endanger an otherwise perfectly configured TLSv1.2-only HTTPS connection.</p>
+<p>To check if a host is vulnerable to DROWN you can use nmap &gt; =7.10 to scan all the services on your host:</p>
+<pre class="prettyprint">nmap –p- –sV –sC example.com</pre>
+<p>A quicker scan, which will only check the most common SSL enabled ports (FTP, HTTP, IMAP, POP, SMTP) is the following line (use in one's sole discretion):</p>
+<pre class="prettyprint">nmap –p 21,25,110,143,443,465,587,993,995,2525 –sV –sC example.com</pre>
+<p>To determine if your system is vulnerable look for the line ‘SSLv2 supported’:</p>
+<pre class="prettyprint">nmap --script ssl-enum-ciphers -p 443 10.0.0.1
+Nmap scan report for 10.0.0.1
+PORT STATE SERVICE REASON
+443/tcp open https syn-ack
+| sslv2:
+| SSLv2 supported
+| ciphers:
+| SSL2_DES_192_EDE3_CBC_WITH_MD5
+| SSL2_IDEA_128_CBC_WITH_MD5
+| SSL2_RC2_128_CBC_WITH_MD5
+| SSL2_RC4_128_WITH_MD5
+| SSL2_DES_64_CBC_WITH_MD5
+| SSL2_RC2_128_CBC_EXPORT40_WITH_MD5
+|_ SSL2_RC4_128_EXPORT40_WITH_MD5
+|_</pre>
+<p>Please note that nmap &lt;7.10 does not catch the OpenSSL bug (<a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-3197">CVE-2015-3197</a>) where OpenSSL still processes SSLv2 handshakes even though it did not offer any SSLv2 ciphers. As an alternative, one can use a tool provided by Hubert Kario, called <a href="https://github.com/tomato42/tlsfuzzer">tlsfuzzer</a>.</p>
+<p>Full details of the DROWN attack, including the paper released by the researchers, can be <a href="https://drownattack.com/#paper">found here</a>.</p>
+<h2 class="section-title">TLS_FALLBACK_SCSV</h2>
+<p>When a client fails to establish an SSL/TLS connection with its most recent supported protocol version, it will attempt to negotiate with the server within the same TCP connection to find the highest common version supported by both the server and client. However, some servers with a poor SSL/TLS implementation are not able to properly communicate to a client that they require an older version of a protocol (e.g. client supports TLS up to version 1.2, while the server only speaks TLS 1.1) and drop the TCP connection. To ensure compatibility, the client will then start a new connection with a lower SSL/TLS version until the negotiation process is complete.</p>
+<p>Unfortunately, this behaviour is a flaw because the server loses the state information about the negotiation process when it drops the TCP connection and leaves connections between the client and server vulnerable to a downgrade attack. To perform such a downgrade, an attacker in a man-in-the-middle position deliberately alters messages from the server to the client or withholds them entirely, hoping that the client will try to reconnect to the server with a lower protocol version that is easier to attack (e.g. SSLv3). The ability of a man-in-the-middle attacker to perform this attack is regardless of whether the server uses a poor SSL/TLS implementation.</p>
+<p>To mitigate this attack vector, the TLS_FALLBACK_SCSV ‘cipher’ was introduced. It is not an actual cipher, but provides a method for the client to signal to the server that a previous connection attempt failed. It is advertised by the client as an available cipher when the client is not using its highest supported version. Servers that have implemented the TLS_FALLBACK_SCSV check will detect this ‘cipher’ and compare the client’s advertised protocol version to their own set of supported versions. If the TLS_FALLBACK_SCSV cipher is present and client protocol version is smaller than the highest version supported by the server, i.e. an attacker has downgraded the SSL/TLS connection, the connection will be aborted. If the server is not able to process the TLS_FALLBACK_SCSV cipher then it will simply think of it as an unsupported cipher and ignore it.</p>
+<p>The following scenarios are provided to help understand the function of the TLS_FALLBACK_SCSV cipher:</p>
+<ol>
+<li>A client that can speak TLSv1.2 attempts to connect to a server that only speaks TLSv1.1: The client’s first attempt to speak TLSv1.2 will fail and we assume the server does not respond properly so closes the connection. The client then tries to reconnect using TLSv1.1 and will also advertise the cipher TLS_FALLBACK_SCSV. The server sees this cipher and compares both protocol versions. It will see that TLSv1.1 is the latest version that it supports and accept the connection.</li>
+<li>As above, the client supports TLSv1.2, but the server also supports TLSv1.2. However, an attacker has dropped connection attempts from the client using TLSv1.2, 1.1 and 1.0 until the client tries to connect using SSLv3. The server supports SSLv3 but sees and understands the TLS_FALLBACK_SCSV cipher, which indicates that the client has previously attempted a connection with a higher version. The server knows that it supports higher version and determines that something has interfered with previous connection attempts resulting in a downgrade. The result is that the server sends an error message to the client and aborts the connection.</li>
+</ol>
+<p>To test if a server checks the TLS_FALLBACK_SCSV cipher, you can use the following command, adjusting the protocol version (highlighted) to the lowest available supported by your server:</p>
+<pre class="prettyprint">openssl s_client –tls1 -fallback_scsv -connect example.com:443</pre>
+<p>If your server supports something better than SSLv3 and checks for the presence of the TLS_FALLBACK_SCSV cipher, it should abort the connection with an error like the following:</p>
+<pre class="prettyprint">tlsv1 alert inappropriate fallback:s3_pkt.c:1262:SSL alert number 86</pre>
+<p>The TLS_FALLBACK_SCSV cipher was first proposed in response to the POODLE attack which, in part, used a downgrade prior to exploiting a padding oracle in SSLv3. Details of the POODLE attack and the proposed TLS_FALLBACK_SCSV cipher can be found here.</p>
+<h2 class="section-title">Logjam</h2>
+<p>The Logjam vulnerability affects cipher suites that use a Diffie-Hellman (DH) key exchange (excluding elliptic curve DH) with small DH parameters (&lt;2048 bits). The research that resulted in the Logjam attack demonstrated how it was possible to pre-compute the majority of work required to crack the DH key exchange. Due to the increasing computational power available (e.g. cloud computing and GPU clusters) it has become possible to crack these small keys in just a small amount of time with only reasonable financial investments, e.g. while it took approximately 6 weeks to crack a 512 bit parameters in 2002, you can crack the same 512-bit DH parameters in only a few hours in 2016. 1024 bit parameters will take a longer to crack, but is understood to be achievable for large organisations and governments with enough computing power.</p>
+<p>This automatically rules out all of the DHE_EXPORT ciphers, which are capped at 512 bits (but you shouldn’t use export ciphers anyway). To check if your non-export DH ciphers have an appropriate key size you can use the following command:</p>
+<pre class="prettyprint">openssl s_client -connect www.example.com:443 -cipher "EDH"</pre>
+<p>The DH parameter size used is displayed in the output next to “Server Temp Key”. Please note that you’ll need at least OpenSSL 1.0.2 to display the ‘Sever Temp Key’ parameter.</p>
+<pre class="prettyprint">---
+No client certificate CA names sent
+Peer signing digest: SHA512
+Server Temp Key: DH, 2048 bits
+---
+SSL handshake has read 6641 bytes and written 455 bytes
+---
+New, TLSv1/SSLv3, Cipher is DHE-RSA-AES256-GCM-SHA384
+...</pre>
+<p>The currently recommended minimum size for DH parameters is 2048 bits. Anything equal or below 1024 is considered insecure.</p>
+<p>Further details on the Logjam attack, including the paper released by the researchers, can be <a href="https://weakdh.org/">found here</a>.</p>
+<h2 class="section-title">SSLv2 Support</h2>
+<p>SSLv2 was released twenty years ago and soon after discovered to have significant weaknesses which could allow an attacker to decrypt and modify communications. It was superseded a year later by SSLv3 which addressed these issues, but despite its age and short lifespan SSLv2 support is still surprisingly common (especially among non-http services – read the DROWN section below to learn why this is a big problem).</p>
+<p>To check whether SSLv2 is enabled on the remote host, the following command can be used:</p>
+<pre class="prettyprint">openssl s_client –ssl2 -connect example.com:443</pre>
+<p>If SSLv2 is supported, the handshake will complete and server certificate information will be returned, as shown in the following response:</p>
+<pre class="prettyprint">openssl s_client -ssl2 -connect 10.0.0.1:443
+CONNECTED(00000003)
+depth=0 /C=AU/ST=/L=/O=Context/OU=context/CN=sslserver
+verify error:num=18:self signed certificate
+verify return:1
+depth=0 /C=AU/ST=/L=/O=Context/OU=context/CN=sslserver
+verify return:1
+---
+Server certificate
+-----BEGIN CERTIFICATE-----
+MIICnjCCAgugAwIBAgIJAPB2liVH7xRsMA0GCSqGSIb3DQEBBQUAMGwxCzAJBgNV
+BAYTAkFVMREwDwYDVQQIDAhWaWN0b3JpYTESMBAGA1UEBwwJTWVsYm91cm5lMRAw
+DgYDVQQKDAdDb250ZXh0MRAwDgYDVQQLDAdQbGF5cGVuMRIwEAYDVQQDDAlzc2xz
+ZXJ2ZXIwHhcNMTQwMTE3MDMwNjAxWhcNMTcxMDEzMDMwNjAxWjBsMQswCQYDVQQG
+EwJBVTERMA8GA1UECAwIVmljdG9yaWExEjAQBgNVBAcMCU1lbGJvdXJuZTEQMA4G
+A1UECgwHQ29udGV4dDEQMA4GA1UECwwHUGxheXBlbjESMBAGA1UEAwwJc3Nsc2Vy
+dmVyMIGbMA0GCSqGSIb3DQEBAQUAA4GJADCBhQJ+AJdlQF95PWaFnmN0hQd5BYUf
+SALBHBDO+JkNIPj5evYEAoPql3Am6Uphv3Pxyd+scDowb7UrReH8dBltxfz0Id4V
+3wpSJRdwo4Gx8xx27tLjDqbTaPKfSRWGpr0s2S2KJerr3XJvTDtWoiHN3zsx5kLU
+qvKTm+3LNHp7DgwNAgMBAAGjUDBOMB0GA1UdDgQWBBS5W+orwrw8K5LuFRykGg9w
+1DCanzAfBgNVHSMEGDAWgBS5W+orwrw8K5LuFRykGg9w1DCanzAMBgNVHRMEBTAD
+AQH/MA0GCSqGSIb3DQEBBQUAA34AegQVwKLQseAu7krFdsrfL117Sfpk7BuucJXJ
+nNbg9WRKFk5raikmp1nc5zLRZ4c6waDSX/rrT2g06IXSAJXmv5d2NYU+5YECJnY5
+ApexOlQJvsunKXZdJvBC6FijyLGi8G9zbA5S++JQkXWtiiICPGF2afYI5ahBgGO2
+hgE=
+-----END CERTIFICATE-----
+subject=/C=AU/ST=/L=/O=Context/OU=context/CN=sslserver
+issuer=/C=AU/ST=/L=/O=Context/OU=context/CN=sslserver
+--
+No client certificate CA names sent
+---
+Ciphers common between both SSL endpoints:
+RC4-MD5 EXP-RC4-MD5 RC2-CBC-MD5 
+EXP-RC2-CBC-MD5 DES-CBC-MD5 DES-CBC3-MD5
+---
+SSL handshake has read 807 bytes and written 233 bytes
+---
+New, SSLv2, Cipher is DES-CBC3-MD5
+Server public key is 1000 bit
+Secure Renegotiation IS NOT supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+Protocol : SSLv2
+Cipher : DES-CBC3-MD5
+Session-ID: 3BD641677102DBE9BDADF9B990D2D716
+Session-ID-ctx:
+Master-Key: D2AAB3751263EB53BAD83453D26A09DA1F700059FD16B510
+Key-Arg : DB92A6A80BF4CA4A
+Start Time: 1390178607
+Timeout : 300 (sec)
+Verify return code: 18 (self signed certificate)</pre>
+<p>If the server does not support SSLv2 the response will be a handshake failure error similar to the following:</p>
+<pre class="prettyprint">CONNECTED(00000003)</pre>
+<p>458:error:1407F0E5:SSL routines:SSL2_WRITE:ssl handshake failure:s2_pkt.c:428:</p>
+<p>A nice one-liner to use in a script:</p>
+<pre class="prettyprint">echo Q | openssl s_client –ssl2 -connect example.com:443 | grep “Begin Certificate”</pre>
+<p>Please note that debian and some other distributions have removed the ssl2 option from their openssl packages years ago (Bug <a href="https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=589706">#589706</a>), despite displaying it as an option in the help section. So if you get the message “unknown option -ssl2” you’ll have grab yourself a standalone version of openssl or remove the patch that disabled sslv2 manually.</p>
+<h2 class="section-title">SSLv3 Support</h2>
+<p>Despite some issues, SSLv3 was considered secure (at least when configured correctly) until last year when the Google Security Team introduced their <a href="https://www.openssl.org/~bodo/ssl-poodle.pdf">Padding Oracle On Downgraded Legacy Encryption</a> (POODLE) attack. POODLE demonstrated that, under certain conditions, it is possible to conduct a "padding oracle" attack against ciphers using cipher-block chaining (CBC) mode. This may allow decryption of communications and disclosure of session cookies. As the only non-CBC cipher supported in SSLv3, RC4, is also known to be cryptographically weak, the conclusion is that SSLv3 should not be used for communications. The Google Security Team further showed that an attacker can force the client and server to downgrade to SSLv3 even if they would normally use TLS, meaning that it is important to ensure that SSLv3 is disabled completely.</p>
+<p>To test whether a system supports SSLv3, the following OpenSSL command can be used:</p>
+<pre class="prettyprint">openssl s_client -ssl3 -connect google.com:443
+
+CONNECTED(00000003)
+depth=2 /C=US/O=GeoTrust Inc./CN=GeoTrust Global CA
+verify error:num=20:unable to get local issuer certificate
+verify return:0
+---
+Certificate chain
+--- Certificate details removed for brevity ---
+---
+New, TLSv1/SSLv3, Cipher is RC4-SHA
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+ Protocol : SSLv3
+ Cipher : RC4-SHA
+ Session-ID: 6E461AEAD8C1516F9D8950A9B5E735F9882BFC6EA0838D81CFD41C01A3799A41
+ Session-ID-ctx:
+ Master-Key: 7E7680640BB7E2C83CBE87342727E0D09AC10EEEB095A8C0A2501EAE80FA1C20D3F3FE4346B1234057D6D506420273FA</pre>
+<pre class="prettyprint">Key-Arg : None
+ Start Time: 1421296281
+ Timeout : 7200 (sec)
+ Verify return code: 0 (ok)
+---</pre>
+<p>A handshake failure error would indicate that SSLv3 is not supported and the server is not vulnerable to POODLE.</p>
+<p>A nice one-liner to use in a script:</p>
+<pre class="prettyprint">echo Q | openssl s_client –ssl3 -connect example.com:443 | grep “Begin Certificate”</pre>
+<h2 class="section-title">Cipher Suites</h2>
+<p>One of the main functions of the SSL/TLS protocols is to allow the client and server to negotiate a mutually acceptable "cipher suite" to use for the connection. The cipher suite chosen specifies a set of algorithms which the client and server will use to perform key exchange, encryption, and message authentication.</p>
+<p>A cipher suite is typically described in a format similar to this:</p>
+<p>TLS_RSA_WITH_AES_128_CBC_SHA</p>
+<p>where RSA is the key exchange algorithm, AES_128_CBC is the encryption cipher (AES using a 128-bit key operating in Cipher-Block Chaining mode), and SHA is the Message Authentication Code (MAC) algorithm.</p>
+<p>The cipher suites a server is configured to support should be dictated by its security requirements. The following guidelines are generally recommended as a baseline:</p>
+<ul>
+<li>The key exchange algorithm should be restricted to those which provide "perfect forward secrecy", such as Ephemeral Diffie-Hellman (DHE) or Ephemeral Elliptic Curve Diffie-Hellman (ECDHE).</li>
+<li>The cipher should not suffer from known cryptanalytic flaws. This rules out RC4 which has been known to have flaws for many years and in the past few years has been shown to be significantly weaker than originally thought.</li>
+<li>The cipher should use at least a 128-bit symmetric key, which rules out DES and Triple-DES.</li>
+<li>Cipher-Block Chaining (CBC) mode is prone to padding oracle attacks and should ideally be avoided altogether, but specifically it should not be used in conjunction with SSLv3 or TLSv1.0 as this can lead to vulnerability to the <a href="http://www.contextis.com/resources/blog/server-technologies-https-beast-attack/">BEAST attack</a>. An alternative is Galois Counter Mode (GCM) which is not affected by these problems and offers authenticated encryption.</li>
+<li>The message authentication algorithm should be SHA256. MD5 is known to be cryptographically weak and is considered insecure by most browsers nowadays. Similarly phasing out SHA1 (just denoted SHA in the cipher suite specifications) has begun, since it has its own weaknesses (for example the ). The major browsers, such as Chrome, Firefox and Internet Explorer will show a warning if the certificate is valid after January 1st Use SHA256 (named as such in the cipher suite specifications) instead.</li>
+<li>NULL and anonymous (anon) ciphers should be avoided as these provide no security at all. "Export" algorithms should also be disabled as their short key lengths make them susceptible to brute-force attacks and other attacks such as the <a href="http://en.wikipedia.org/wiki/FREAK">FREAK attack</a>.</li>
+</ul>
+<p>Nmap's "ssl-enum-ciphers" script can be used to produce a list of the supported cipher suites in the following way:</p>
+<pre class="prettyprint">nmap --script ssl-enum-ciphers -p 443 example.com</pre>
+<p>Example</p>
+<pre class="prettyprint">nmap --script ssl-enum-ciphers -p 443 10.0.0.1
+Nmap scan report for 10.0.0.1
+PORT STATE SERVICE REASON
+443/tcp open https syn-ack
+| ssl-enum-ciphers:
+| SSLv3
+| Ciphers (6)
+| TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA - unknown strength
+| TLS_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA - weak
+| TLS_DH_anon_EXPORT_WITH_RC4_40_MD5 - broken
+| TLS_DHE_RSA_WITH_AES_128_CBC_SHA - strong
+| TLS_DHE_RSA_WITH_AES_256_CBC_SHA - unknown strength
+| TLS_RSA_WITH_3DES_EDE_CBC_SHA - strong
+| TLS_RSA_WITH_AES_128_CBC_SHA - strong
+| TLS_RSA_WITH_AES_256_CBC_SHA - unknown strength
+| Compressors (1)
+| uncompressed
+| TLSv1.0
+| Ciphers (6)
+| TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA - unknown strength
+| TLS_DHE_RSA_WITH_AES_128_CBC_SHA - strong
+| TLS_DHE_RSA_WITH_AES_256_CBC_SHA - unknown strength
+| TLS_RSA_WITH_3DES_EDE_CBC_SHA - strong
+| TLS_RSA_WITH_AES_128_CBC_SHA - strong
+| TLS_RSA_WITH_AES_256_CBC_SHA - unknown strength
+| Compressors (1)
+| uncompressed
+|_</pre>
+<p>While nmap will give a strength rating for each supported cipher suite, the fast pace of change SSL/TLS security means that these ratings should be manually reviewed.</p>
+<p>A list of recommended ciphers for different use cases can be found over at <a href="https://wiki.mozilla.org/Security/Server_Side_TLS">Mozilla</a>.</p>
+<p>To manually verify if a certain type of cipher suite is available one can use the following OpenSSL commands to see if a connection attempt is successful. Please note that a successful connection means that there is at least one cipher that supports this type, but there might be many more. Therefore a manual inspection might be the better choice (see above). A list of available ciphers can be displayed with:</p>
+<pre class="prettyprint">openssl ciphers</pre>
+<p>Following is means to test for ciphers that should be disabled/enabled, based on the cipher criteria mentioned above.</p>
+<p>Anonymous Cipher (Connection should fail):</p>
+<pre class="prettyprint">openssl s_client -cipher aNULL -connect example.com:443</pre>
+<p>DES Cipher (Connection should fail):</p>
+<pre class="prettyprint">openssl s_client -cipher DES -connect example.com:443</pre>
+<p>3DES Cipher (Connection should fail):</p>
+<pre class="prettyprint">openssl s_client -cipher 3DES -connect example.com:443</pre>
+<p>Export Cipher (Connection should fail):</p>
+<pre class="prettyprint">openssl s_client -cipher EXPORT -connect example.com:443</pre>
+<p>Low Cipher (Connection should fail):</p>
+<pre class="prettyprint">openssl s_client -cipher LOW -connect example.com:443</pre>
+<p>RC4 Cipher (Connection should fail):</p>
+<pre class="prettyprint">openssl s_client -cipher RC4 -connect example.com:443</pre>
+<p>NULL Cipher (Connection should fail):</p>
+<pre class="prettyprint">openssl s_client -cipher NULL -connect example.com:443</pre>
+<p>Perfect Forward Secrecy Cipher (Connection should NOT fail):</p>
+<pre class="prettyprint">openssl s_client -cipher EECDH, EDH NULL -connect example.com:443</pre>
+<h2 class="section-title">SSL/TLS Certificates</h2>
+<p>SSL/TLS supports the use of authentication via X.509 certificates, which are often termed "SSL certificates" when used in this context. Server certificates enable the client to verify that it is connecting to the correct host. Though not usually used for HTTPS, SSL/TLS can also support mutual authentication in which the client proves its own identity through the provision of its own certificate.</p>
+<p>Some of the main security properties which should be considered when setting up a certificate include:</p>
+<ul>
+<li>"Not Before" - This gives the start date of the certificate and should be a date in the past.</li>
+<li>"Not After" - This gives the expiry date of the certificate after which is should not be trusted. It is therefore important to ensure that this is a date in the future. As the expiry date approaches, a new certificate should be issued to replace it.</li>
+<li>"Signature Algorithm" - This is the algorithm used to ensure the certificate's integrity. MD5 has been shown to be inadequate for this, with collision attacks allowing fake, but valid, certificates to be generated. SHA1 is in the process of being phased out due to known weaknesses (see the Cipher Suite section above), with SHA2 hash functions being the preferred alternative.</li>
+<li>"Public-Key" - The public key should be long enough to ensure that attacks are computationally infeasible. In the case of RSA, 2048 bit public keys are now considered a sensible minimum to protect against factoring attacks.</li>
+<li>"Issuer" - This is the entity which has issued the certificate and should be a trusted party recognised by both the client and server. The issuer is typically a third-party certificate authority (such as DigiCert in the example above), though larger organisations often operate their own certificate authority to sign certificates for internal use. While it is possible to generate so-called "self-signed" certificates, these prevent the client from authenticating the server and open up the possibility of man-in-the-middle attacks in which an attacker dupes the client and/or server into communicating with the attacker rather than each other.</li>
+<li>"Subject" and "Subject Alternative Name" - These should contain the DNS information necessary to tie the IP of the server running the SSL/TLS service. If these values are not valid domain names (or wildcard domains), then the client will be unable to determine whether or not the certificate is associated with the server in question and cannot therefore use it to authenticate the server.</li>
+</ul>
+<p>To view the details of a server's certificate, the following command can be used:</p>
+<pre class="prettyprint">openssl s_client -connect example.com:443 | openssl x509 -noout -text</pre>
+<p>This will produce output similar to the following (here PayPal's certificate is shown):</p>
+<pre class="prettyprint">Certificate:
+ Data:
+   Version: 3 (0x2)
+   Serial Number:
+ 0e:65:41:91:6c:e8:cf:b2:9b:7b:52:71:01:05:ba:c4
+ Signature Algorithm: sha256WithRSAEncryption
+ Issuer: C=US, O=DigiCert Inc, OU=www.digicert.com, CN=DigiCert SHA2 High Assurance Server CA
+   Validity
+   Not Before: Dec 12 00:00:00 2014 GMT
+   Not After : Dec 16 12:00:00 2016 GMT
+ Subject: C=US, ST=California, L=San Jose, O=PayPal, Inc., OU=PayPal Production, CN=paypal.com
+ Subject Public Key Info:
+   Public Key Algorithm: rsaEncryption
+    Public-Key: (2048 bit)
+    Modulus:
+      00:d5:c8:b2:65:07:ff:fb:71:0a:cf:a8:77:97:fc:
+      e1:a4:87:5d:79:29:03:e0:1a:5f:c2:f8:71:c9:ac:
+      bc:d3:16:e0:9c:2e:bb:d9:1c:5b:cc:90:7d:e3:54:
+      ab:53:79:50:37:63:b1:cb:68:56:ee:6a:5b:d2:10:
+      38:1a:35:f7:37:12:83:d9:72:51:9e:b7:f9:9c:1d:
+      b8:a9:e6:f3:27:bb:5b:8b:b9:be:fa:39:19:83:d9:
+      cd:66:69:1d:cc:8a:cb:59:b5:53:3e:ca:41:f6:ac:
+      89:4d:58:06:04:a5:e2:c9:94:05:26:6c:24:a6:81:
+      ca:4a:01:11:4c:a2:8d:83:7a:9a:2a:7d:16:93:ca:
+      a0:df:59:b8:e1:38:18:b2:bd:eb:77:6b:57:fb:7f:
+      d6:70:e1:2d:70:dd:cc:af:43:f0&amp;#x1F1E9;&amp;#x1F1EA;a0:fc:2f:8e:
+      94:74:3c:4f:ae:ca:f6:f2&amp;#x1F18E;09:7f:63:71:b6:27:
+      78:4d:f8:e1:e0:86:3a:81:9f:d4:55:45:27:ff:4d:
+      53:2f:99:43:28:ad:fa:c9:63:6f:64:28:36:d7:ea:
+      c3:00:50:88:86:a3:d0:83:ae:be:99:18:25:b2:44:
+      05:c6:e8:36:4a:fb:4d&amp;#x1F18E;df:6d:0f:50:3f:80:fc:
+      38:ba:4c:53:c1:6d:48:22:68:7a:ed:6e:05:e4:9d:
+      58:ef
+   Exponent: 65537 (0x10001)
+ X509v3 extensions:
+   X509v3 Authority Key Identifier:
+     keyid:51:68:FF:90:AF:02:07:75:3C:CC:D9:65:64:62:A2:12:B8:59:72:3B
+ X509v3 Subject Key Identifier:
+   1F:54:C7:2D:0E:D3:6C:C4:63:FE:66:1C:EA:8C:50:75:3A:01:8F:DE
+ X509v3 Subject Alternative Name:
+   DNS:paypal.com, DNS:www.paypal.com
+X509v3 Key Usage: critical
+   Digital Signature, Key Encipherment
+X509v3 Extended Key Usage:
+   TLS Web Server Authentication, TLS Web Client Authentication
+X509v3 CRL Distribution Points:
+ Full Name:
+   URI:http://crl3.digicert.com/sha2-ha-server-g3.crl
+ Full Name:
+   URI:http://crl4.digicert.com/sha2-ha-server-g3.crl
+ X509v3 Certificate Policies:
+   Policy: 2.16.840.1.114412.1.1
+     CPS: https://www.digicert.com/CPS
+ Authority Information Access:
+   OCSP - URI:http://ocsp.digicert.com
+   CA Issuers - URI:http://cacerts.digicert.com/DigiCertSHA2HighAssuranceServerCA.crt
+ X509v3 Basic Constraints: critical
+     CA:FALSE
+Signature Algorithm: sha256WithRSAEncryption       
+ 3d:79:69:48:5d:f6:bc:4b:5f:81:f3:97:9d:61:e5:9c:46:b9:
+ 73:00:66:09:f1:8a:06:89:14:a3:25:ea:ba:a2:5d:ac:77:3a:
+ 8f:6a:8a:11:9b:c3:35:67:99:9f:9d:c2:c0:ac:9f:eb:24:58:
+ c8:4a:be:07:31:30:8c:69:07:bc:ff:c0:5a:d1:17:c6:05:f7:
+ 75:ca:fe&amp;#x1F4BF;98:78:43:41:ac:14:75:f7:c9:10:f4:07:38:58:
+ 73:6a:84:58:1f:a9:31:7d:28:47:70:98&amp;#x1F1E9;&amp;#x1F1EA;3f:d7:00:82:a6:
+ 5c:2e:5d:31:96:4a:06:82:a2:a0:02:95:fd:6f:ef:66:4a:57:
+ 50:c3:1a:84:48:26:47:73:6e:c8:d7:30:fb:75:11:d6:ee:67:
+ 7e:d4:15:b2:44:15:ef:ee&amp;#x1F18E;ba:81:c2:f5:05:04:d1:f3:70:
+ bb:96:41:03:eb:d1:e0:e4:3d:57:41:8d:3d:7a:df:f0:c1:68:
+ 6f:43:68:e1:8d:1e:19:7e:57:aa:49:43:28:2a:f1:8c:f7:0d:
+ a4:6a:8c:18:75:6b:a4:cc:a7:2f:e5:21:d1:81:8c:d4:bc:f4:
+ 00:4c:f6:37:03:a3:61:33:b2:ea:15:34:48:53:83:48:57:6c:
+ 33:f2:b7:fb:f3:fc:ea:df:0d:d0:e2:49:01:b4:23:c9:3d:7a:
+f4:42:4f:98</pre>
+<h2 class="section-title">Renegotiation</h2>
+<p>The SSL/TLS protocols allow the client and server to renegotiate new encryption keys during a session. A vulnerability was discovered in 2009 whereby an attacker could exploit a flaw in the renegotiation process and inject content into the start of the session, compromising the integrity of the session.</p>
+<p>This is only possible if two conditions are met, namely that the server does not support secure renegotiation but does honour client-initiated renegotiations. These conditions can be checked for as described below:</p>
+<h2 class="section-title">Secure Renegotiation</h2>
+<p>The following demonstrates how to verify if a system supports secure renegotiation.</p>
+<pre class="prettyprint">openssl s_client -connect example.com:443</pre>
+<p>A system that does not support secure renegotiation will return the following when a connection is established.</p>
+<pre class="prettyprint">CONNECTED(00000003)
+139677333890704:error:1407F0E5:SSL routines:SSL2_WRITE:ssl handshake failure:s2_pkt.c:429:
+---
+no peer certificate available
+---
+No client certificate CA names sent
+---
+SSL handshake has read 0 bytes and written 36 bytes
+---
+New, (NONE), Cipher is (NONE)
+Secure Renegotiation IS NOT supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+ Protocol : SSLv2
+ Cipher : 0000
+ Session-ID:
+ Session-ID-ctx:
+ Master-Key:
+ Key-Arg : None
+ PSK identity: None
+ PSK identity hint: None
+ SRP username: None
+ Start Time: 1428910482
+ Timeout : 300 (sec)
+ Verify return code: 0 (ok)
+---</pre>
+<h2 class="section-title">Client Initiated Renegotiation</h2>
+<p>The following demonstrates how to check if client initiated renegotiation is supported.</p>
+<pre class="prettyprint">openssl s_client -connect example.com:443</pre>
+<p>Once the connection is established, the server will wait for us to type the next command. We can write the following two lines in order to initiate a renegotiation by specifying R in the second line, followed by enter or return.</p>
+<pre class="prettyprint">openssl s_client -connect host:port
+HEAD / HTTP/1.0
+R
+&lt;Enter or Return key&gt;</pre>
+<p>A system that does not support client initiated renegotiation will return an error and end the connection, or the connection will time out. Please note that below is just one of the many different error messages that you can encounter when your renegotiation is blocked.</p>
+<pre class="prettyprint">RENEGOTIATING
+write:errno=104</pre>
+<p>A system that supports client initiated renegotiation will keep the connection active, and respond to further commands. Please note that some implementations allow a limited rate of renegotiations before blocking your renegotiation attempts. So if it initially looks like the server supports renegotiation try sending R a few more times to see if it really poses a threat.</p>
+<h2 class="section-title">Compression</h2>
+<p>The use of compression has been linked to two side channel attacks: CRIME and BREACH. </p>
+<h3>Crime</h3>
+<p>The Compression Ratio Info-leak Made Easy (CRIME) attack is a side-channel attack against TLS compression. To carry out the attack, the attacker needs to exert partial control over the content of requests made by the client (e.g. by using a Cross-Site Scripting vulnerability to force the user's browser to issue requests). The attacker can then observe the compressed size of these requests on the network and from that infer the contents of the remainder of the request (e.g. session cookies) based on the level of compression achieved.</p>
+<p>To test whether a server supports TLS compression, and is vulnerable to CRIME, the following method can be used:</p>
+<pre class="prettyprint">openssl s_client -connect example.com:443</pre>
+<p>On the servers supporting compression, a response similar to the one below will be received, containing details about the compression. The lines "Compression: zlib compression" and "Compression: 1 (zlib compression)" indicate that the remote server is vulnerable to the CRIME attack.</p>
+<pre class="prettyprint">---
+New, TLSv1/SSLv3, Cipher is DHE-RSA-AES256-SHA
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: zlib compression
+Expansion: zlib compression
+SSL-Session:
+ Protocol : TLSv1.1
+ Cipher : DHE-RSA-AES256-SHA
+ Session-ID: 50791A02E03E42F8983344B25C8ED4598620518D5C917A3388239AAACE991858
+ Session-ID-ctx:
+ Master-Key: 9FEDB91F439775B49A5C49342FF53C3DD7384E4AFC33F9C6AFB64EA3D639CA57253AD7D059BA54E01581AD3A73306342
+ Key-Arg : None
+ PSK identity: None
+ PSK identity hint: None
+ SRP username: None
+ TLS session ticket lifetime hint: 300 (seconds)
+ TLS session ticket:
+ 0000 - 34 38 24 70 35 88 4a 68-0c 80 e6 c5 76 a1 0e ee 48$p5.Jh....v...
+ 0010 - 14 2e fb ef fa 42 f0 c1-58 ee 70 02 90 45 f4 8c .....B..X.p..E..
+ 0020 - 7d 0b 2e 1e 71 70 b0 a2-cc 27 1b 13 29 cc f5 ee }...qp...'..)...
+ 0030 - 84 43 98 fa b1 ae 83 dc-ff 6d aa 07 9f 7a 95 4f .C.......m...z.O
+ 0040 - 44 68 63 21 72 d7 b9 18-97 d8 8e d7 61 7d 71 6f Dhc!r.......a}qo
+ 0050 - a7 16 85 79 f9 a2 80 2a-b4 bc f9 47 78 6a b7 08 ...y...*...Gxj..
+ 0060 - f6 4f 09 96 7b e8 d4 9b-26 2d 1a fd 55 fe 6a ab .O..{...&amp;-..U.j.
+ 0070 - fc 8d 6d 87 7a 13 e1 a9-0a 05 09 d9 ce ea fe 70 ..m.z..........p
+ 0080 - 09 c9 5f 33 3c 5f 28 4e-20 3b 3a 10 75 c4 86 45 .._3&lt;_(N ;:.u..E
+ 0090 - 1d 8b c8 a5 21 89 a1 12-59 b6 0f 55 e3 48 8f 91 ....!...Y..U.H..
+ 00a0 - 01 af 53 b6 ..S.
+ Compression: 1 (zlib compression)
+ Start Time: 1348073759
+ Timeout : 300 (sec)
+ Verify return code: 20 (unable to get local issuer certificate)
+---</pre>
+<p>For servers that have TLS compression disabled, the response will be similar to the following. The "Compression: NONE" shows that this server rejects usage of TLS-level compression.</p>
+<pre class="prettyprint">---
+New, TLSv1/SSLv3, Cipher is ECDHE-RSA-AES128-GCM-SHA256
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+ Protocol : TLSv1.2
+ Cipher : ECDHE-RSA-AES128-GCM-SHA256
+ Session-ID: 7E49EA6457B200B441A26C05F1AE9634AAF97284AC7A12EC58F69CEF5470B052
+ Session-ID-ctx:
+ Master-Key: E035F082F5545424373A546A1F76D77673E8AEE018B3F0A3AFD7A3545746013664C18E6BB69F08BFAECA6C7FB3010C9C
+ Key-Arg : None
+ PSK identity: None
+ PSK identity hint: None
+ SRP username: None
+ TLS session ticket lifetime hint: 100800 (seconds)
+ TLS session ticket:
+ 0000 - 66 72 6f 6e 74 70 61 67-65 61 61 61 61 61 61 61 frontpageaaaaaaa
+ 0010 - 89 55 c6 6a 92 c3 28 85-86 b0 ff c3 08 12 5a a8 .U.j..(.......Z.
+ 0020 - f2 ec f8 56 6d d3 29 99-7b 98 90 ef 57 fd c6 15 ...Vm.).{...W...
+ 0030 - ee a2 53 4b 43 ef 19 ee-41 25 1f 76 28 37 68 b6 ..SKC...A%.v(7h.
+ 0040 - 64 ca e7 3f 71 01 70 30-35 91 ef bc d8 19 20 4f d..?q.p05..... O
+ 0050 - 9d 9e 2c ab 3f 35 5c 3f-65 f8 c6 9a a9 90 fa 60 ..,.?5\?e......`
+ 0060 - 4d 53 a1 b8 49 8c e7 61-e4 6c e1 51 8e 83 b5 25 MS..I..a.l.Q...%
+ 0070 - bc 9a 32 d8 fa be 16 a1-ae 3d 8c 0b e3 9e e4 78 ..2......=.....x
+ 0080 - 77 d7 91 6b a9 a0 01 2b-e1 98 33 d4 2c eb b3 84 w..k...+..3.,...
+ 0090 - f9 da 0f fa 77 df ac d6-08 b6 34 97 07 d9 b2 58 ....w.....4....X
+ Start Time: 1428988675
+ Timeout : 300 (sec)
+ Verify return code: 20 (unable to get local issuer certificate)
+---</pre>
+<p>Servers that support the SPDY protocol are generally vulnerable for CRIME due to the way they use cookie compression (this is supposed to be fixed in version 4). To check whether your SSL/TLS service supports SPDY use the following command and look for a line ‘Protocols advertised’. If it exists you should see the SPDY version in use, if not your server does not support SPDY.</p>
+<pre class="prettyprint">openssl s_client -nextprotoneg NULL -connect example.com:443</pre>
+<p>The following server (google.com) for example speaks spdy/3.1 as seen in the second line:</p>
+<pre class="prettyprint">CONNECTED(00000003)
+Protocols advertised by server: h2, spdy/3.1, http/1.1
+depth=3 C = US, O = Equifax, OU = Equifax Secure Certificate Authority
+verify return:1
+depth=2 C = US, O = GeoTrust Inc., CN = GeoTrust Global CA
+verify return:1
+depth=1 C = US, O = Google Inc, CN = Google Internet Authority G2
+verify return:1
+depth=0 C = US, ST = California, L = Mountain View, O = Google Inc, CN = *.google.com
+verify return:1
+---
+Certificate chain
+ 0 s:/C=US/ST=California/L=Mountain View/O=Google Inc/CN=*.google.com
+ i:/C=US/O=Google Inc/CN=Google Internet Authority G2
+ 1 s:/C=US/O=Google Inc/CN=Google Internet Authority G2
+ i:/C=US/O=GeoTrust Inc./CN=GeoTrust Global CA
+ 2 s:/C=US/O=GeoTrust Inc./CN=GeoTrust Global CA
+ i:/C=US/O=Equifax/OU=Equifax Secure Certificate Authority
+---
+Server certificate
+-----BEGIN CERTIFICATE-----
+MIIHtTCCBp2gAwIBAgIIdI13ggMPwqowDQYJKoZIhvcNAQELBQAwSTELMAkGA1UE
+BhMCVVMxEzARBgNVBAoTCkdvb2dsZSBJbmMxJTAjBgNVBAMTHEdvb2dsZSBJbn</pre>
+<h3>Breach</h3>
+<p>The BREACH attack is analogous to the CRIME attack, but this time exploits the use of HTTP compression to again infer the contents of attacker-influenced requests.</p>
+<p>To test whether a server supports deflate or compression, the following steps can be performed:</p>
+<pre class="prettyprint">openssl s_client -connect example.com:443</pre>
+<p>Submitting the following will allow us to see if HTTP compression is supported by the server.</p>
+<pre class="prettyprint">GET / HTTP/1.1
+Host: example.com
+Accept-Encoding: compress, gzip</pre>
+<p>If the response contains encoded data, similar to the following response, it indicates that HTTP compression is supported; therefore the remote host is vulnerable.</p>
+<pre class="prettyprint">HTTP/1.1 200 OK
+Server: nginx/1.1.19
+Date: Sun, 19 Mar 2015 20:48:31 GMT
+Content-Type: text/html
+Last-Modified: Thu, 19 Mar 2015 23:34:28 GMT
+Transfer-Encoding: chunked
+Connection: keep-alive
+Content-Encoding: gzip
+¬ =�A
+�0
+ �}E�� �/�փg�
+�� oP��
+��u4��22��,f&amp;4Y��Į9 .�R�oKc�]�`|�o�r
+0</pre>
+<p>A system which does not support deflate or compression will ignore the compress header request and respond with uncompressed data, indicating that it is not vulnerable.</p>
+<h2 class="section-title">Implementation Issues</h2>
+<p>SSL/TLS is only as secure as its implementation and a number of flaws have surfaced in TLS software in recent years. This has included TLS (not SSLv3) implementations which are vulnerable to POODLE, and timing attacks such as the <a href="http://en.wikipedia.org/wiki/Lucky_Thirteen_attack">Lucky-13 attack</a>. We highlight two notable implementation vulnerabilities here, but more important than their details is the message that keeping SSL/TLS software patched and up-to-date is an essential piece of the security puzzle.</p>
+<h3>Heartbleed</h3>
+<p>The Heartbleed bug is a result of a weakness in OpenSSL. It can be exploited to retrieve memory contents of a server/host running a vulnerable version of OpenSSL.</p>
+<p>The following versions of OpenSSL are vulnerable:</p>
+<p>OpenSSL 1.0.1 through 1.0.1f (inclusive)<br/>
+The following versions of OpenSSL are not vulnerable:</p>
+<ul>
+<li>OpenSSL &gt;1.0.1g</li>
+<li>OpenSSL 1.0.0 branch</li>
+<li>OpenSSL 0.9.8 branch</li>
+</ul>
+<p>There are many scripts publicly available that can be used to test whether a system is affected by this vulnerability.</p>
+<p>Servers accessible from the internet can be tested using the Heartbleed test websites like <a href="https://filippo.io/Heartbleed/">https://filippo.io/Heartbleed/</a>, which is run by Filippo Valsorda.</p>
+<p>Alternatively, Nmap (v6.46 and above) can be used to test this bug by using the ‘ssl-heartbleed.nse’ script.</p>
+<pre class="prettyprint">nmap -p 443 --script ssl-heartbleed --script-args vulns.showall example.com</pre>
+<p>The output will be similar to the following:</p>
+<pre class="prettyprint">PORT STATE SERVICE
+443/tcp open https
+| ssl-heartbleed:
+| VULNERABLE:
+| The Heartbleed Bug is a serious vulnerability in the popular OpenSSL cryptographic software library. It allows for stealing information intended to be protected by SSL/TLS encryption.
+| State: VULNERABLE
+| Risk factor: High
+| Description:
+| OpenSSL versions 1.0.1 and 1.0.2-beta releases (including 1.0.1f and 1.0.2-beta1) of OpenSSL are affected by the Heartbleed bug. The bug allows for reading memory of systems protected by the vulnerable OpenSSL versions and could allow for disclosure of otherwise encrypted confidential information as well as the encryption keys themselves.
+|
+| References:
+| https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-0160
+| http://www.openssl.org/news/secadv_20140407.txt
+|_ http://cvedetails.com/cve/2014-0160/</pre>
+<h2 class="section-title">Change Cipher Spec Injection</h2>
+<p>A weakness exists in some versions of OpenSSL which can be exploited by intermediary third parties in order to retrieve sensitive information from encrypted communication.</p>
+<p>Affected Versions:</p>
+<ul>
+<li>OpenSSL 1.0.1 through 1.0.1g</li>
+<li>OpenSSL 1.0.0 through 1.0.0l</li>
+<li>all versions before OpenSSL 0.9.8y</li>
+</ul>
+<p>Testing requires using publicly available tools, such as the the ‘ssl-ccs-injection’ nmap script by Claudiu Perta, which can be used to test for this vulnerability. This script can be downloaded from <a href="https://nmap.org/nsedoc/scripts/ssl-ccs-injection.html">https://nmap.org/nsedoc/scripts/ssl-ccs-injection.html</a>.</p>
+<pre class="prettyprint">nmap -p 443 --script ssl-ccs-injection example.com</pre>
+<p>Sample output:</p>
+<pre class="prettyprint">PORT STATE SERVICE
+443/tcp open https
+| ssl-ccs-injection:
+| VULNERABLE:
+| SSL/TLS MITM vulnerability (CCS Injection)
+| State: VULNERABLE
+| Risk factor: High
+| Description:
+| OpenSSL before 0.9.8za, 1.0.0 before 1.0.0m, and 1.0.1 before
+| 1.0.1h does not properly restrict processing of ChangeCipherSpec
+| messages, which allows man-in-the-middle attackers to trigger use
+| of a zero-length master key in certain OpenSSL-to-OpenSSL
+| communications, and consequently hijack sessions or obtain
+| sensitive information, via a crafted TLS handshake, aka the
+| "CCS Injection" vulnerability.
+|
+| References:
+| https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-0224
+| http://www.cvedetails.com/cve/2014-0224
+|_ http://www.openssl.org/news/secadv_20140605.txt</pre>
+<h2 class="section-title">Cipher Order Enforcement</h2>
+<p>Some servers do not enforce their cipher suite order. This means that instead of the server picking its preferred cipher suite out of the list of cipher suites that overlap with the client, it makes its decision based on the order that the client specifies / chooses.</p>
+<p>This means that a misconfigured client could potentially use a weaker cipher suite, even if both sides support and advertise a stronger cipher suite, because the client prioritises the weaker suite.</p>
+<p>To verify that the server enforced the configured order, perform the following steps:</p>
+<p>1.)    Get a list of supported ciphers, e.g. with nmap:</p>
+<pre class="prettyprint">nmap -p 443 --script ssl-enum-ciphers example.com</pre>
+<p>2.)    Pick a protocol (e.g. TLS 1.2), and choose 2 different supported cipher suites from this protocol, one which you consider stronger than the other: E.g. “AES128-GCM-SHA256” and “AES128-SHA”.</p>
+<p>3.)    Run openssl s_client twice, once with the 2 cipher suites in one order, and once with them reversed.</p>
+<p>A well-configured server will pick the same preferred cipher suite each time:</p>
+<pre class="prettyprint">openssl s_client –tls1_2 –cipher ‘AES128-GCM-SHA256:AES128-SHA’ –connect contextis.co.uk:443
+---
+New, TLSv1/SSLv3, Cipher is AES128-GCM-SHA256
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+    Protocol  : TLSv1.2
+    Cipher    : AES128-GCM-SHA256
+
+    Session-ID: 92DFFA0A38308AF5C62AA9A0BDCE338AC01C6A8B4B8A35EE7DE28C43F8651BA3
+    Session-ID-ctx: 
+    Master-Key: E63188DB4C1F162A122787F697156EFBD8BC35AD99ACC91639BC67E367B5B54D58FC143E145DFA3ABAD89370E21B8469
+    Key-Arg   : None
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - 17 3a 40 e3 1e 78 46 41-77 28 b2 e6 f2 2e a6 7a   .:@..xFAw(.....z
+    0010 - 9b 91 6b e2 fc bb 40 ad-5b b3 46 9b c2 e5 45 97   ..k...@.[.F...E.
+    0020 - 1f b3 67 75 ce e5 d2 d7-f5 78 cb f7 a4 c5 22 f0   ..gu.....x....".
+    0030 - 77 b7 ae a6 02 45 63 6f-ff 45 67 09 cd 68 f2 71   w....Eco.Eg..h.q
+    0040 - 1f 44 14 da 5c ac 62 6e-dc a5 57 fc 9d 1d a7 f5   .D..\.bn..W.....
+    0050 - ff 88 74 cc 3b c6 fb de-ed b1 96 70 eb a0 cc 91   ..t.;......p....
+    0060 - 95 6c 92 39 5f 5e 69 8e-9c 96 5c 8a e2 38 4f d9   .l.9_^i...\..8O.
+    0070 - de 85 ca 4d 59 72 ec 9a-0e 57 4f 30 51 79 9a c7   ...MYr...WO0Qy..
+    0080 - cc b0 c1 4b 41 07 4c 20-27 69 be ef cf 90 b7 21   ...KA.L 'i.....!
+    0090 - 78 ea fa 8e 75 25 22 d0-ab 20 44 a4 f8 89 43 22   x...u%".. D...C"
+    00a0 - b6 43 a8 a5 8f 37 af e0-7d af f0 ed 31 cf 69 85   .C...7..}...1.i.
+    00b0 - 23 fb e1 87 7c 26 5c 7e-2d 0d 70 52 91 62 18 34   #...|&amp;\~-.pR.b.4
+
+
+    Start Time: 1480346163
+    Timeout   : 300 (sec)
+    Verify return code: 0 (ok)
+---
+
+
+openssl s_client –tls1_2 –cipher ‘AES128-SHA:AES128-GCM-SHA256’ –connect contextis.co.uk:443
+---
+New, TLSv1/SSLv3, Cipher is AES128-GCM-SHA256
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+    Protocol  : TLSv1.2
+    Cipher    : AES128-GCM-SHA256
+
+    Session-ID: 322A0FAC254F028D5E4532B8626825278249D0A73B2038FD9030EA95BAEFDBB1
+    Session-ID-ctx: 
+    Master-Key: 8D89CA85E5AD35A19A04A10F6FD7A334ABEA2316F207F8D96D14C194D98A2024CCA404DCF89E65D9B9030115DCBC4C76
+    Key-Arg   : None
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - de e8 b7 6f 0a 2a dc ec-cd dd 84 d9 8f f4 3b 9a   ...o.*........;.
+    0010 - 39 2f 8c b7 f6 a1 83 15-9e 97 44 18 25 24 55 fb   9/........D.%$U.
+    0020 - 1d ec bf 8f 2e a8 c8 4a-80 85 df ac 23 9b 1d 1d   .......J....#...
+    0030 - 97 5a 5a e8 81 31 43 71-51 62 a6 4b 89 3e 6d 0e   .ZZ..1CqQb.K.&gt;m.
+    0040 - 99 ea a2 ec b9 2a 93 67-6b 9d 68 63 f4 65 9b 8d   .....*.gk.hc.e..
+    0050 - 10 e1 ae b9 7c 5a 64 51-43 f2 69 2d 90 63 6c 1a   ....|ZdQC.i-.cl.
+    0060 - 92 c8 77 e3 c0 e7 ca 50-ff 6e 0f d6 5e 82 29 b5   ..w....P.n..^.).
+    0070 - 1b ad 9f 5e c6 ea f7 3e-d8 63 95 ff ff 2e e3 57   ...^...&gt;.c.....W
+    0080 - 69 7f 07 47 88 25 fd ba-89 e1 a6 3c ac 92 78 49   i..G.%.....&lt;..xI
+    0090 - 75 8e 8e 65 80 ea 43 50-b0 c5 0c 45 a1 4e 3f b4   u..e..CP...E.N?.
+    00a0 - 39 b0 63 bb aa 34 f6 f4-a9 0c f7 d8 f1 51 52 33   9.c..4.......QR3
+    00b0 - 28 f0 2a 5e 48 f3 a6 7c-58 16 2d 3d b9 8b a5 25   (.*^H..|X.-=...%
+
+
+    Start Time: 1480349843
+    Timeout   : 7200 (sec)
+    Verify return code: 0 (ok)
+---</pre>
+<p>A badly-configured server will pick a different cipher suite depending on the order the client specified them (usually the first one specified by the client or a random pick each time).</p>
+<pre class="prettyprint">openssl s_client –tls1_2 –cipher ‘AES128-GCM-SHA256:AES128-SHA’ –connect bad.example.com:443
+---
+New, TLSv1/SSLv3, Cipher is AES128-GCM-SHA256
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+    Protocol  : TLSv1.2
+    Cipher    : AES128-GCM-SHA256
+    Session-ID: 92DACA0FB08AF5C62AA9A0BDCE338AC01
+    Session-ID-ctx: 
+    Master-Key: A7B245DB4C1F162A122787F697156EFBD8BC35AD99ACC91639BC67E367B5B54D58FC143E145DFA363146A745A7B245DB469
+    Key-Arg   : None
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - 17 3a 40 e3 1e 78 46 41-77 28 b2 e6 f2 2e a6 7a   .:@..xFAw(.....z
+    0010 - 9b 91 6b e2 fc bb 40 ad-5b b3 46 9b c2 e5 45 97   ..k...@.[.F...E.
+    0020 - 1f b3 67 75 ce e5 d2 d7-f5 78 cb f7 a4 c5 22 f0   ..gu.....x....".
+    0030 - 77 b7 ae a6 02 45 63 6f-ff 45 67 09 cd 68 f2 71   w....Eco.Eg..h.q
+    0040 - 1f 44 14 da 5c ac 62 6e-dc a5 57 fc 9d 1d a7 f5   .D..\.bn..W.....
+    0050 - ff 88 74 cc 3b c6 fb de-ed b1 96 70 eb a0 cc 91   ..t.;......p....
+    0060 - 95 6c 92 39 5f 5e 69 8e-9c 96 5c 8a e2 38 4f d9   .l.9_^i...\..8O.
+    0070 - de 85 ca 4d 59 72 ec 9a-0e 57 4f 30 51 79 9a c7   ...78r...WO0Qy..
+    0080 - cc b0 c1 4b 41 07 4c 20-27 69 be ef cf 90 b7 21   ...AG.L 'i.....!
+    0090 - 78 ea fa 8e 75 25 22 d0-ab 20 44 a4 f8 89 43 22   x...u%".. X...C"
+    00a0 - b6 43 a8 a5 8f 37 af e0-7d af f0 ed 31 cf 69 85   .d...7..}...4.i.
+    00b0 - 23 fb e1 87 7c 26 5c 7e-2d 0d 70 52 91 62 18 34   #...|&amp;\~-.7R.b.4
+
+    Start Time: 1480346163
+    Timeout   : 300 (sec)
+    Verify return code: 0 (ok)
+---</pre>
+<pre class="prettyprint">openssl s_client –tls1_2 –cipher ‘AES128-SHA:AES128-GCM-SHA256’ –connect bad.example.com:443
+---
+New, TLSv1/SSLv3, Cipher is AES128-SHA
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+    Protocol  : TLSv1.2
+    Cipher    : AES128-SHA
+    Session-ID: 0FACBAD5254F028D5E4532B8626825278249D0A73B2038FD9030EA48310CDBB1
+    Session-ID-ctx: 
+    Master-Key: A731CE9DF018D89CA85E5AD35A19A04A10F6FD7A334ABEA2316F207F8D96D14C194D98ACFFF965D9B903A891C34C4C76
+    Key-Arg   : None
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - de e8 b7 6f 0a 2a dc ec-cd dd 84 d9 8f f4 3b 9a   ...o.*........;.
+    0010 - 39 2f 8c b7 f6 a1 83 15-9e 97 44 18 25 24 55 fb   9/........D.%$U.
+    0020 - 1d ec bf 8f 2e a8 c8 4a-80 85 df ac 23 9b 1d 1d   .......J....#...
+    0030 - 97 5a 5a e8 81 31 43 71-51 62 a6 4b 89 3e 6d 0e   .ZZ..1CqQb.K.&gt;m.
+    0040 - 99 ea a2 ec b9 2a 93 67-6b 9d 68 63 f4 65 9b 8d   .....*.gk.hc.e..
+    0050 - 10 e1 ae b9 7c 5a 64 51-43 f2 69 2d 90 63 6c 1a   ....|EdQC.i-.cl.
+    0060 - 92 c8 77 e3 c0 e7 ca 50-ff 6e 0f d6 5e 82 29 b5   ..w....P.n..^.).
+    0070 - 1b ad 9f 5e c6 ea f7 3e-d8 63 95 ff ff 2e e3 57   ...^...&gt;.c.....W
+    0080 - 69 7f 07 47 88 25 fd ba-89 e1 a6 3c ac 92 78 49   i..G.%.....&lt;..xI
+    0090 - 75 8e 8e 65 80 ea 43 50-b0 c5 0c 45 a1 4e 3f b4   F..e..CP...E.N?.
+    00a0 - 39 b0 63 bb aa 34 f6 f4-a9 0c f7 d8 f1 51 52 33   1.D..f.......Q79
+    00b0 - 28 f0 2a 5e 48 f3 a6 7c-58 16 2d 3d b9 8b a5 25   (.*^J..|F.-=...%
+
+    Start Time: 1480349843
+    Timeout   : 7200 (sec)
+    Verify return code: 0 (ok)
+---</pre>
+<h2 class="section-title">Summary and Conclusions</h2>
+<p>We have seen that TLS is finally taking off, improving the overall situation for the end user. At the same time we have seen that modern TLS implementations can have their security level lowered, or even completely compromised by insecure configuration. This includes the use of legacy protocols (SSLv2, SSLv3) or using weak ciphers (TripleDES/3DES, RC4, CBC ciphers, Export, anonymous, null etc.).</p>
+<p>When we communicate with our clients we often hear that possible backwards compatibility is the main reason for still supporting outdated protocol versions. However, SSLv2 was superseded in the last millennium and was finally deprecated in 2011; SSLv3 was deprecated in 2015. There really should be no reason to support either of these versions anymore. If you think your clients still require it, you are vulnerable to a whole range of security problems that have been tackled over the last decades.</p>
+<p>Rather than supporting weak ciphers and protocol versions for the sake a few potential clients or users, administrators should be looking to upgrade their server configurations to support the most secure options available. A weak configuration not only affects a few legacy clients, but everyone who uses the service.</p>
+<p>The upcoming TLSv1.3 (currently a working draft) tries to enforce this by protocol. It explicitly prohibits a server that wants to offer TLSv1.3 to respond to SSLv2 or SSLv3 requests, as well as prohibiting the use of weak ciphers and settings.</p>
+<p>This post has presented the means to manually test for some of the most common vulnerabilities and misconfigurations which can undermine the security of SSL/TLS. Addressing these should be considered a minimum for anyone configuring SSL/TLS. It should be noted that SSL/TLS and its cryptographic component are subject to constant research, which means that other attacks might exist that are not covered here. A secure SSL/TLS configuration is a moving target and additional or better attacks may be discovered in the future.</p>
+<h2 class="section-title">Contact and Follow-Up</h2>
+<p>Michael is part of our Assurance team in Context's Germany office.  He’s been working for Context for a year, primarily on testing Web applications and Infrastructure. He has a particular interest in novel exploitation techniques, and is a keen runner.</p>
+<h2 class="section-title">References</h2>
+<ul>
+<li>BREACH <a href="http://breachattack.com/">http://breachattack.com/</a></li>
+<li>CVE-2015-3197: <a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-3197">https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2015-3197</a></li>
+<li>DROWN <a href="https://drownattack.com/">https://drownattack.com/</a></li>
+<li>Freestart collision weakness: <a href="https://eprint.iacr.org/2015/967.pdf">https://eprint.iacr.org/2015/967.pdf</a></li>
+<li>HEARTBLEED <a href="http://heartbleed.com/">http://heartbleed.com/</a></li>
+<li>LOGJAM <a href="https://weakdh.org/">https://weakdh.org/</a></li>
+<li>Mozilla SSL Generator: <a href="https://mozilla.github.io/server-side-tls/ssl-config-generator/">https://mozilla.github.io/server-side-tls/ssl-config-generator/</a></li>
+<li>POODLE: <a href="https://www.openssl.org/~bodo/ssl-poodle.pdf">https://www.openssl.org/~bodo/ssl-poodle.pdf</a></li>
+<li>Schneier on Security: <a href="https://www.schneier.com/blog/archives/2013/09/how_to_remain_s.html">https://www.schneier.com/blog/archives/2013/09/how_to_remain_s.html</a></li>
+<li>tlsfuzzer: <a href="https://github.com/tomato42/tlsfuzzer">https://github.com/tomato42/tlsfuzzer</a></li>
+</ul>
+</article>
+{% endraw %}

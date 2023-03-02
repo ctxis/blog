@@ -1,0 +1,200 @@
+---
+layout: blogpost
+title: "A code signing bypass for the VW Polo"
+author: "Context Research"
+author_role: ""
+summary: "Focusing on the infotainment system of the Volkswagen® Polo®, and will reveal how the security checks which prevent modifications to its firmware can be circumvented by an attacker in order to allow privileged execution and unrestricted access to the infotainment system’s internals.
+This blog post is the latest of several demonstrating ongoing security vulnerabilities in devices categorised as being a part of the ‘Internet of Things’"
+tags: [Product Security, Vulnerabilities and exploits, Security assessment and testing]
+hero_banner: Keyboard.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Last year, we began a collaboration with Which? magazine to assess the security of a typical consumer vehicle, focusing on two of the UK's best-selling cars – one of which was the Volkswagen® Polo®. The project was a success, and you can read about the results of our vulnerability assessment in the <a href="https://www.which.co.uk/news/2020/04/we-hacked-a-ford-focus-and-a-volkswagen-polo/">Which? article published back in April</a>. Since reporting our findings to Volkswagen®, we have had several positive discussions with their security and development teams, and we’re now ready to share some of the technical details of one of the vulnerabilities we discovered in the Polo®. This blog post represents the outcome of our dialogue with the security team at Volkswagen®, whose deft technical judgement and commitment to pragmatism and openness throughout the process has made this an exceptionally swift and straightforward disclosure.</p>
+<h2>What's the bug?</h2>
+<p>The bug is present in libMetainfoParser.so, which is a component of the firmware installed on the Discover Media infotainment system of the 2019 Volkswagen® Polo®. It allows an attacker with physical access to the unit to circumvent cryptographic integrity checks imposed upon inbound firmware updates, and thereby install and run their own privileged code on the system. We can confirm that the bug is present in firmware version 1901 (in use at least as far back as July 2018) but were unable to determine whether the bug was also present in earlier versions too.</p>
+<h2>How is the system meant to work?</h2>
+<p>The Polo®'s infotainment system accepts updates via an SD card slot under the dashboard. The Polo® user manual describes how to locate the slot and perform the update, which is tantamount to inserting the SD card and selecting "perform update" in the system's user interface. This triggers a process which starts by reading the SD card and looking for a valid system update file on it, and finishes with applying the contents of that system update file to the infotainment system. A set of integrity checks is performed as part of this process, which includes verifying that the update has been signed with Volkswagen®'s signing certificate; should the file fail to pass any of the integrity checks, it won't be installed. The result is a process that should only accept and apply valid updates which have been signed by Volkswagen®.</p>
+<h2>Update structure</h2>
+<p>Updates are provided as 7-zip archives, which can include data (e.g. media, navigation updates,) software (scripts, compiled binary executables) or a mixture of the two. At the time of writing, several examples are available for download from the relevant section of the <a href="https://webspecial.volkswagen.de/vwinfotainment/int/en/index/downloads#/">Volkswagen® website</a>. The directory structure and file hierarchy of an update appears to be somewhat flexible; they are composed of one or more "metainfo" files alongside a set of update data files. Metainfo files serve several purposes, including:</p>
+<ul>
+<li>Describing which files are included in the update</li>
+<li>Describing how these files should be applied to the system</li>
+<li>Allowing for cryptographic integrity checking of the update</li>
+</ul>
+<p>An example of part of a metainfo file is show below:</p>
+<pre class="prettyprint">[common]
+Release = "StationLogo DB Europe v1.10.10" 
+Vendor = "MIB2_STD_Delphi" 
+Variant = "17241" 
+Variant2 = "17242" 
+Variant3 = "17245" 
+Variant4 = "17248" 
+Variant5 = "17249" 
+Variant6 = "17250" 
+Variant7 = "17256" 
+Variant8 = "17257" 
+Variant9 = "17261" 
+Variant10 = "17262" 
+Variant11 = "17263" 
+Variant12 = "17268" 
+Region = "Europe" 
+skipSaveTrainName = "true"
+ UserSwdl = "true"
+ MetafileChecksum = "e377419127f9e245ccfec0511d724d61055852f0"
+
+[StationLogo] 
+VendorInfo = "MIB2_STD_Delphi" 
+DeviceDescription = "Station Logo Database" 
+DeviceRelease = "011010" 
+
+[StationLogo\StationLogo\0\default\File] 
+Source = "../../../../../Common/stl.1vw" 
+FileSize = "113930240" 
+Version = "011010" 
+Destination = "/lng/db/STL_DB.sqlite" 
+DisplayName = "Station Logo DB v1.10.10" 
+CheckSumSize = "524288" 
+CheckSum = "ffdaf78733be6d3e53f26dc7354f77750ceb86df" 
+CheckSum1 = "e8a9660af62011d57493dfe3c81fb31ccda0c084" 
+CheckSum2 = "08355f66e29eb4702aa675cac25d90244f992e95" 
+CheckSum3 = "568e8a9c5bf659c72bf2bb49565dd872488c0ce4" 
+CheckSum4 = "8eb9ac36193f813f119d2972f2399f8e86eb707d" 
+CheckSum5 = "7fb31bd5a461702ad6c8bdaa659684ad9e74715e" 
+CheckSum6 = "afa3c4e42829f40bf67b52fdbcf45c20bb5a9625" 
+# ... snip ... 
+CheckSum212 = "e28feaf38956cc320127e497a71fb535c83c1cfc" 
+CheckSum213 = "29bd9e071ab8e9955dd6c152a6357dfc62c849ad" 
+CheckSum214 = "f386c7bf46858a8f5c631f48fc6b5edb490eda76" 
+CheckSum215 = "ab278c71d6abb011e0e93f83f418d59268887a1f" 
+CheckSum216 = "f663ff76ccb111cebee129a494829712ae1a7b5b" 
+CheckSum217 = "74acdddc7fa9cd254d2a77b9f344114d61757c56"
+
+[StationLogo\InfoFile\0\default\File] 
+CheckSum = "508319b62f5c554ba1741d0d5f0ba19df0ee082d" 
+FileSize = "71" 
+Version = "011010" 
+Source = "update.txt" 
+Destination = "/extbin/swdl/packages/StationLogo" 
+DisplayName = "Infofile. Station Logo DB v1.10.10" 
+CheckSumSize = "524288" 
+
+[Signature] 
+signature1 = "c2de3f156f1dc5cc50819a5061c58e44" 
+signature2 = "541df7af8ba2717beb168f068fcce4dc" 
+signature3 = "d616e1d97ce67bbc1b00ce692d3ff15f" 
+signature4 = "486a0e9fb4c6a20aac0403b359ddec38" 
+signature5 = "cef1febfeff07fd94a8492357eb74403" 
+signature6 = "0d977fa034b900f59d430a170ba36c50" 
+signature7 = "ddb28865e10e68b762fc894545e697c4" 
+signature8 = "7d21f06e2c9653696a0d368db8d428cc"</pre>
+<p>As can be seen above the metainfo uses an ini-style format with section names surrounded by square brackets("[ ]"). Section names are case-insensitive - they are all converted to lowercase before being processed by code on the infotainment system. The lines immediately following a section header are considered to belong to that section, and each contain a key-value pair. Finally, lines starting with the octothorpe character ("#") are considered to be user comments and are ignored, though in practice we did not see them used in any real system updates.</p>
+<p>Of special note are the sections "[common]" (or sometimes, "[common_release_<number>]") which contained important metadata and were present in every metainfo file we observed, and the "[signature]" section, which contains the metainfo file's signature. Finally, we note that most of the other sections contain the key "Checksum", or sometimes "Checksum#", where # is a decimal integer starting at 1 and increasing by 1 on each proceeding line.</number></p>
+<h2>Parsing and Integrity Checking</h2>
+<p>Update verification is a three-step process performed immediately after parsing the metainfo file, with the integrity of the metainfo file being checked first, before using the information contained within it to verify the files which it describes.</p>
+<p>Parsing (and subsequently verifying) the file is handled by a function named parse_metainfo_file(). A concise summary of this function is as follows:</p>
+<ul>
+<li>Open the metainfo file for reading.</li>
+<li>Read the file line by line until the end.</li>
+<li>If the line is empty or a comment, ignore the line.</li>
+<li>If the line is a key-value pair, add it to the set of parsed content for the current section.</li>
+<li>If the line is a section header, change the current section to this section.</li>
+<li>Verify all the links to other sections</li>
+<li>Verify the signature of the metainfo file</li>
+<li>Verify the checksum of the metainfo file</li>
+</ul>
+<p>Once this has been completed, the update is considered valid. We describe the three checks in reverse order below.</p>
+<h3>Constituent file integrity check</h3>
+<p>Each file described in a "[File]" section contains, among others, the following key-value pairs:</p>
+<ul>
+<li>A CheckSumSize value, which is an integer value</li>
+<li>One or more Checksum values (Checksum, Checksum1, Checksum2...) which are 40-character hexadecimal strings</li>
+</ul>
+<p>To validate a file, the file is read from the beginning in chunks of CheckSumSize bytes (the final chunk may be smaller than this size.) Each chunk is hashed using the SHA1 hash algorithm, then compared to one of the "Checksum" values in the relevant section. The first chunk hash is compared to the value at "Checksum", the second is compared to "Checksum1", the third is compared to "Checksum2," and so on. If every chunk hash matches, the file is considered valid.</p>
+<h3>Metainfo file integrity check</h3>
+<p>In order to validate the integrity of the metainfo file, bytes from two sections of the file are read into a buffer.</p>
+<ul>
+<li>The first section spans from the beginning of the file to the beginning of the line starting "MetafileChecksum" within the "[common]" section.</li>
+<li>The second section spans from the beginning of the subsequent line to the beginning of the line starting "[Signature]"</li>
+</ul>
+<p>These sections are read into the buffer back-to-back, so the second section starts immediately after the first section finishes. These bytes are then hashed using the SHA1 hash algorithm, which gives the checksum for the metainfo file. This checksum is compared to the MetaFileChecksum value within "[common]". If the values match, the file is considered valid.</p>
+<h3>Metainfo file authenticity check</h3>
+<p>In order to validate the authenticity of the metainfo file, its checksum is first calculated in the manner described above. The values of each of the key-value pairs in the "[Signature]" section are concatenated together and interpreted as a hexadecimal description of a string of bytes, giving a 128-byte signature block. This is decrypted using Volkswagen®'s public signing key, which is hard-coded into the library which performs these checks. If the decrypted value of the signature matches the calculated checksum, the file is considered authentic.</p>
+<h2>Update Checking Vulnerability</h2>
+<p>From the methods described above, it should be clear that the update verification system operates on a hierarchically-established chain of trust:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Figure_1.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Figure_1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Figure_1.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Figure_1.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<ul>
+<li>The hard-coded key from Volkswagen® is considered trusted.</li>
+<li>The trusted hard-coded key is used to derive a trusted metainfo file checksum value from the metainfo file signature (this is checked by the metainfo file authenticity check)</li>
+<li>The trusted metainfo file checksum value is used to establish overall trust of that metainfo file by comparing it to the calculated checksum for that metainfo file (this is checked by the metainfo file integrity check)</li>
+<li>The trusted metainfo file is used to establish trust of each of the files it describes by comparing their calculated checksums to those contained in the trusted metainfo file (these are checked by the constituent file integrity check)</li>
+</ul>
+<p>However, we also observed that the metainfo file integrity check uses only two ranges of bytes to calculate the checksum of a metainfo file: - The first section spans from the beginning of the file to the beginning of the line starting "MetafileChecksum" within the "[common]" section. - The second section spans from the beginning of the subsequent line to the beginning of the line starting "[Signature]"</p>
+<p>This means that any information added to the metainfo file outside of this range will not modify its checksum, nor affect its validation against its signature. It will, however, be parsed normally: in our summary of parse_metainfo_file(), we established that the metainfo file is parsed fully from the beginning to the end.</p>
+<p>There is therefore a disparity between the parts of the file which are parsed, and those which are validated, as shown in the diagram below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Figure_2.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Figure_2.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Figure_2.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Figure_2.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Representation of a metainfo file which has been modified to contain additional content (left), illustration of the lines which are parsed by the system (centre), illustration of the lines which are validated against the file's signature (right).</em></p>
+<p> </p>
+<p>This creates an opportunity for an attacker to add their own lines to the metainfo file, thereby allowing other files to be included in the update without causing any authenticity or integrity checks to fail. In the illustration above, a modified section has been added to the metainfo file immediately after the signature block. This section is still parsed as normal, but is not hashed during the signature validation step, meaning that its contents can be set arbitrarily.</p>
+<h2>So what?</h2>
+<p>By adding a section (or sections) to the metainfo file in this way, an attacker can surreptitiously append files to a signed update without causing it to be rejected by the system. These files are then applied to the infotainment system. We were able to demonstrate that privileged scripts on the system could be overwritten in this way; these would subsequently be executed with root permissions, thereby granting the attacker unrestricted access to the infotainment system's internals. From here, the attacker could:</p>
+<ul>
+<li>Modify system code</li>
+<li>Delete system code</li>
+<li>Deny access to the infotainment system</li>
+<li>Access restricted system data</li>
+<li>Access adjacent peripherals/systems (microphone, CAN bus, user’s mobile phone, web browser)</li>
+</ul>
+<p>As changes made to the system are persistent, any modifications will remain until explicitly removed by re-exploiting the vulnerability. This has significant implications for cars, which are frequently used and owned by more than one person throughout their serviceable life – second-hand sales, car shares/rentals, company cars, or simply cars shared between members of a family are all common examples of how this might manifest. An attacker could modify system files to perform their preferred malicious behaviour (perhaps gathering user data, or crippling system components) before passing it on to an unsuspecting victim.</p>
+<p>The obvious post-exploitation step would of course be to <a href="https://www.contextis.com/en/blog/hacking-canon-pixma-printers-doomed-encryption">run Doom</a>, but sadly, we didn't have enough time to get that working during this project.</p>
+<h2>Impact</h2>
+<p>As this was a new vulnerability, we weren't able to fully disclose it as part of our initial report with Which?. Instead, we reached out to the security team at Volkswagen®, who were proactive in wanting to discuss impact, remediation, and a timeline for coordinated disclosure. Volkswagen® were happy to give us a statement describing their process for handling the bug:</p>
+<blockquote style="text-style:italic;">With regard to the cybersecurity of our products and services, we are very much aware of our role and responsibility towards our customers. In order to fulfill this responsibility in the best possible way, we have established a Car-Security-Incident-Response-Team in addition to our already existing quality processes. This team consists of experts from different organizational units. Reports on possible security vulnerabilities of our products and services are handled by this team within the framework of an established process:</blockquote>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Figure_3.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Figure_3.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Figure_3.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Figure_3.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<blockquote>During processing, all necessary resources are called in and the available information is analyzed and evaluated. Any additional information needed to fully understand the reported topic may be gained through a collaboration with the reporter. Within this step, we are following a coordinated disclosure approach from the first point of contact. During the whole process run and if necessary, any recommendation for further measures is reported to the responsible management committee for confirmation.</blockquote>
+<blockquote>Volkswagen is taking every report about possible security vulnerabilities of our products and services very seriously. While we are continuously evaluating the risk landscape of our products and services, any support from security researcher side helps us to further strengthen the security of our todays and future systems.</blockquote>
+<p>Volkswagen® have chosen not to patch this vulnerability in the affected system, so although future models should avoid similar problems, it will likely remain present in 2019 Polos for the foreseeable future. We also found evidence which strongly implied that core elements of this firmware were used by at least two other car manufacturers, suggesting that this bug may also be present in other models of vehicle beyond those produced by Volkswagen®. For these reasons, we’ve chosen not to publish our exploit code.</p>
+<h2>Why should I care?</h2>
+<p>One thing that we see as security researchers is that even across otherwise highly dissimilar devices, there are predictable patterns to how and where exploitable bugs manifest. Firmware update mechanisms remain an excellent place to start looking for bugs if one is present on the device you're auditing. In fact, you'll observe that the Doom article from 2014 (linked earlier) where one of our team ran Doom on a printer was possible because of - you guessed it - security issues surrounding the firmware update mechanism. Cars and printers are clearly very different types of device, but if we compare each component in isolation, they each have comparable requirements (power, network connectivity, software maintenance, and so on) which have the potential to be exploited individually by an attacker to make in-roads on the component under scrutiny.</p>
+<p>We’ve come a long way since 2014, but six years later, we hope to demonstrate that this class of bug still has plenty of mileage left.</p>
+</article>
+{% endraw %}

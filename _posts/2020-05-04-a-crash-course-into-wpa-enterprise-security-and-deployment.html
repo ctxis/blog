@@ -1,0 +1,215 @@
+---
+layout: blogpost
+title: "A crash course into WPA Enterprise security and deployment"
+author: "Daniel Kumar"
+author_role: "Assurance Consultant"
+summary: "This blog post is the first in a three-part series into WPA security. It will be a crash course into Wi-Fi Protected Access (WPA) Enterprise security, its benefits over WPA personal, along with architectural implementation and client configuration considerations to ensure your wireless network is as secure as can be. Parts two and three of this blog series will take a look at attacks against WPA Enterprise, and provide an introduction to WPA3."
+tags: [Security]
+hero_banner: Keyboard.jpg
+---
+{% raw %}
+<article class="article-content">
+<h2>Background On WPA</h2>
+<p>Firstly, a little background on what WPA is. WPA currently comes in 3 versions, WPA, WPA2, and the recently announced WPA3. The original WPA protocol implemented the draft <a href="https://en.wikipedia.org/wiki/IEEE_802.11i-2004">IEEE 802.11i</a> standard and was introduced due to security shortcomings within the Wired Equivalent Privacy (WEP) protocol. The subsequent WPA2 protocol implemented all mandatory requirements of the final <a href="https://en.wikipedia.org/wiki/IEEE_802.11i-2004">IEEE 802.11i</a> standard, increasing the overall security posture of the protocol.</p>
+<p>The following table outlines the key security differences between two protocols:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/p.2_table_protocols__800_265_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/p.2_table_protocols__800_265_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201229140154/https://www.contextis.com/media/images/content/p.2_table_protocols_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/p.2_table_protocols__800_265.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Delving into each of these protocols inner workings is beyond the scope of this blog, however, it is worth knowing that the newer WPA protocols are more secure than their predecessors. A comparison of these protocols, along with the newer WPA3 protocol will be detailed in a later blog post.</p>
+<h2>WPA Security Modes</h2>
+<p>The following two security modes are available when handling authentication to WPA networks:</p>
+<ul>
+<li>Personal: This mode uses a Pre-Shared Key (PSK), similar to a passphrase for authenticating clients to the network. All clients use the same PSK to connect to the network.</li>
+<li>Enterprise: This mode uses a Remote Authentication Dial in User Service (RADIUS) server to handle authentication to the network. This allows each user to have separate credentials.</li>
+</ul>
+<h2>Benefits of Enterprise Mode Security</h2>
+<p>The key protocol used in Enterprise mode security, RADIUS, is a centrally managed AAA protocol (Authentication, Authorisation, Accounting). This means that RADIUS is able to provide the following benefits over personal mode security:</p>
+<ul>
+<li>Authentication – Validation of clients to the network through credentials. Both enterprise and personal mode security perform authentication, with personal security utilising a shared passphrase, while enterprise security supporting a wide variety of authentication methods, e.g. credentials, certificates, network location, etc. As clients connect to an enterprise network with their own credentials, this allows users to be differentiated, aiding in user management, network analysis, and more.</li>
+<li>Authorisation – Enterprise security allows users to access resources based on permissions granted during authentication. This is possible as clients have their own set of credentials, and thus is not possible in personal mode security</li>
+<li>Accounting – Enterprise security allows for network usage and services accessed by users to be tracked, providing auditability within a network</li>
+</ul>
+<p>As Enterprise mode allows users to have their own set of credentials to the network, a number of security benefits arise over the use of a pre-shared key in Personal mode, these include:</p>
+<ul>
+<li>The ability to revoke a single users access at any time</li>
+<li>Limits the risk of credentials being shared</li>
+<li>Unique user encryption keys, preventing users from decrypting each other’s data</li>
+<li>Auditability of the network as network traffic can be tied back to a user</li>
+</ul>
+<p>By contrast, the use of a shared passphrase opens a network up to the following, but not limited to, risks:</p>
+<ul>
+<li>Rogue ex-employees: Ex-employees who have left the company are still able to access a network as they know the PSK</li>
+<li>Stolen/lost devices: Devices which have been stolen or lost have the potential to leak the networks existing PSK to malicious individuals</li>
+<li>Passphrase sharing: Employees may simply give a networks passphrase to guests and friends for ease of use</li>
+</ul>
+<p>To mitigate these risks, the passphrase of a personal network would have to be changed. This change would have to be pushed through to users, affecting all users. By using Enterprise mode security however, accounts can be revoked individually, allowing for easier remediation of the above risks.</p>
+<p>Additional notable benefits from the use of Enterprise mode security include;</p>
+<ul>
+<li>Protection against rogue access point attack, as clients and/or servers can validate each other</li>
+<li>Heterogeneous logging of authentication data in a single location for easier log collection and monitoring</li>
+<li>Granular access control configuration e.g. allowing certain users to be configured to access the internet, but not corporate resources, or allowing full access, etc.</li>
+</ul>
+<p>The use of enterprise security ensures that organisations are able to implement key features for a robust, auditable, and secure network, and should be utilised for any wireless network that is used for business purposes and can reach corporate systems.</p>
+<h2>Drawbacks of Enterprise Mode Security</h2>
+<p>Although there are numerous benefits to Enterprise mode security, there are a few potential drawbacks which should be considered before an actual deployment is undertaken. The drawbacks encountered generally depend on the configurations and size of the deployment, however, these typically only last during the initial deployment phase.</p>
+<p>The following issues will be encountered during a deployment, and have the highest impact in a typical deployment:</p>
+<ul>
+<li>Compared to a simple Personal mode wireless setup, Enterprise mode requires a RADIUS server to be setup. This in itself can be a large undertaking for IT administrators who have never used the technology before, and if a deployment is sufficiently large, e.g. if the deployment requires disaster recovery/failover.</li>
+<li>Choosing the appropriate Enterprise authentication method will also affect the effort required during initial setup. Authentication methods which require digital certificates to be installed onto all clients and authentication servers (RADIUS), will require certificates to be pushed to all respective devices. Whereas an authentication method where only the authentication servers require certificates will be significantly less effort, however, at the cost of security.</li>
+</ul>
+<h2>WPA Enterprise Architecture</h2>
+<p>Firstly, some background on the 802.1X standard. At a high level, this standard defines authentication mechanisms over LAN and WAN networks. This includes wired and wireless networks, and is really what WPA Enterprise mode is actually implementing (therefor the term Enterprise mode and 802.1X authentication can be loosely interchanged within this blog). Additionally, although this blog post Is focusing on wireless networks, the concepts can be extended to include your wired networks.</p>
+<p>Continuing with Enterprise mode security, a RADIUS server is used to perform all authentication tasks. The client typically communicates with an access point which transparently passes messages between the client and authentication server which performs user authentication.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/p.5_WAP_graphic__800_623_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/p.5_WAP_graphic__800_623_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201229140154/https://www.contextis.com/media/images/content/p.5_WAP_graphic_.png"></a>
+<a class="modal-img visible-xs" href="/web/20201229140154/https://www.contextis.com/media/images/content/p.5_WAP_graphic_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The following standard definitions are used to describe systems within an Enterprise mode environment:</p>
+<ul>
+<li>Supplicant: A client device which will connect to the network such as a Microsoft Windows laptop/desktop, or mobile devices such as iOS and Android devices</li>
+<li>Authenticator: An access point which is capable of passing messages between the supplicant and authentication server</li>
+<li>Authentication Server: A server which runs the Remote Authentication Dial In User Service (RADIUS) protocol. This server is used to perform authentication and validation of users</li>
+</ul>
+<p>The following are popular implementations of the RADIUS protocol:</p>
+<ul>
+<li>Network Policy Server (NPS): This is an implementation of the RADIUS protocol by Microsoft which is included with Microsoft Windows Server 2008 and above. Prior to this it has been known as Internet Authentication Service (IAS)</li>
+<li>FreeRADIUS: This is a freely available RADIUS server which can be installed on most Operating Systems. FreeRADIUS is highly customisable and able to work with a wide range of authentication types</li>
+</ul>
+<p>Note that these are not the only RADIUS implementations and many vendor solutions exist. Vendor solutions may also integrate well with existing products within the organisation and these should be considered.</p>
+<p>When choosing an appropriate RADIUS server, the following should be considered:</p>
+<ul>
+<li>How easily can the server be deployed?</li>
+<li>Does the server have all the features required to support the organisations current &amp; future environment?</li>
+<li>How easy is it to initially learn, deploy, and maintain the server?</li>
+</ul>
+<p>The following table outlines the pros and cons of the identified RADIUS solutions in context of the above questions:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/p.6_RADIUS_implementation__800_606_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/p.6_RADIUS_implementation__800_606_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201229140154/https://www.contextis.com/media/images/content/p.6_RADIUS_implementation_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/p.6_RADIUS_implementation__800_606.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>EAP Authentication Methods</h2>
+<p>For wireless Enterprise mode network authentication, the Extensible Authentication Protocol (EAP) framework is used (the 802.1X standard actually defines the encapsulation of “EAP over LAN” networks, known as EAPOL). The EAP framework does not define how authentication takes place, instead it defines standard functionality, allowing for multiple EAP methods to be developed which conform to these standard functionalities.</p>
+<p>The most secure EAP methods incorporate “outer” and “inner” authentication. The “outer” authentication method is the process of creating a secure tunnel to safely transmit authentication information. This is done by creating a TLS tunnel through the use of server and/or client certificates. The “inner” authentication method performs the authentication, this authentication is performed within the secure tunnel created by the “outer” authentication method to ensure privacy and tampering protection.</p>
+<p>The most common, and secure EAP methods of authentication are as follows:</p>
+<ul>
+<li>EAP Transport Layer Security (EAP-TLS): Requires both the supplicant and authentication server to validate each other’s identity through digital certificates. This is considered the most secure method as clients are validated by the server, and compromising a user’s password is not enough to gain access to the network</li>
+<li>EAP-TTLS: This method uses a TLS outer tunnel to securely perform authentication. The TLS tunnel is setup using digital certificates on the authentication server however, there is no requirement for the client to have a digital certificate. This method supports legacy password based inner authentication methods such as MSCHAPv2</li>
+<li>PEAP: Similar to EAP-TTLS in that a secure encrypted TLS connection is used, and only the client must validate the server. PEAP however, tunnels EAP methods for use in inner authentication. This allows legacy password based authentication methods, e.g. EAP-MSCHAPv2, but also allows EAP methods such as EAP-TLS to be securely tunnelled</li>
+</ul>
+<p>Although EAP-TLS is considered the most secure EAP method, implementing EAP-TLS is a trade-off between convenience and security. This is due to the management required in generating and push certificates to all client devices. This EAP method is desired as it prevents against a number of attacks, mainly rogue access points, as both the client and server must validate each other.</p>
+<h2>Client Security Considerations</h2>
+<p>Before Enterprise mode security is deployed, it is good to get an understanding of some common security configuration options that clients should implement.</p>
+<p>The following options are available in Microsoft Windows and macOS Operating Systems:</p>
+<ul>
+<li>Validate server certificate: Requires the client to verify the authentication servers certificate before authenticating. If the certificate is not already trusted, the user is then prompted to accept the certificate. For macOS systems, the authentication servers certificate can be hard coded to be trusted</li>
+<li>Validate server name: Limits the client to only connect to authorised authentication servers. The validation is done by checking the Common Name (CN) within the authentication servers certificate, to see if it matches any server listed in this field</li>
+<li>Enable Identity Privacy: Enabling identity privacy will prevent any usernames from being sent in clear text when attempting to authenticate. This is typically done by using the “anonymous” identity, preventing information leakage within the network to attackers</li>
+</ul>
+<p>The following options are available in Microsoft Windows Operating Systems:</p>
+<ul>
+<li>Trusted Root Certification Authorities: The root Certificate Authority (CA) which issued the certificate to the authentication server should be trusted by the client. The most secure configuration is to ensure only the trusted root CA is explicitly checked, preventing some known attacks using signed certificates with rogue access points</li>
+<li>Disables users from authorising new servers or CAs: This option should be enabled to disallow users from validating new arbitrary certificates. Certificates should be handled by administrators to not produce warnings in daily use, and enabling this will prevent users from accidentally accepting certificate warnings from rogue access points</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/p.8_EAP_properties__800_439_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/p.8_EAP_properties__800_439_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201229140154/https://www.contextis.com/media/images/content/p.8_EAP_properties_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/p.8_EAP_properties__800_439.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Example PEAP properties configuration window for Microsoft Windows 10 clients</em></p>
+<h2>Recommendations for Implementing/Migrating to WPA Enterprise</h2>
+<p>When attempting to deploy a WPA Enterprise mode security network, regardless of if it is an upgrade to an existing environment, or a completely new environment, the following general technology deployment rules should be kept in mind:</p>
+<ul>
+<li>Perform testing and initial deployment in a test environment</li>
+<li>If testing is performed on existing systems, always make a backup first</li>
+<li>Document the steps taken to setup any system for easy replication</li>
+<li>Ensure that processes are in place when critical changes are being made to quickly revert changes if issues are identified e.g. reverting a failed deployment which cuts wireless access for users</li>
+</ul>
+<p>Deployment of an Enterprise mode wireless network follows the below high level phases:</p>
+<ol>
+<li>Research and Planning – Researching your organisations current wireless networking configuration; What security posture does the organisation want to reach? And what has to be implemented to reach that ideal security posture?</li>
+<li>Test Deployment – Deployment of the implementation plan as a test environment</li>
+<li>Production Deployment – Deployment of the network to the production environment</li>
+<li>User Migration – Seamlessly migrating users from the exiting network to the new network</li>
+</ol>
+<h3>Research and Planning</h3>
+<p>The research and planning phase consists of identifying features of your current network, allowing for configurations to be planned effectively.</p>
+<p>The following questions should be answered in order to understand what is understand what is required for your organisations deployment:</p>
+<ul>
+<li><strong>Which clients currently connect to the network?</strong> This will help identify which authentication methods are natively supported by the networks current clients, e.g. Microsoft Windows 7 and below does not natively support EAP-TTLS, but software which allows this can be installed. Furthermore, this will allow you to determine what authentication methods the RADIUS server must support</li>
+<li><strong>What authentication types is your organisation willing to support?</strong> This will help determine what infrastructure is required, e.g. EAP-TLS will require extensive public-key infrastructure (PKI) to manage server and client certificates, whereas PEAP only requires server certificates which are trusted by the clients</li>
+<li><strong>What Certificate Authority (CA) will be used to issue certificates to the RADIUS server/clients?</strong> It is recommended to use an in-house CA as all clients will need to trust that CA. If a public CA is used, then attackers can purchase certificates from the public CA and masquerade as an internal RADIUS server</li>
+<li><strong>Will Bring Your Own Device (BYOD) and Guest networks be supported?</strong> If so, then appropriate authentication methods should be allowed. E.g. EAP-TLS is not practical to implement as the only supported authentication method</li>
+<li><strong>How many clients connect to the current wireless network?</strong> Identifying the current networks load will help assess if excessive strain will be placed on the RADIUS server during high load times. If so, multiple RADIUS servers may be required for load balancing</li>
+<li><strong>Can the network withstand any downtime?</strong> If network downtime is unacceptable, then multiple RADIUS servers in failover mode should be considered</li>
+</ul>
+<p>Answering the above questions will result in a solid understanding of what needs to be deployed, and what configurations should services be setup with. The final thing to plan out is a solid migration plan for how users will migrate to the new network. Details on how users can be migrated can be found in the ‘User Migration’ section below, however it is good to have a rough idea of the plan before deployment has begun.</p>
+<h3>Test Deployment</h3>
+<p>Once a deployment plan has been created and the required configurations understood, testing can commence!</p>
+<p>In most cases, deployment will consist of the following:</p>
+<ol>
+<li>Testing and deploying a RADIUS server</li>
+<li>Setting up a test wireless network</li>
+</ol>
+<p>A key note when deploying the test environment is to <strong>note down all steps taken to setup everything</strong>! With rigorous notes, then deploying to the production environment when ready will be a piece of cake.</p>
+<p>When deploying a new RADIUS server, initially ensure that a single server instance works. If multiple RADIUS servers are planned, then the configuration from the first one can be copied and replicated. Additionally, during the test phase, test certificates can be deployed to the RADIUS server and test clients. In production however, ENSURE that valid certificates are always used.</p>
+<p>When setting up the test network, use throwaway/spare access points to create the network, then attempt to connect a client to test network to ensure that the test setup is working as expected.</p>
+<h3>Production Deployment &amp; User Migration</h3>
+<p>Once you are happy that testing has succeeded it is time to push to production! Migrating users will require the following steps:</p>
+<ol>
+<li>Deploying the final infrastructure</li>
+<li>Updating existing or implement new network configurations to use Enterprise mode security</li>
+<li>Pushing the required wireless profiles to clients</li>
+</ol>
+<p>It is important to have a solid plan on how clients will obtain the appropriate wireless configuration. Having user’s setup their own device and clicking through certificate warnings normalises this behaviour. If this behaviour is normalised, rogue access points have the potential to abuse this to gain access to the network.</p>
+<p>If Windows hosts are mainly in use within the organisation and managed through Active Directory, it is possible to push out wireless profiles via Active Directory. For Mac OS hosts, software such as “Apple Configurator” can be used to push wireless profiles to managed devices. For Linux hosts and unmanaged devices, e.g. iOS and Android phones within the network, clients may need to setup their own devices. In this case, organisations can provide detailed configuration guides for these systems for users to connect securely.</p>
+<p>Step 1 of user migration can be performed at any time. Step 2 and 3 however, have multiple potential implementation methods. If your organisation is implementing WPA Enterprise for the first time, a typical a straight deployment will suffice. If an existing WPA Personal network is in use, there are multiple deployment options, but the most important consideration is that users do not experience any downtime. Some transition methods include:</p>
+<ul>
+<li>The “big-bang” approach: Not recommended... This approach means all wireless profiles are updated, and client configurations are pushed to devices at the same time. This is a highly risky method, since if anything goes wrong, all clients are affected</li>
+<li>The “phased” approach: Small numbers of access points and users are migrated one at a time, e.g. one branch/premises is migrated at a time. This ensures that if any issues are identified, only a small number of users are affected and must be reverted</li>
+<li>The “simultaneous new network” approach: This approach works if the new network does not require the same SSID (network identifier/name) as the old network. A new configuration can be pushed to clients while the old configuration still exists. Access points can then be slowly migrated from Personal to Enterprise mode and users will automatically connect, resulting in no downtime</li>
+</ul>
+<h2>Conclusion</h2>
+<p>I hope this deep dive has shown the benefit of using WPA Enterprise mode security over Personal mode security for organisations. Although it may be some time to learn and deploy the infrastructure for this security mode, the benefits heavily outweigh the drawbacks of some initial investment into the network.</p>
+<p>Enterprise mode security is not invulnerable to attacks however, and a future blog post will demonstrate how weak Enterprise configurations can give way to some attacks. Additionally, with WPA3 readily coming into consumer devices, lookout for a future blog post comparing the WPA standards in a much more depth than this blog could.</p>
+</article>
+{% endraw %}

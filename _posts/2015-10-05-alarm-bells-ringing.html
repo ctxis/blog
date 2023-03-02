@@ -1,0 +1,181 @@
+---
+layout: blogpost
+title: "Alarm bells ringing!"
+author: "Neil Biggs"
+author_role: "Head of Research"
+summary: "We like to look at the security of consumer and commercial products, either as a product security evaluation for a customer or for our own interest. In previous blog posts we examined peripheral devices that are considered to be part of the Internet of Things (IoT), such as printers and smart light bulbs. We've also talked about the congestion in the radio frequency spectrum."
+tags: [Product Security]
+hero_banner: Alarm_bells_are_ringing_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>We’re now seeing even traditional “security” products such as burglar alarms feature Internet of Things type functionality and, as similar vulnerabilities in these types of products could have serious consequences, we thought we’d take a look.</p>
+<p>The first product we looked at was a Yale smart burglar alarm system which, at the time of purchase, was available through major high street retailers for around £600 and is designed to be installed by the end user. The smart burglar alarm system allows activation and monitoring of the alarm and cameras via a smart phone over the Internet. It also has the option to add smoke detectors to the system. Crucially, it’s a secondary security system, in that it monitors but doesn't control access.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale-image-600.width-800_800_503_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale-image-600.width-800_800_503_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale-image-600.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale-image-600.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>[picture from <a href="http://www.yalestore.co.uk/alarms/easyfit-range/easy-fit-smartphone-alarm-369.html">http://www.yalestore.co.uk/alarms/easyfit-range/easy-fit-smartphone-alarm-369.html</a>]</p>
+<p>The concept of an easy fit smart alarm system is very appealing as it provides the ability to remotely monitor your home security whilst at work or on holiday. However, from a security standpoint, this feature could open up new attack vectors against a product that owners expect to work when it matters most. With this in mind, we decided to see how secure the product was.</p>
+<h2>Day 1</h2>
+<p>The first thing that we did was to unpack all the items and set them up, although we did disable the external alarm to avoid deafening ourselves! Having set up the device, we started capturing traffic between the mobile application and the control box. This gave us a high level understanding of the systems components and their interactions, as shown in the following diagram:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale_System_Diagram-600.width-800_800_512_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale_System_Diagram-600.width-800_800_512_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_System_Diagram-600.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_System_Diagram-600.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The design of the system immediately highlights a number of areas that could be of particular interest:</p>
+<ul>
+<li>The main control box, which communicates wirelessly with the cameras and sensors in the home, as well as being connected to the Internet in order to provide remote activation and monitoring via the corresponding Yale smartphone application</li>
+<li>The <a href="https://en.wikipedia.org/wiki/ZigBee">Zigbee protocol</a> and <a href="https://en.wikipedia.org/wiki/ISM_band">868MHz ISM band</a> communications to the peripheral devices</li>
+<li>The communication between the control box and the app running on the mobile phone</li>
+</ul>
+<p>The next step was to capture and analyse the communications taking place. This revealed that the communications with the mobile app were transmitted to a Yale server and used <a href="https://en.wikipedia.org/wiki/XMPP">XMPP</a> (XMPP is a simple message protocol based on XML). It’s worth highlighting that the XMPP communications between the control box and the Yale server are unencrypted. Some examples of the XMPP traffic can be found below. </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210413203224im_/https://www.contextis.com/media/images/content/yale_cropped.focus-none.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210413203224im_/https://www.contextis.com/media/images/content/yale_cropped.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/yale_cropped.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/yale_cropped.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The XMPP commands are sent to and from the control box. They provide status updates and allow for operations such as arming and disarming the alarm. This traffic is interesting as it uses basic authentication (clear text password) and all the requests can be viewed.</p>
+<p>This indicated that the control box was a good candidate for closer inspection. Our next step was a port scan of the central unit, which revealed an internal web user interface running on port 80. On trying to access the page a username and password prompt was displayed:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale_Auth_Required_Dialogue.focus-none.width-800_800_218_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale_Auth_Required_Dialogue.focus-none.width-800_800_218_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Auth_Required_Dialogue.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Auth_Required_Dialogue.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If incorrect credentials are submitted an unauthorised page is displayed. Even from this initial page it is clear this is not a polished UI for home use and appears to be more for diagnostics and maintenance. There’s no mention of it in the manual, so why is it running? The page titles also give a clue to the likely functionality.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale_Unauthorised.focus-none.width-800_800_581_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale_Unauthorised.focus-none.width-800_800_581_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Unauthorised.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Unauthorised.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>After manually entering some common passwords with no success we needed to find a way to get hold of the credentials. We considered brute force, but were keen to get to know the box a little better so we decided to take a more hands on approach.</p>
+<h2>Day 2</h2>
+<p>The next step in trying to get the default credentials was to take a look inside the control box. We identified a 10-pin ARM <a href="https://en.wikipedia.org/wiki/Joint_Test_Action_Group">JTAG</a> header on the bottom left of the control panel. A quick continuity check confirms that the pins on the header are connected to the JTAG pins on the System on Chip (SoC), a Cortex-M4 based Freescale chip. Our hope was that the firmware could be extracted via JTAG so that we could search for the password in the firmware image. The datasheet for the SoC says that it supported read-protection on the JTAG interface.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale_PCB.focus-none.width-800_800_540_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale_PCB.focus-none.width-800_800_540_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_PCB.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_PCB.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>However, no such protection existed, and the firmware was easily extracted. At this point we were about to embark on another IDA Pro adventure, but before getting too deeply involved we ran ‘strings’ just to see if there was anything interesting. One string in particular stood out - surely this wasn’t the password for the web interface? Yes the interface we didn’t even try to brute-force against had a password that could be found by simply running strings over the firmware.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale_Authorised.focus-none.width-800_800_247_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale_Authorised.focus-none.width-800_800_247_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Authorised.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Authorised.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Now we had access to the web UI we started playing around with the various options. The device management page had lots of interesting buttons to press and, given we had disabled the large siren, one of our number decided it was safe to press the “test siren” button…</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale_Device_Management.focus-none.width-800_800_684_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale_Device_Management.focus-none.width-800_800_684_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Device_Management.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Device_Management.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p> … we soon learnt that the control panel also had an internal buzzer that could be very loud in a small space. This was quickly disabled for future tests!</p>
+<p>The page that was of particular interest was the panel control page which has options for arming and disarming the alarm. These were tested and they do indeed activate and deactivate the alarm system. The traffic for these commands was analysed in Wireshark and the specific packets quickly identified.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Yale_Panel_Control.focus-none.width-800_800_271_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Yale_Panel_Control.focus-none.width-800_800_271_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Panel_Control.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413203224/https://www.contextis.com/media/images/content/Yale_Panel_Control.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We wrote a short python script to login to the web server using the admin credentials and submit the disarm request. This allows for the alarm to be deactivated by simply locating the control box, unplugging the Ethernet cable and directly connecting the laptop running the python script. It is worth noting that when a sensor detects movement and the control box is armed there is a 30 second default time period to allow the user to disarm the system. Once the control box is located it can be disarmed in seconds without any alerts being reported back to the corresponding phone app.</p>
+<h2>Summary</h2>
+<p>Our initial assumption that choosing an IoT security product from an established vendor would potentially provide a difficult target was proven to be false. After just a couple of days of analysis we were able to show that within a few seconds of physical access to the control box, the alarm can be disabled trivially.</p>
+<p>In summary the key issues identified were:</p>
+<ul>
+<li>Running the web server on the hub with a fixed username and password</li>
+<li>Not enabling the JTAG read protection on the System on Chip</li>
+<li>Not encrypting the XMPP traffic from the hub to the Yale servers</li>
+</ul>
+<h2>Disclosure and comment from Yale</h2>
+<p>We first reported our findings to Yale in February 2015, and have been in discussion with them since then. We would like to thank them for their positive response to our findings.</p>
+<p>Yale released an update to their firmware in July 2015, and also provided us with the following comment:</p>
+<p><em>"We would like to thank Context IS for the responsible way in which they have carried out their testing and for giving us the opportunity to discuss it in confidence.</em></p>
+<p><em>We would certainly agree with Context’s point that the “internet of things” and connected systems present new challenges, especially in the home market where consumers are not always aware of the potential risks.</em></p>
+<p><em>Our policy is neither to confirm nor deny any reports about the security of Yale products, as any comment could inadvertently disclose information which might aid criminal activity.</em></p>
+<p><em>As one of the most trusted brands in home security, Yale takes product security very seriously and we have a robust, continuous testing and upgrade process."</em></p>
+<p>More details on Context's responsible disclosure policy can be found <a href="https://www.contextis.com/about-us/responsible-disclosure/">here</a>.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Neil leads the Research team and is based in Context's Cheltenham office. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

@@ -1,0 +1,80 @@
+---
+layout: blogpost
+title: "Securing Corporate Mobile Devices"
+author: "Craig Donkin"
+author_role: "Senior Consultant"
+summary: "Mobile computing is well and truly ubiquitous, and has transformed the business world. But the risk of devices being stolen or compromised is a real threat to many organisations, which is why it is crucial to have a suitable and robust Enterprise Mobile Management (EMM) solution and policy."
+tags: [Mobile]
+hero_banner: securing-corporate-mobile-devices_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Be it a mobile phone, tablet, laptop or now even a smart watch, the use of these devices poses challenges for information security management in organisations big and small.  Mobile devices become an extension of the network perimeter, but unlike a server in a data hall, they are far easier to lose or steal.</p>
+<p>The risk of a lost or stolen device is not just the data that is stored locally on the device – data such as contacts, cached emails, notes, sensitive documents and photos – as mobile devices can also provide a direct route into the heart of an organisation through VPNs and workspace browsers, which if compromised could provide malicious actors a means to further compromise a company’s internal network.</p>
+<p>A compromised mobile device can result in severe reputational and financial damage to an organisation, as well as violations of legislation relating to privacy and compliance. In addition, security threats to mobile devices are evolving, with smartphones increasingly seeing the same kind of targeted sophisticated attacks that traditional workstations have experienced for many years.</p>
+<p>Fortunately, Enterprise Mobility Management (EMM) solutions are also becoming more sophisticated and adept at aiding organisations in protecting their mobile devices, and the UK government has acted on the risk by releasing security guidance for end users as well as incorporating mobile devices in their <a href="/web/20200608121502/https://www.contextis.com/services/assurance/cyber-essentials-plus/">Cyber Essentials</a> scheme. Despite these improvements, we often see clients struggle to effectively manage and secure mobile devices, putting sensitive data at risk.</p>
+<p>Below, we compare the three main EMM approaches: COBO, BYOD and COPE. Based on our extensive experience of performing <a href="/web/20200608121502/https://www.contextis.com/services/assurance/mdm-configuration-reviews/">EMM policy reviews</a> and mobile <a href="/web/20200608121502/https://www.contextis.com/services/assurance/mobile-application-security/">application</a> and <a href="/web/20200608121502/https://www.contextis.com/services/assurance/mobile-device-security/">platform</a> testing for our clients, we also provide some general guidance for mobile device management.</p>
+<h2>EMM Approaches</h2>
+<h3>Corporate Owned, Business Only (COBO)</h3>
+<p>COBO is where organisations supply employees with a device to use but restrict the device to business purposes only, prohibiting the use of the phone as a personal device. Policies are deployed to strongly lock down a device, preventing a user from changing security settings and installing third party applications that may impact on the security of the device. COBO deployments typically use a small pool of device types, making it easier to manage the hardware and end user support requirements.</p>
+<h3>Bring Your Own Device (BYOD)</h3>
+<p>BYOD emerged as consumerism, third party applications and cloud solutions changed the mobile device landscape. BYOD allows end users to work on a device of their choosing and ownership, securely accessing corporate documents and emails via standard or third-party applications. BYOD promised an organisation a reduction in the workload and cost of managing devices, however in our experience many organisations have struggled to successfully implement a BYOD program that provides the correct level of security whilst balancing the demands of employees. </p>
+<p>From a security standpoint, BYOD unleashes a medley of devices and platforms into the corporate environment. Without an MDM policy, there is no control from the organisation on devices being connected to the network, even if those devices contain known weaknesses with known exploits. You wouldn’t (shouldn’t) install a new server running a vulnerable operating system in your external DMZ so why allow vulnerable mobile device access from an open wireless network in the user’s favourite coffee shop?</p>
+<p>As technology advances, the BYOD movement have expanded to include bring your own applications (BYOA) and now bring your own wearables (BYOW), each posing the same problems to organisations as BYOD. </p>
+<h3>Corporate Owned, Personally Enabled (COPE)</h3>
+<p>COPE is an approach that sits in between COBO and BYOD. The organisation owns the device and sets policies governing its use in relation to corporate data and the corporate network. A user will typically pick a device from a pool and then use it for both work and personal use. COPE allows an organisation to control the devices, and thus the risks that they introduce to their network, whilst keeping corporate data secure and employees happy. </p>
+<p>EMM solutions have helped to bridge the COBO – BYOD gap by developing solutions that provide separate workspaces that provide security and usability to the work side of a mobile device, whilst satisfying users with modern devices that can be used for third party applications like social media and games.</p>
+<h2>Recommended EMM Policy</h2>
+<h3>Device Security </h3>
+<p>The first line of defence is to secure the device so that if it is stolen an attacker can’t easily gain access to the underlying operating system and data. Regardless of the chosen EMM approach, policies should be configured to:</p>
+<ul>
+<li>Enforce a strong, complex device password, and if applicable a workspace password. This should disable the use of weaker password mechanisms such as numeric PINs, and enforce password ageing to ensure a new password is set regularly.</li>
+<li>Enforce a low maximum number of failed login attempts and initiate an automatic wipe of the workspace or device if the threshold is exceeded.</li>
+<li>Auto lock the screen and workspaces when the device is inactive and set the timeout to a low number.</li>
+<li>Enforce encryption of the device, including removable storage and mobile backups.</li>
+<li>Provide a means for mobile administrators to wipe the device in the event it is reported lost or stolen.</li>
+</ul>
+<p>If possible, policy settings should be set that prevent an end user from removing the deployed profiles, or from changing any enforced settings.</p>
+<p>If an MDM is used in a BYOD approach, only setting a strong workspace password and enabling device encryption can provide mitigation from loss of data in the event of device theft. However it is recommended that both strong device passwords and strong workspace passwords, accompanied by device encryption is used where applicable. </p>
+<h3>Device Functionality</h3>
+<p>Deciding what freedoms to allow your employees with regards to functionality can be the trickiest part of setting up an EMM policy. An organisation needs the devices to be usable and at the same time secured from risk. For example, should you allow your users to install any applications they want? Should they be allowed to use voice control apps such as Siri? The following guidelines should be considered:</p>
+<ul>
+<li>For a COBO policy an organisation should deploy approved applications prior to and during a deployment, and should restrict users from installing additional applications. </li>
+<li>For COPE deployments a regulated internal app store can be used as a compromise containing pre-approved applications for install. If access to a 3rd party app store is provided, the EMM should be used to monitor the applications installed by the user.</li>
+<li>In both cases users should be restricted from uninstalling any corporately deployed applications and profile configurations.  </li>
+<li>If taking a BYOD approach, to mitigate the risk of a malicious third party application compromising the secure workspace an organisation should implement guidelines around application security, and should ensure that their EMM solution uses segregated work and personal spaces and is kept up to date. The EMM can be used to monitor the applications installed by the user. </li>
+<li>Depending on the sensitivity of the business use, an organisation should consider disallowing the use of the camera. For example in R&amp;D, military or government use cases.  If the use case is sensitive, BYOD shouldn’t be used at all. </li>
+<li>If allowing voice control such as Siri, restrict older OS versions that contain lock screen bypasses using voice control and in all situations voice control should only be enabled when the device is unlocked. </li>
+<li>To prevent data disclosure and exfiltration, users should be prevented from taking screenshots of the device screen and notifications should not be shown on the lock screen.</li>
+<li>Finally, work and personal segregation can be further enforced by preventing an end user from opening documents from managed sources like corporate email or file stores in unmanaged apps like personal email.</li>
+</ul>
+<h3>Networking &amp; Communications</h3>
+<p>Policies should also be configured that help to reduce the risk of data exfiltration from the device, or man-in-the-middle attacks. The following points should be considered:</p>
+<ul>
+<li>Protocols like Bluetooth and Airdrop can be used to exfiltrate data from a device, and could provide a vector for mobile malware. Consideration should be taken in disabling these protocols in a COBO and COPE deployment. However this will have an impact on the ability to use peripherals that rely on Bluetooth such as car integration, smart watches, headphones and fitness trackers. If enabled, ensure that policies are set to force a password when pairing devices and ensure that they are not used as unmanaged drop targets.</li>
+<li>In all deployments users should be restricted from using cloud backup. Although trust in the cloud provider's security such as iCloud, Dropbox and Google Drive might be implicit, consideration should be taken to the risk of data exfiltration. Once corporate data is in the cloud an organisation no longer has control of it. If a user leaves the organisation, sensitive data and credentials may still be stored in their cloud accounts. </li>
+<li>To protect enterprise apps from man-in-the-middle attacks users should be restricted, in all deployments, from accepting untrusted TLS/SSL certificates. Note this may cause some issues when accessing internal resources that use self-signed certificates or certificates that are signed with an internal certificate authority.</li>
+</ul>
+<h3>Additional Considerations</h3>
+<p>In addition, consideration should be taken to:</p>
+<ul>
+<li>Ensure that when a BYOD approach is taken, devices that are old and have known weaknesses are prevented from use. Many EMM solutions allow an organisation to prevent policies from being deployed to outdated platforms.</li>
+<li>Ensure that policies are deployed that aid in the event of an incident. For example remote logging and inventory.</li>
+<li>Back up the technical policies with soft policies governing the usage of mobile devices and ensure employees sign and understand these.</li>
+</ul>
+<h2>Summary and Conclusions</h2>
+<p>The guidance in this blog post should provide a starting point for ensuring that corporate data is secured and not put at unnecessary risk. It is important to get the security of your solution assured by security professionals. At Context we can:</p>
+<ul>
+<li>Provide pre-testing consultancy aimed at aiding an organisation in developing a secure EMM deployment strategy. </li>
+<li>Review internal policies relating to the governance of the EMM solution including security and device policies.</li>
+<li>Review deployed policies: do they align to internal documented policies and security best practice?</li>
+<li>Review policy implementation: are the policies actually deploying to devices as intended?</li>
+</ul>
+<p>In addition Context has experience at taking a holistic approach to EMM security testing, including:</p>
+<ul>
+<li>External and Internal infrastructure assessments of cloud and on premise EMM deployments</li>
+<li>Build reviews of servers and networking components involved in an EMM deployment</li>
+<li>Mobile application penetration testing of applications deployed by EMM solutions. </li>
+</ul>
+</article>
+{% endraw %}

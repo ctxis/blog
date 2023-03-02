@@ -1,0 +1,104 @@
+---
+layout: blogpost
+title: "Expressing Yourself: Analysis of a Dot Net Elevation of Privilege Vulnerability"
+author: "James Forshaw"
+author_role: "Security Consultant"
+summary: "In the .NET framework sandboxing is implemented by running code with 'Partial Trust' which uses the built-in Code Access Security (CAS) framework to limit what code can do to a specific set of permissions."
+tags: [Vulnerabilities and exploits]
+hero_banner: Expressing_yourself_analysis_of_a_dot_net_elevation_of_privilege_vulnerability_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>This is used in technologies such as <a href="https://msdn.microsoft.com/en-us/library/t71a733d%28v=vs.110%29.aspx">ClickOnce Deployment</a> to limit what permissions an application runs with. As an example there is the FileIOPermission class which is used when opening a file or enumerating the file system. When a piece of code requires this facility it makes a Demand for the permission. This starts a process where the framework will walk the current execution stack inspecting each piece of calling code and checking if it has that permission in its current set. If the framework encounters a stack frame which doesn’t have that permission (such as partially trusted code) then it throws a SecurityException and blocks the request. This is very important because this protects trusted code from being subverted to do privileged requests as the entire stack leading up to the call is checked.</p>
+<p>What happens when trusted code does want to open a file? Well permission objects also have an Assert method. When code calls this method it effectively places a marker on the stack which tells the framework, “Hey no need to go any further, assume from here the entire stack is trusted”. Of course non-trivial code might then do a significant amount of work under this asserted permission some of which could actually be untrusted, but it doesn’t matter, if the framework encountered this untrusted call lower down the stack than the assert it still will fail as expected.</p>
+<p>What this can do is set you up for a Trusted Chain attack where you re-purpose existing trusted code to perform an action you control. From the security manager's point of view all calls on the stack are trusted, so the asserted permission holds. This is exactly the same sort of issue which I abused in Java to get my Pwn2Own jacket.</p>
+<p>Finding trusted chains is tricky, you need to find the right combination of pieces to put together to have some useful effect. Therefore the stack walking security model works fairly well as long as partially trusted code cannot manufacture its own fully trusted methods. It turns out there was a way to do so, in .NET 3.5 and above it was possible for partially trusted code to create fully trusted methods using the DynamicMethod class. This was apparently a design decision taken by the .NET product team, they did identify it might be a security issue but perhaps did not see a way of exploiting it. Fortunately you can't just exploit it directly, say by calling Assert to disable the security, but what it did allow you to do was create custom trusted chains.</p>
+<p>The simplest way of using DynamicMethod, without getting into detail with MS Intermediate Language (MSIL) is by using the Linq <a href="https://msdn.microsoft.com/en-us/library/system.linq.expressions.expression.aspx">Expression</a> class. The C# compiler provides a nice lambda style syntax to populate the Expression object. Note that this is not the same as a normal lambda function that gets compiled into your code and therefore runs with partial trust. Instead the compiler builds a representation of the expression you want to run in memory, and when the <a href="https://msdn.microsoft.com/en-us/library/bb345362.aspx">Compile</a> method is called a delegate is created backed by a DynamicMethod object.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Expressing_Yourself_1.width-800_800_317_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Expressing_Yourself_1.width-800_800_317_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_1.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_1.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If you could bind the resulting delegate from this process to a call-back which runs under higher asserted permissions it will not cause the security manager to throw a SecurityException and your action will run as if it had those permissions. This is how you can use this to break out a sandbox.</p>
+<h2>Exploiting SecurityException</h2>
+<p>Whenever I audit code for security issues I always try and make note of unusual behaviour. In this case I had noticed a long time ago that the <a href="https://msdn.microsoft.com/en-us/library/system.security.securityexception.aspx">SecurityException</a> class had an Assert for full privileges during its constructor and ToString method. In fact I had abused this before to get an information disclosure vulnerability (<a href="https://www.cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2012-1896">CVE-2012-1896</a> for those interested), but I just knew there must be more to it than that. Let's look at one of the constructors:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Expressing_Yourself_2.width-800_800_396_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Expressing_Yourself_2.width-800_800_396_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_2.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_2.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Nothing immediately untoward there, but look again at the setting of <em>Demanded</em>. This is actually a property, not a field of the class. This means that when it gets set some code will execute. If we go and look at the <em>setter</em> code, we can find it is converting the passed in <em>demanded</em> object to a string through the <em>XMLUtil.SecurityObjectToXmlString</em> method.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Expressing_Yourself_3.width-800_800_136_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Expressing_Yourself_3.width-800_800_136_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_3.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_3.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>To cut a long story short, what this ends up doing is converting the demanded object to an <a href="https://msdn.microsoft.com/en-us/library/system.security.ipermission.aspx">IPermission</a> interface, calling the <a href="https://msdn.microsoft.com/en-us/library/system.security.isecurityencodable.toxml.aspx">ToXml</a> method on that and returning the XML string. But I noticed there was potential for a trusted chain, during the conversion to a string it iterates through the <a href="https://msdn.microsoft.com/en-us/library/system.security.securityelement.children.aspx">Children</a> property of a <a href="https://msdn.microsoft.com/en-us/library/system.security.securityelement.aspx">SecurityElement</a> object we can control. This almost sounds like my Java Pwn2Own vulnerability all over again.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424144403im_/https://www.contextis.com/media/images/content/Expressing_Yourself_4.width-800.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424144403im_/https://www.contextis.com/media/images/content/Expressing_Yourself_4.width-800.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_4.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_4.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>So we have a potential point for control, we now just need to exploit it. What we need to find is a fully trusted class, which will perform an attacker controlled call-back when iterating a list of values and is also an <a href="https://msdn.microsoft.com/en-us/library/system.collections.arraylist.aspx">ArrayList</a> object. Sounds a tough challenge, but you can never underestimate the power of having so much code to reuse. Looking in <a href="https://www.red-gate.com/products/dotnet-development/reflector/">Reflector</a> there weren't that many derived forms of the ArrayList class, and the ones that did not look like they were immediately useful. Then I found the <a href="https://msdn.microsoft.com/en-us/library/system.collections.arraylist.adapter.aspx">ArrayList.Adapter</a> static method. This creates an ArrayList around any IList interface; this is far more useful, there are a lot of classes which implement the <a href="https://msdn.microsoft.com/en-us/library/system.collections.ilist.aspx">http://msdn.microsoft.com/en-us/library/system.collections.ilist.aspxIList </a>interface.</p>
+<p>After a bit more digging I settled on the <a href="https://msdn.microsoft.com/en-us/library/system.windows.forms.listview.listviewitemcollection.aspx">ListViewItemCollection</a> class which is part of the <a href="https://msdn.microsoft.com/en-us/library/system.windows.forms.listview.aspx">ListView</a> control in Windows.Forms. When a ListView is placed in VirtualMode, meaning the list generates items on demand, it will call the <a href="https://msdn.microsoft.com/en-us/library/system.windows.forms.listview.retrievevirtualitem.aspx">RetrieveVirtualItem</a> event on the ListView when the caller requires an item from the collection. Our exploit ends up running the following sequence of events:</p>
+<ol>
+<li>A new SecurityException object is created receiving a custom permission object with overridden ToXml method as the demanded parameter.</li>
+<li>SecurityException asserts full trust, calls ToXml on the permission object</li>
+<li>ListViewItemCollection created in virtual mode, RetrieveVirtualItem event bound to a fully trusted DynamicMethod which runs Process.Start("calc")</li>
+<li>ToXml creates a new SecurityElement object and binds the ListViewItemCollection to the Children property via the ArrayList adapter.</li>
+<li>SecurityElement object returned to the caller and its ToString method is called. This iterates the Children ArrayList, which in turn calls the RetrieveVirtualItem event, which creates the Windows Calculator</li>
+</ol>
+<p>So putting it all together here is some sample code which when placed in a custom permission class and gets passed to the SecurityException constructor will run calculator.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Expressing_Yourself_5.width-800_800_752_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Expressing_Yourself_5.width-800_800_752_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_5.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424144403/https://www.contextis.com/media/images/content/Expressing_Yourself_5.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The first attempt to fix the issue was to correct the places where you could abuse this functionality, such as in Windows Forms (see MS13-015) but after supplying Microsoft with at least 3 more vulnerabilities, exploited using the same technique they finally made DynamicMethod not generate trusted methods. This should be fixed for good, I hope, but again it only serves to demonstrate how difficult it is to sandbox code when you run multiple different permission levels within the same process.</p>
+</article>
+{% endraw %}

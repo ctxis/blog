@@ -1,0 +1,125 @@
+---
+layout: blogpost
+title: "Java Pwn2Own"
+author: "Context"
+author_role: "Leading cyber security consultancy"
+summary: "On 16th April Oracle released Java 7 Update 21 (which you should install now if you haven’t already!) This release fixes all the Java vulnerabilities disclosed to Oracle during the recent Pwn2Own 2013 competition held at the CanSecWest security conference in Vancouver on the 6th March 2013, alongside a significant number of other bugs."
+tags: []
+hero_banner: An_introduction_to_debugging_the_windows_kernel_with_windbg_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>I was the first winner of the Java exploit competition at this event, and this blog provides an both an overview of my winning entry, and an insight into just how difficult it is to fully secure a complex system such as Java against a determined attacker.</p>
+<p>But let’s start with the bug itself, CVE-2013-1488, which is surprisingly innocuous and one which could easily be missed during a code security review. It was an issue I found in the <a href="https://docs.oracle.com/javase/7/docs/api/java/sql/DriverManager.html">java.sql.DriverManager</a> class which is a trusted part of the framework. As the documentation states this class’s purpose is for “… managing a set of JDBC drivers.” and is an extensible Java framework for accessing relational databases. Within the <a href="http://hg.openjdk.java.net/jdk7u/jdk7u/jdk/file/0a00f10abb2d/src/share/classes/java/sql/DriverManager.java">source code</a> for this class a Java vulnerability hunter would be drawn to the two AccessController.doPrivileged blocks like a moth to a flame, they allow the Java libraries to temporarily elevate its privileges to perform a security critical action. The first block does not do very much (it simply gets a system property) but the second one is far more interesting:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031330im_/https://www.contextis.com/media/images/content/driver_manager.width-800.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031330im_/https://www.contextis.com/media/images/content/driver_manager.width-800.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/driver_manager.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/driver_manager.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The reason this code is interesting is because it is performing a non-trivial task during this block of elevated privileges. Even more importantly, an attacker can directly interact with this process because of the use of the ServiceLoader class which will instantiate a sequence of objects from a manifest of class names provided in the applet’s JAR file.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/jarmaniest_annotated.width-800_800_310_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/jarmaniest_annotated.width-800_800_310_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/jarmaniest_annotated.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/jarmaniest_annotated.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>That in and of itself might not be massively helpful to an attacker, mainly because all objects created have to implement the java.sql.Driver interface, so we cannot just find any arbitrary class and reuse it. We could try and find an existing driver which did something bad when created with its default ‘empty’ constructor, but doesn’t sound too likely either. But looking closer at the lines which are actually doing the work, there is something else interesting going on:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/interator.width-800_800_56_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/interator.width-800_800_56_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/interator.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/interator.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Whilst it isn’t immediately obvious these lines are doing a lot more than they seem, the code is actually looping through an “iterator” which creates each object from a list of class names in turn via the reflection API Class.newInstance(). It then concatenates that object with a string and tries to log the result (ironically by default there is no log enabled and this result is thrown away). Whilst it isn’t explicit in the code, and thus might be missed unless you are paying close attention, what this is actually doing is calling the toString method on every object it creates during a privileged block. To say this is probably bad is maybe understating the issue, but what can we do with it?</p>
+<p>Exploiting this comes down to a variation of the “Trusted Method Chain” attack. This is a technique in platforms such as Java and .NET which allows an attacker to construct a chain of method calls from parts of the trusted Java class libraries and the JVM, which result in some action which circumvents security restrictions. I can’t claim credit for the discovery of this technique, and so for a better description in the Java world I would defer to the legendary Sami Koivu <a href="https://slightlyrandombrokenthoughts.blogspot.co.uk/2010/04/java-trusted-method-chaining-cve-2010.html">here</a>.</p>
+<p>The reason you need to do this is because unsigned Java code running in the browser plugin is untrusted. If you try and perform a security critical action (such as opening a file) the security manager installed to protect the sandbox will notice you and stop the action. But if all the calls on the stack are trusted (i.e. from built in classes) then the manager will trust you to perform the action, leading to the potential for a sandbox escape. </p>
+<p>From this we need some way of going from a toString method call to a sandbox escape, and that doesn’t sound like it should be easy. But looking over the history of Java exploitation, it turns out there are a number of examples of doing just this, the previous link to Sami’s blog has one (fixed obviously) and there is another very well-known one related to the Rhino Javascript Engine, <a href="http://schierlm.users.sourceforge.net/CVE-2011-3544.html">CVE-2011-3544</a> discovered by Michael Schierl (which is also fixed). So a similar technique might be worth pursuing in this case, perhaps if we could create a Javascript Error object in a similar fashion to CVE-2011-3544 it would work for us, we could get it called by DriverManager and we could escape the sandbox?</p>
+<p>But how could we do that, as I’ve just said this has been fixed? Well “yes”, but perhaps not in the way you would expect. The actual implementation of the Rhino Script Engine NativeError class wasn’t changed; instead the script engine code was modified to ‘capture’ the access control context under which it was instantiated during its default constructor. Any Javascript method is then run within an AccessController.doPrivileged block with the captured context, so that the Javascript code can only ever do as much damage as the thing which created it. This means that, if untrusted Java applet code created the engine, all Javascript would run at most with the applet’s permissions. However what if the engine was created by trusted code running with elevated permissions? Well, if we look at the code for the <a href="http://hg.openjdk.java.net/jdk7u/jdk7u/jdk/file/0a00f10abb2d/src/share/classes/com/sun/script/javascript/RhinoScriptEngine.java">RhinoScriptEngine class</a> we can actually see the fix in action:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/rhinoscriptengine.width-800_800_268_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/rhinoscriptengine.width-800_800_268_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/rhinoscriptengine.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/rhinoscriptengine.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If running in a sandbox, the constructor checks whether it is running under a fully privileged context, if it isn’t then an exception occurs and the current context is captured, otherwise accCtxt is left as its default value of null. When it comes to running Javascript code, if accCtxt is null then it is run with the permissions of the direct caller, which is exactly the scenario we want, as it breaks the fix applied to solve CVE-2011-3544 and allows us to repurpose the same technique to create our trusted chain. It is worth noting that this isn’t actually the original fix, its behaviour resulted in a code change which made it less vulnerable to these attacks, but as I will demonstrate it didn’t matter for this vulnerability. </p>
+<p>So the final piece of the puzzle is how to create the RhinoScriptEngine class under a privileged context, well the answer has been staring us in the face all along: we can use our own ServiceLoader iterator combined with a Set class to create a trusted chain between the toString method and instantiation of the RhinoScriptEngine class. The reason this works is that the Set class’s toString method will iterate over the values of the iterator object, which, in turn, causes the ServiceLoader iterator to instantiate an attacker supplied list of objects. This list can then be recovered at a later time for the purposes of exploitation. Take, for example, the following class which implements the Driver interface and derives from AbstractSet but uses a “fake” iterator:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/fakedriver.width-800_800_418_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/fakedriver.width-800_800_418_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/fakedriver.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/fakedriver.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>When called by the DriverManager code the order of operations is as follows:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031330im_/https://www.contextis.com/media/images/content/trusted_chain.width-800.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031330im_/https://www.contextis.com/media/images/content/trusted_chain.width-800.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/trusted_chain.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/trusted_chain.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Once the script engine object is created, we now just need a second driver which again derives from a Set class, this time we use it to call toString on our custom Error object, by adding it to the Set, and it’s “game over”:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/fakedriver2.width-800_800_474_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/fakedriver2.width-800_800_474_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/fakedriver2.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20200424031330/https://www.contextis.com/media/images/content/fakedriver2.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In conclusion, to exploit that single, seemingly innocuous bug required repurposing a massive amount of unrelated code to disable the security manager and therefore break out of the sandbox. I guess that is why Oracle considering it to have a Medium Access Complexity within the CVSSv2 scoring scheme. But that is also why I think something like Java can never be secured against hostile code running within a sandboxed environment: the attacker has too much control to craft the environment to exploit the tiniest of weaknesses. The large amount of “trusted” code bundled with the JRE just acts to amplify that power.</p>
+</article>
+{% endraw %}

@@ -1,0 +1,289 @@
+---
+layout: blogpost
+title: "Cost Effective Drone Detection | Context Information Security US"
+author: "Alex Farrant"
+author_role: "Senior Researcher"
+summary: "The arms race in the proliferation of drones (small unmanned aircraft systems - SUAS) and systems to counter them is showing no signs of slowing. Despite military drones posing the most obvious potent threat, the more common threat is that posed by consumer drones which can be purchased in the supermarket."
+tags: [Security, Threat and Risk Mangement]
+hero_banner: Communicating_a_cyber_attack_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<h2 class="section-title">Background</h2>
+<p>Consumer drones are regularly used for surveillance, smuggling and trespassing in restricted areas. Recent conflicts in Syria have seen low cost drones used to deliver modified explosive payloads with high accuracy with a terrifying psychological impact. This trade craft was taught en masse at training academies in Syria <sup><a href="https://www.c4isrnet.com/digital-show-dailies/modern-day-marine/2017/09/21/in-drones-isis-has-its-own-tactical-air-force/" target="_blank">1</a></sup> for example so it must be assumed the specialist knowledge, and experience, required to modify a consumer drone in this manner is available to those who should seek it.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/DroneBanner.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/DroneBanner.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/DroneBanner.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/DroneBanner.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">Drone enabled cyber</h2>
+<p>The gap between the cyber security and counter drone domains is closing as drone-enabled cyber warfare becomes a reality. First floated publicly as an emerging threat in 2011 <sup><a href="https://www.wired.com/2011/08/blackhat-drone" target="_blank">2</a></sup>, the idea that an attacker could slurp sensitive wireless data without needing access to your building, parking lot or even neighbourhood gives low budget attackers a low-risk, nation state SIGINT capability. A drone equipped with a Raspberry Pi and modem can hover over your most sensitive building and it would give attackers a privileged position to operate from, as if an entire team of penetration testers had bypassed security and climbed up to the roof with their laptops. Advances in battery technology and reduction in pricing means the viability and likelihood of this threat is increasing.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/SignalsCode1.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/SignalsCode1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/SignalsCode1.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/SignalsCode1.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">Detection</h2>
+<p>There are many ways to detect a drone including audio, optical, radar and passive RF detection. Many systems incorporate a variety of techniques to ensure complete coverage and minimise false positives at the cost of complexity and inevitably cost. The arms race to develop the most capable system has seen equipment costs spiral into the millions. This is completely at odds with the cost of the threat when you consider that the price range for hand guns and the metal detectors used to identify them are more closely aligned. More advanced technologies exist for detecting concealed weapons but metal detectors are popular as they present a cost effective solution.</p>
+<p>Detecting a drone on a budget is a greater challenge as you must be selective about the sensors. Audio is attractive from a cost perspective, but has been shown to be prone to false positives (birds), optical works only in clear light conditions , can also be subject to false positives (distant aircraft) or is very expensive (thermal imaging). Radar is effective but requires radiating RF and is expensive. That leaves passive RF detection which is prone to interference and not guaranteed to be present as drones can be on auto-pilot.</p>
+<p>Of the listed technologies, only audio and RF solutions can be implemented for less than the cost of a market leading (and payload capable) consumer drone like a DJI Phantom which is a target budget for a cost effective counter measure. Audio’s susceptibility to false positives and its limited range leaves RF as the prime candidate.</p>
+<h2 class="section-title">Passive RF detection</h2>
+<p>Passive RF detection of drones is one of the most popular techniques as a consumer drone is normally remote controlled. Drones without RF links are like like low metal content guns designed to evade metal detectors, they exist, but they’re very expensive so you rarely come across them outside Hollywood.</p>
+<p>The threat now is from drones with RF links which is why detecting RF links should be the priority.</p>
+<h2 class="section-title">Data Links</h2>
+<p>A typical remote controlled consumer drone has two radio links: A mandatory control channel and an optional video downlink. The control channel is used to send commands from a Ground Control System (GCS) up to a drone. These links are typically narrowband Frequency Shift Keyed (FSK) hoppers (to improve resilience) operating in the unlicensed Industrial Scientific Medical (ISM) bands such as 434MHz (EU), 915MHz (US), 2.4GHz and 5.8GHz.</p>
+<p>The 2.4GHz band is easily the most popular for consumer drones due to its global ratification and an abundance of cheap transceivers. It’s also the busiest band in the world. <sup><a href="https://www.contextis.com/en/blog/wireless-gridlock-in-the-iot3" target="_blank">3</a></sup></p>
+<p>The video downlink is used to relay data back to the GCS with a different high bandwidth signal.</p>
+<h3>DJI Lightbridge and Ocusync</h3>
+<p>The DJI family of drones use a dynamic wideband Orthogonal Frequency Division Multiplexing (OFDM) signal which, like its control link, can be found in the ISM bands on the quietest channel. Unlike the GCS this does not hop, but does dynamically retune (and automatically change from HD to 4K) to another channel if it experiences noise from other systems. During a flight it's normal for a video signal to move around and occupy several different channels. In our experience of field testing, a video link will appear back on the same channel and mode it took off with. This is becuase the local RF environment near the GCS will appear similar to when it selected its channel at take-off.</p>
+<p>A DJI video link can switch between several different modes ranging from low to high bandwidth. With a DJI Mavic Pro for example, the smooth mode offers a ~10MHz wide carrier with a reduced bitrate, HD mode has a higher bitrate and 4K mode has the highest bitrate and bandwidth at ~20MHz.  At 20MHz the signal has the same bandwidth as 802.11g but operates on discretely different frequencies so can still be distinguished from WiFi when measured.</p>
+<h2 class="section-title">Cellular controlled drones</h2>
+<p>A harder target to detect is a drone controlled via a cellular modem as you are looking for an encrypted phone signal. Thankfully, these are not available on the open market but the know-how to couple a modem with a MAVLink telemetry module is. To detect this threat with passive RF, you would need to monitor all the local cellular spectrum (2G to 5G) looking for a strong uplink signal as phones have distinct pairs of frequencies for communicating to and from a base station.  Geo-locating it passively from signal strength would be impractical in a populated and cluttered area as a phone adjusts its power levels dynamically to conserve battery. The only conclusion you could reach is that the phone is ‘closer than’ x metres based upon minimum power levels.  A better way to detect robots with modems would be at the network level as you can positively identify telemetry like MAVLink <sup><a href="https://en.wikipedia.org/wiki/MAVLink" target="_blank">7</a></sup> – assuming it’s not encrypted of course.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Graph_1.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Graph_1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Graph_1.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Graph_1.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The DJI video stream itself is AES encrypted and if you have a drone-detection product with proprietary keys in it like a DJI Aeroscope, you could decrypt the video link and receive not just the video but the GPS position of the drone along with its serial number.  If the drone you are trying to detect is not a DJI drone then you would not get as much information from it with this system - as the UK Police discovered during the Gatwick drone incident which required a military ‘vendor-agnostic’ counter-drone system to be deployed.</p>
+<h2 class="section-title">Weak signal detection</h2>
+<p>Devices operating in the ISM band have strict power limits (20dBm Effective Radiated Power) which means they have very weak signals. Detecting a weak signal from several kilometres away in a very noisy piece of spectrum is no easy task and requires significant Digital Signal Processing (DSP) expertise.</p>
+<p>Using Software Defined Radio (SDR), radio baseband can be inspected for noise. This noise must exceed a defined threshold to be considered for onward processing. Setting this threshold directly impacts the working range and processing load of the system, so a high threshold will reduce workload by only selecting the strongest signals for processing but will only detect very close drones. A low threshold will exponentially increase workload but you will be processing an enormous amount of WiFi and Bluetooth which shares the band.</p>
+<p>In order to develop a cost effective detection solution a sensible trade off must be sought based upon low cost SDR receivers and a threshold which satisfies both range and detection ability. This can be achieved by using other signal parameters, like frequency, to be more selective about which signals to process.</p>
+<p>In our experience of detecting distant drones in congested environments using SDRs we have found 2km to be a practical maximum for passive consumer drone detection in the 2.4GHz band. This distance is based upon EU power limits of 20dBm so will be further with US limits of 30dBm. There are low power RF systems like LoRa<sup><a href="https://en.wikipedia.org/wiki/LoRa" target="_blank">4</a></sup> which can work over 10km with less power but they are narrowband. The Minimum Detectable Signal (MDS) theory <sup><a href="https://en.wikipedia.org/wiki/Minimum_detectable_signal" target="_blank">5</a></sup> states that receiver noise increases with bandwidth so just because a narrowband LoRa signal can go 10km doesn’t mean a 20MHz DJI video signal can.  To detect and measure a DJI drone you need more receiver bandwidth than the target signal so for 30MHz bandwidth the noise floor would be -99dBm as an absolute minimum.</p>
+<p>For accurate measurements you need the signal to be clear of the (random) noise floor by at least 10dB, called the Signal-to-Noise (SNR) ratio. This would make the minimum <em>measureable</em> signal -89dBm under ideal ‘quiet’ conditions. Factor in a sensible 10dB budget for channel noise caused by other devices in the band (WiFi, Bluetooth, Zigbee, CCTV) and your detection threshold is now only -79dBm.</p>
+<p>For extrapolating the distance from the signal strength you can use a propagation model such as the Friis transmission formula <sup><a href="https://en.wikipedia.org/wiki/Friis_transmission_equation" target="_blank">6</a></sup> which assuming the power output is known (20dBm for example) means a drone at the -79dBm ‘practical and realistic’ threshold is at 1500m range. A far cry from the big figures quoted by counter drone market leaders but useful all the same when you consider prison smugglers are normally a few hundred metres from the fence in the nearest treeline.</p>
+<p>If you’ve ever flown your own drone you’ll appreciate 1500m is a very long way, requiring several minutes’ flight, and it’s hard to see a consumer drone in the sky after 300m distance.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/MOAFFT.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/MOAFFT.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/MOAFFT.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/MOAFFT.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">Tracking </h2>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/intersections.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/intersections.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/intersections.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/intersections.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>Geo-location</h3>
+<p>Geo-locating an RF signal can be performed using a variety of techniques using power, phase and timing with increasing complexity and cost. A basic technique with a cheap antenna is to use signal strength and overlay circles representing signal range and note the intersections using loci and trigonometry. This 2D technique produces two results, one actual and one mirror which must be discounted. It's sensitive to errors in signal strength so is not recommended for use in an urban area.</p>
+<p>A more advanced form of this signal strength technique is to use three sensors and create spheres representing possible locations and use spherical geometry to find the intersection. This GPS-like technique produces a single higher quality result which,  significantly in terms of drone detection, includes altitude.</p>
+<p>To mitigate the error with signal strength based geo-location a degree of error is returned with each ‘3D fix’, so if one radio is reporting a bad reading due to attenuation from trees for example, the error reported will be substantial and the result can be discarded or displayed but with a large error radius. Context have implemented this technique with success.</p>
+<p><a name="field_id_257[blocks_block_id_4235][values][Video]"> </a></p>
+<div class="video-wrapper">
+<iframe allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="" frameborder="0" height="315" src="https://web.archive.org/web/20220518152711if_/https://www.youtube.com/embed/E2SHvMFCEvk" width="560"></iframe>
+</div>
+<p>If signal strength cannot be relied upon due to attenuating obstructions such as trees and buildings then timing must be used. Time-Difference-On-Arrival (TDOA) is more a advanced technique which uses a basic antenna but compares discrete differences in the arrival time of signals to localise the source. To do this a software process must compare two pieces of baseband from the same point in time using a technique called cross-correlation which produces the modal timing difference between the samples.</p>
+<p>The difference between two radios will produce a parabola curve. By comparing multiple curves you will get a position fix for the emitter’s location. The accuracy of the position fix is proportional to the timing accuracy per sample so it can be deduced that a higher sample rate produces higher precision results. GPS accurate TDOA is possible theoretically and under the right circumstances but hard to achieve in practice.</p>
+<p>For TDOA to be viable, a high sample rate (&gt;20Msps), precision nanosecond accurate timing and a cross-correlation engine are required.   This is a lot to ask from a budget, compact, RF detection system but with advances in SDR and embedded processing is becoming more achievable than ever. This TDOA technology has been on the Government end of the open market for several years for spectrum surveillance but is not <em>yet</em> cost effective for consumer drone tracking.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/DJI_image1.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/DJI_image1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/DJI_image1.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/DJI_image1.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>When you have a system capable of automatically geo-locating signals you can quickly become overwhelmed with data and spots on a map. To make sense of these results a tracking algorithm must join the dots using signal parameters and time and space.</p>
+<p>Error is natural in RF geo-location so the algorithm must be able to distinguish between good and bad track candidates and make decisions based on the likelihood that a drone travelled a given distance in a given time. It’s not always possible to follow a track seamlessly as a drone could disappear behind a large building and reappear on the other side. Under these circumstances, two tracks would be generated and presented to an analyst to interpret against the backdrop of mapping.</p>
+<p>Once you have a track it can be used to answer two priority questions: Firstly <strong>where is the drone heading</strong> and secondly <strong>where is the operator</strong> located. Even if the drone was launched from beyond the detection range of the sensor, the track’s vector will give an indication of its origin and the drone’s model (see identification section) will give the maximum possible distance it could have come from providing a cone of interest for searching for the operator.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/broken_track.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/broken_track.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/broken_track.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/broken_track.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">Identification</h2>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Finger-Printa.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Finger-Printa.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Finger-Printa.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Finger-Printa.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Identifying a drone from passive RF is challenging, especially if you are not decoding the protocol. Decoding the drone’s protocols, for example the FSK control channel, would be the logical way to identify a drone from its protocol structure and even ID number but given the threat landscape and recent experience at Gatwick <sup><a href="https://en.wikipedia.org/wiki/Gatwick_Airport_drone_incident" target="_blank">8</a></sup> it would be a dangerous assumption to expect your control channel to be a protocol you know and can decode.</p>
+<p>Also for legal reasons you cannot freely decode any signal you like. It is against the law to intercept signals without consent or a warrant. Identification without interception is necessary which leaves only metadata analysis.</p>
+<p>One vendor agnostic, metadata-based approach is to use physical signal measurements and a database of known signals to determine the threat. You can match known drone parameters against a database and positively discriminate non-drone signals such as Bluetooth but this approach cannot help with an unknown drone.</p>
+<h3>Detecting unknown drones</h3>
+<p>To detect a new (unidentified) drone you must identify patterns of unknown signal activity which match a criteria for a drone. As a drone is generally moving and needs a wideband downlink and a narrowband uplink you can follow the pattern(s) using the right algorithms.</p>
+<p>Context have developed techniques to match signal hardware using passive RF which allows a known device to be recognised from metadata and without decoding any protocols or trampling on privacy.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/matching.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/matching.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/matching.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/matching.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">Denial</h2>
+<p><img alt="Signal Jammer" src="/blog/assets/media/Jammer.jpg" style="border-width: 0px; border-style: solid; float: left; width: 100px; height: 250px;">Destroying or jamming a drone is high risk. If you did it over a crowd people could get seriously hurt which would be ironic if the drone was not equipped with a dangerous payload in the first instance.</img></p>
+<p>Interfering with wireless signals is illegal without a warrant in both the UK (Wireless Telegraphy Act) and US (The Communications Act) which renders some counter-drone systems legally inoperable in the civil market – despite such systems being sold into this market for considerable amounts.</p>
+<p>In Context’s experience the kinetic effect, for example an RF jammer, is a separate system which should be triggered by a separate detect-track-identify solution, much like how an air defence battery is networked together.</p>
+<p>For a football stadium that effect could be as simple as messaging a police officer with the assessed launch site so the pilot can be identified quickly and the drone threat neutralised.</p>
+<h2 class="section-title">COPTHORNE</h2>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="https://web.archive.org/web/20220518152711im_/https://www.contextis.com//media/images/heros/_image_800_auto/Image-1.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="https://web.archive.org/web/20220518152711im_/https://www.contextis.com//media/images/heros/_image_800_auto/Image-1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="https://www.contextis.com//media/images/heros/_image_1900_auto/Image-1.jpg"></a>
+<a class="modal-img visible-xs" href="https://www.contextis.com//media/images/heros/_image_800_auto/Image-1.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>For the last few years Context have invested substantial effort into cost effective drone detection in partnership with a leading radio manufacturer. The outcome is a lightweight, passive, cloud-based RF survey system based upon their compact SDRs.</p>
+<p>The auto-classification system is capable of rapidly identifying and geo-locating known and <strong>unknown</strong> RF systems, in particular drone downlinks and their remote controllers. Users are alerted to their presence in real-time according to customisable rules.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Telegram_Alert.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Telegram_Alert.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Telegram_Alert.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Telegram_Alert.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>At the sensor, a scanner looks for signals that appear close to a user defined criteria and reports anonymous measurements with kilohertz and nano-second precision. Bandwidth efficient signal metadata is reported to a server via a secure cellular VPN. With GPS the system is scalable, location agile and easy to deploy.</p>
+<p>The system is able to fingerprint the class of signal and known hardware with a proprietary profiling algorithm. For drones it can distinguish between different models of controller from the same manufacturer and recognise frequency agile encrypted video downlinks. Post-incident forensics allows RF metadata from recovered devices to be shared and matched as industry standard PCAP files</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/DroneDetection.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/DroneDetection.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/DroneDetection.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/DroneDetection.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Received Signal Strength Indication (RSSI) Multilateration<strong> </strong>geo-location is performed using power measurements at the server from two or more radios with accuracy determined by target range and baseline geometry. Time-Difference-Of- Arrival (TDOA) is supported by the SDR and is under active development.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Tracking.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Tracking.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Tracking.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Tracking.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Detection and geo-location range is determined by target power and sensor deployment with up to 2km detection possible for a drone. Indoor use is also possible to detect rogue wireless devices such as mobile phones.</p>
+<p>Free-form geo-fences can be defined and added as conditions to alert rules so human friendly alerts are disseminated such as ‘Drone in west car park’.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Perimiter.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Perimiter.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Perimiter.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Perimiter.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>COPTHORNE was successfully field tested for two months over the summer on solar power and is scheduled for standards based testing soon.</p>
+<p>For more information about COPTHORNE, commercial opportunities and our wireless research contact <a href="mailto:info@contextis.com?cc=products@contextis.com&amp;subject=Copthorne Enquiry">info@contextis.com</a>.</p>
+<div class="video-wrapper">
+<iframe allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="" frameborder="0" height="315" src="https://web.archive.org/web/20220518152711if_/https://www.youtube.com/embed/K_iRY1XDDQA" width="560"></iframe>
+</div>
+<h2 class="section-title">References</h2>
+<ol>
+<li><a href="https://www.c4isrnet.com/digital-show-dailies/modern-day-marine/2017/09/21/in-drones-isis-has-its-own-tactical-air-force/" id="1">https://www.c4isrnet.com/digital-show-dailies/modern-day-marine/2017/09/21/in-drones-isis-has-its-own-tactical-air-force/</a></li>
+<li><a href="https://www.wired.com/2011/08/blackhat-drone" id="2">https://www.wired.com/2011/08/blackhat-drone</a></li>
+<li><a href="https://www.contextis.com/en/blog/wireless-gridlock-in-the-iot" id="3">https://www.contextis.com/en/blog/wireless-gridlock-in-the-iot</a></li>
+<li><a href="https://en.wikipedia.org/wiki/LoRa" id="4">https://en.wikipedia.org/wiki/LoRa</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Minimum_detectable_signal" id="5">https://en.wikipedia.org/wiki/Minimum_detectable_signal</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Friis_transmission_equation" id="6">https://en.wikipedia.org/wiki/Friis_transmission_equation</a></li>
+<li><a href="https://en.wikipedia.org/wiki/MAVLink" id="7">https://en.wikipedia.org/wiki/MAVLink</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Gatwick_Airport_drone_incident" id="8">https://en.wikipedia.org/wiki/Gatwick_Airport_drone_incident</a></li>
+</ol>
+</article>
+{% endraw %}

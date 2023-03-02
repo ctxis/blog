@@ -1,0 +1,177 @@
+---
+layout: blogpost
+title: "Security in the (Hybrid) Cloud: Containerization"
+author: "Ranulf Green"
+author_role: "Technical Lead, North America"
+summary: "This is the third and final entry in a series of blog posts looking at how we are evolving our penetration testing techniques to work with hybrid cloud solutions. The first post looked at some general concerns that can arise with hosting in these environments, the second we looked at the concerns around integrating internal systems with a hybrid cloud. In this instalment we tackle the security concerns around containerization."
+tags: [Security, Security assessment and testing]
+hero_banner: Security_of_the_hybrid_cloud_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>There is a plethora of containerization software emerging on the market. Two of the most popular are CloudFoundry and Kuberenetes.</p>
+<p>CloudFoundry provides an application layer Platform as a Service (“PaaS”) implementation and Kubernetes provides a container layer PaaS. Whilst Kubernetes supports multiple options for containers, a little research suggests that Docker is the most popular. CloudFoundry also supports Docker in recent releases; however, the default is Warden.</p>
+<p>One hurdle faced by many organizations, particularly those who have traditionally relied on automated solutions for security testing, is how to identify and remediate security weaknesses which are associated with the implementation of containerized application deployment.</p>
+<p>There are certainly additional risks such as greater than one application being run in tandem on the same operating system as another application. Both applications could likely have completely different security profiles; for example, an in-house developed management interface and a legacy COTS application. All of a sudden, the question of a compromise of one application affecting multiple other applications becomes one of the most significant threats. For this reason, the “assumed compromise” approach should certainly be considered for testing. Furthermore, the process that a hacker would need to go through post-compromise to deploy an interactive communication stream, upload tools and download confidential data can be assessed and controls be enforced to reduce the likelihood of a successful attack.</p>
+<p>Other attack vectors to consider include those originating from the various management interfaces available. In CloudFoundry both a web application and command line API are available. Consideration should be taken to ensure that network access to these interfaces is restricted to ensure a single compromised container does not impact the security of all application running in the CloudFoundry environment.</p>
+<p>In some cases security weaknesses may exist that are only possible as a result of platform functionality that was not fully understood at the time of implementation. For example, as noted in the BSides capture the flag contest, it was possible to exploit functionality within Kubernetes to gain access to all the flags by compromising just one host (<a href="https://hackernoon.com/capturing-all-the-flags-in-bsidessf-ctf-by-pwning-our-infrastructure-3570b99b4dd0">https://hackernoon.com/capturing-all-the-flags-in-bsidessf-ctf-by-pwning-our-infrastructure-3570b99b4dd0</a>).</p>
+<p>We have seen a similar behaviour in CloudFoundry whereby administrative access to create deploy, delete and generally administrate the platform is accessible from within a deployed application. Whilst the attacker would still need access to credentials, should an application be Internet facing, the attacker may be provided with a lucrative means of traversing onto the internal network.</p>
+<p>We have commonly found Kubernetes to be configured to allow direct access to the REST API responsible for managing containers from within containers running application code. If an attacker can access this API (maybe using a poorly configured Squid instance or by exploiting code execution on the application) they can perform privileged actions such as executing commands on the master node. From this position, the attacker would be able to access other containers and maybe even traverse to other datacentres or hosting providers.</p>
+<h2>Hacking Docker Containers</h2>
+<p>A number of weaknesses may exist within the container itself. These range from an unpatched Linux kernel that is vulnerable to privilege elevation resulting in compromise of all containers on a single node to exposed services listening on the localhost as root that are vulnerable and can be attacked from within a container.</p>
+<p>Consider the scenario where the attacker has gained access to a restricted container by exploiting application layer weaknesses. Using this access the attacker would look to gain access to other containers and the base operating system. One particularly common issue with Docker based systems is mounting volumes from the base host to the container.</p>
+<p><strong>Example 1 – Breakout via a mapped volume</strong></p>
+<p>Let us first consider a Docker container running with the “home” directory mapped:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud1_800_130_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud1_800_130_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud1_562_91_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud1_562_91_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The first step is to install the required tools. As it’s a cloud environment, it’s fairly common to have direct internet access:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud2_800_270_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud2_800_270_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud2_664_224_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud2_664_224_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We now need to configure the user’s home directory with the “.ssh” directory:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud3_800_431_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud3_800_431_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud3_485_261_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud3_485_261_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We now need to create an SSH key pair:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud4_800_535_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud4_800_535_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud4_553_370_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud4_553_370_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Then copy the SSH public key to the “authorized_keys” file in a /home/containertest/.ssh/ directory:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud5_800_143_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud5_800_143_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud5_658_118_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud5_658_118_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Finally SSH into the base host using the generated key:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud6_800_238_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud6_800_238_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud6_751_223_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud6_751_223_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><strong>Example 2 – Breakout via the Docker socket </strong></p>
+<p>In this example, we have compromised a Docker container where the Docker socket is mapped:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud7_800_37_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud7_800_37_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud7_846_39_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud7_800_37_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>First we update and install the Docker client:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud8_800_55_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud8_800_55_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud8_865_59_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud8_800_55_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>There are 100 things to do from here but one easy technique is to create a new container with the base systems root file system mapped:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Hybrid_Cloud9_800_169_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Hybrid_Cloud9_800_169_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Hybrid_Cloud9_634_134_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Hybrid_Cloud9_634_134_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>From here we could add SSH keys, view stored data, access the AWS CLI and compromise any keys that may be stored on the system.</p>
+<h2>Other services running in containers and the base host</h2>
+<p>Consideration should also be taken to test any accessible service that is offered to containers via the platform such as shared or dedicated database instances. An attacker may be able to connect to services not provisioned to a container if appropriate access controls are not configured.</p>
+<p>Consideration should also be taken to ensure any internally used software such as Apache Tomcat and PHP is kept up-to-date. Weaknesses within these software packages could affect all applications which may be a nasty surprise where an application is being transitioned from an old, fully patched environment to a new environment where the patching process has not been fully implemented.</p>
+<p>In some cases additional hardening can be provided at an application layer to disable certain functionality such as:</p>
+<p><em>Runtime.getRuntime().exec(…)</em></p>
+<p><strong>SSO authentication</strong></p>
+<p>Often additional SSO authentication is implemented. There are many well publicized implementation weaknesses within common SSO mechanisms such as OAuth/JWT and SAML such as forging JWT tokens, abusing unchecked redirection URL to steal user’s access tokens and signature wrapping attacks. Where unprivileged user accounts are compromised, attack vectors such as privilege escalation and resource consumption DoS may also be of consideration.</p>
+<h2>Data exfiltration</h2>
+<p>In some cases the application weakness identified would not permit interactive communication between the attacker and the application’s container. Often these weaknesses are identified by injecting an OS level time delay and observing the time taken for the web server to respond:</p>
+<p><em>") &lt; $(sleep 10);</em></p>
+<p>Dependent on the network architecture, the attacker may be able to establish an interactive communication channel by executing a third party binary (such as shellinabox) which can be downloaded from an Internet source and executed resulting in an additional listening network service being made accessible. One alternative available within CloudFoundry is using Web Sockets which are by default supported and can be made available by injecting malicious content into an application page.</p>
+<p>If network access is restricted to a single port already used by the running application the attacker may seek to kill off the original application service and run an alternative process exposing a web shell allowing interactive communication. Alternatively the attacker may be able to exfiltrate data using recursive DNS queries containing small snippets of a file in the hostname of the query:</p>
+<p><em>some-secret-importantdata.contextis.com</em></p>
+<h2>Conclusion</h2>
+<p>Implementing application deployment using containerization platforms is certainly not going away in the foreseeable future. There are certainly security benefits from such architectures. However, in order to fully jump on the “cloud” wagon it is necessary to ensure the greatest level of protection is available to deployed applications and management components. A manual and bespoke end-to-end penetration test will help highlight any security weaknesses within the platform and when remediated will reduce the likelihood of a single application compromise affecting any other application, the internal network, or any part of the platform.</p>
+</article>
+{% endraw %}

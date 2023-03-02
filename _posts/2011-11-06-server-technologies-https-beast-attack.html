@@ -1,0 +1,138 @@
+---
+layout: blogpost
+title: "Server Technologies - HTTPS BEAST Attack"
+author: "Context"
+author_role: "Leading cyber security consultancy"
+summary: "A number of our clients have asked for advice regarding the HTTPS BEAST attack. This blog is intended to give a more realistic overview of what the attack means to those who are concerned with the effect that it may have on their web applications, and answer some of the questions received."
+tags: [Security]
+hero_banner: Server_technologies_https_beast_attack_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Security researchers have discovered a practical way to exploit a vulnerability in older versions of TLS/SSL (TLSv1.0, SSLv3.0 and lower), commonly used for HTTPS connections. The theory behind this attack has been known for some time, but previously no practical attack had been found.</p>
+<p>This theoretical flaw was remediated in TLSv1.0’s successor, TLSv1.1. SSLv2.0 was the first publicly available version of SSL, and is now disabled by default by all newer browsers due to its inherent flaws. It was replaced by SSLv3.0. This was then replaced by TLSv1.0, TLSv1.1 and then TLSv1.2. This current TLS version is the first to no longer offer downgrade capabilities to SSLv2.0.</p>
+<p>BEAST is short for Browser Exploit Against SSL/TLS. This vulnerability is an attack against the confidentiality of a HTTPS connection in a negligible amount of time [1]. That is, it provides a way to extract the unencrypted plaintext from an encrypted session. Demonstrations of the exploit by the researchers, Thai Duong and Juliano Rizzo, can be found on Duong’s blog [2]. A good technical write-up of the flaw can also be found at EKR's blog [3].</p>
+<h2>How would an attack take place?</h2>
+<p>BEAST has three conditions that must be met for this attack to take place:</p>
+<ol>
+<li>JavaScript or applet injection into the same origin of the web site</li>
+<li>Network sniffing of the connection must be possible</li>
+<li>A vulnerable version of SSL must be used which is using a block cipher</li>
+</ol>
+<p>The BEAST attack that was demonstrated used a flaw in Java’s Same Origin Policy. However there may be other weaknesses within the website that allow us to include malicious content within the Same Origin, for example weaknesses within a file upload feature.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-https-beast-1.width-800_800_484_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-https-beast-1.width-800_800_484_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412134533/https://www.contextis.com/media/images/content/blog-https-beast-1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412134533/https://www.contextis.com/media/images/content/blog-https-beast-1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If we have the ability to inject content within the same origin policy, whether through a browser bug or otherwise, there is already a large array of attacks we can perform; we have access to the page content, we can perform any action that the victim user could do and we can steal the cookie and hijack the session. We can even display a new login prompt that tricks the user into sending their credentials to us. And we can do all of this without needing to sniff the network traffic.</p>
+<p>So if we can do all this, what is the point of the BEAST attack? Well there are a number of ways in which a developer can either increase the complexity or mitigate some of these attacks, adding an additional layer of protection. One example is the HTTPOnly property that can be set on cookies. With this property, a browser will not allow applets or JavaScript to gain access to the cookie value. This can prevent session hijacking.</p>
+<p>If we can extract the plaintext of the HTTPS session, then we can gain access to the HTTPOnly cookie and this is the demonstrated attack, possibly the only one.</p>
+<p>Therefore in terms of risk, the BEAST attack is akin to not setting the HTTPOnly property on cookies. Many websites don’t set this property, and thus are no more vulnerable. If you are concerned about the BEAST attack, we suggest you first concern yourself with the HTTPOnly property which is more likely.</p>
+<h4>Rich Internet Applications</h4>
+<p>Rich Internet Applications (RIA) are much more similar to desktop applications, providing a richer array of functionality which makes many more complex tasks much easier and possible to develop and deliver from a web site. RIAs include Java applets, Flash, and Silverlight.</p>
+<p>In order for an RIA such as a Java Applet to be injected into the page or site, the RIA must appear as if from the same origin as the website. This is typically performed by using a browser flaw in the Same Origin Policy or a vulnerability within the website that allows it to be uploaded and hosted from within the same domain. This can then either be injected into a pre-existing page, for example using Cross Site Scripting, or a custom page to load it can be used.</p>
+<p>Please note that the demonstration and blog by Duong uses a Java applet and a Same Origin Policy (SOP) exploit in a browser that also requires a man-in-the-middle attack. It also states that a flaw in the SOP will still prevent access to existing cookies. Existing cookies (with the exception of ones with the HTTPOnly flag) are accessible by all web content within the SOP, whether by an SOP flaw or not; thus Context has assumed the issue is with HTTPOnly cookies. All cookies are of course accessible once the channel’s plaintext has been accessed, however as already mentioned we already have access to this without the need for a network sniffer.</p>
+<h4>JavaScript</h4>
+<p>It appears to be possible to perform a BEAST attack using HTML5 WebSockets (v.76 and lower) in Safari. It is not known whether there are other JavaScript mechanisms, as a pure binary socket is needed, however changes to the specification or new features may in the future introduce more mechanisms. Using a feature such as WebSockets to perform a BEAST attack could result in the ability to use a Cross-Site Scripting (XSS) vulnerability to inject the BEAST agent. This is especially concerning given the prevalence of XSS.</p>
+<h2>Can't I just limit my web server to TLS 1.1 and 1.2 only?</h2>
+<p>It’s not as simple as that, unfortunately.</p>
+<p>Many browsers do not support TLS 1.1 or 1.2. This includes all versions of IE on Windows XP. Those browsers that do support TLS 1.1/1.2 have it turned off by default. The reason it is off is because older web servers, which account for a large portion of the internet, are unable to handle a TLS 1.1/1.2 connection, and due to the error condition that takes place, the connection won’t downgrade to an older protocol.</p>
+<p>Therefore not only will most of your users be unable to access your web site, but those that can, will not have it enabled. Those that enable it will probably be stuck in a position of needing to turn it on and off depending on which website they want to access.</p>
+<p>It is also worth considering your corporation’s standard build for end users, as many have yet to roll out Windows 7. In fact, a significant but minor number of the applications we test only support IE7, and it appears there are new applications being developed towards IE7 only compatibility, as that is the standard build internally.</p>
+<p>The following table shows the browsers that support TLSv1.1, and the percentage of users [4]:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/https_beast_1.width-800_800_310_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/https_beast_1.width-800_800_310_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412134533/https://www.contextis.com/media/images/content/https_beast_1.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210412134533/https://www.contextis.com/media/images/content/https_beast_1.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>There is limited information available regarding OSX and Safari TLSv1.1 support however the general consensus appears to be that it is not supported.</p>
+<p>Microsoft Windows accounts for 85.6% of current operating system usage. This is broken down as follows:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/https_beast_2.width-800_800_214_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/https_beast_2.width-800_800_214_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412134533/https://www.contextis.com/media/images/content/https_beast_2.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210412134533/https://www.contextis.com/media/images/content/https_beast_2.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>(* This assumes that the portion of IE users per Microsoft OS is constant across the OSs, i.e. 56.49%).</p>
+<p>Thus there are roughly 21% of users who are equipped with browsers that can support TLSv1.1. This support is off by default, and it is not known how many users have changed this default but it is assumed to be low as users generally don’t change default settings.</p>
+<h2>Is it possible to fix TLS 1.0?</h2>
+<p>It looks like it. The major vendors of both browsers and server-side technologies have all announced that they are working on a patch. In some cases, patches have already been released. This appears to be mainly a trade-off between finding a solution quickly, and minimising compatibility issues.</p>
+<p>For example, OpenSSL based servers (e.g. Apache) can make use of an option to prevent the attack, however it is incompatible with IE6 which still accounts for around 2.7% of users.</p>
+<p>Microsoft as of yet have not released a patch for their servers, and have not provided details on which versions and products will be patched.</p>
+<h2>What can I do to ensure our users are secure?</h2>
+<p>Due to the compatibility issues mentioned above, you are going to have difficulties in enforcing a secure HTTPS connection. A decision between usability and security is needed.</p>
+<h4>Upgrade</h4>
+<p>Within a controlled environment, for example an internal network, although a potentially large task, it may be possible to upgrade all users and servers to products that support TLS 1.1 or 1.2 only. If already upgraded, it should be possible to roll out a policy change. However, be aware that users may have difficulties accessing some external sites, and these may be sites needed for their work. A secondary browser could be supplied for this purpose.</p>
+<p>It is however, a worthy exercise to upgrade your servers to provide support of TLS 1.1 and 1.2, in addition to the older versions. This allows you to provide those users who are security aware and proactive, with a secure environment and is likely to protect you against other attacks that might come to light.</p>
+<p>If you are going to throw usability to the wind and limit the server to TLS 1.1 and 1.2 only, we suggest you do this in such a way as to allow for a friendly user error message to be presented to the user. This can be used to educate the user as to how they can access your site.</p>
+<p>It is also important to make sure you aren’t running one of the servers that doesn’t support browsers with TLS 1.1 or 1.2 enabled; otherwise these users must change their settings to view your website, which may require restarting the browser. They will probably also not get a decent error message informing them why they can’t view the website, so there is a high chance they won’t know what they need to do to fix the situation.</p>
+<h4>Get Tested &amp; Fix Security Flaws</h4>
+<p>Although the demonstrated attack utilises a browser bug, there is the potential for other methods to be employed to inject the BEAST agent into the browser. Some of these may utilise flaws in the application, and thus it is important to ensure a high security standard is being adhered to.</p>
+<p>There are also a number of areas in which the use of session hijacking can be reduced or made more complex, for example:</p>
+<ul>
+<li>Transferable session prevention – prevent the ability to use a session token from a different IP and a different user agent, to increase complexity (this won’t prevent an attack)</li>
+<li>The existence of a logout button, which functions correctly</li>
+<li>Session timeout set to a sensible time and functioning correctly</li>
+<li>Regenerating a new and unique cookie value per session</li>
+<li>One-time passwords</li>
+<li>A secure HTTPS configuration</li>
+</ul>
+<h2>What about stream ciphers?</h2>
+<p>As suggested earlier, stream ciphers are not vulnerable to the BEAST attack. Therefore, if you disable support for all block ciphers, you are also protected. However, RC4 is pretty much the only commonly occurring stream cipher. This narrows your support considerably to just those clients that also support RC4.</p>
+<p>On top of this, RC4 has its own security flaws [5]. However, these flaws are not as easy to exploit, and in some cases not applicable to HTTPS. Giving RC4 ciphers a higher priority than block ciphers will reduce the use of block ciphers and therefore reduce the number of clients vulnerable to the BEAST attack. Details on how to do this on Windows Servers can be found at [6].</p>
+<h2>I want TLS 1.1 or 1.2, what do I need to do to enable this?</h2>
+<h4>OpenSSL (i.e. Apache)</h4>
+<p>TLS 1.1 and 1.2 have been implemented in OpenSSL version 1.0.1 and above, thus browsers that support these can use these versions. However, most distributions come with 0.9.x. A fix to BEAST has been implemented in 0.9.6d however it is frequently disabled due to incompatibility with IE6. It is disabled using the following flag:</p>
+<p>SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS</p>
+<p>This flag is also included with:</p>
+<p>SSL_OP_ALL</p>
+<h4>IIS on Windows Server 2003</h4>
+<p>TLS 1.1 and 1.2 are not supported in Windows Server 2003, and Microsoft is currently investigating this issue:</p>
+<p>“We are actively working with partners in our Microsoft Active Protections Program (MAPP) to provide information that they can use to provide broader protections to customers.</p>
+<p>Upon completion of this investigation, Microsoft will take the appropriate action to help protect our customers. This may include providing a security update through our monthly release process or providing an out-of-cycle security update, depending on customer needs.” [7]</p>
+<h4>IIS on Windows Server 2008 R2</h4>
+<p>Windows Server 2008 R2 supports TLS 1.1 and 1.2. can be enabled by changing the SCHANNEL\Protocol DisabledByDefault keys to 0x0 [8].</p>
+<h2>Conclusion</h2>
+<p>First, I’d like to reiterate that we are solely talking about HTTPOnly cookies. If you have not enabled HTTPOnly cookies, you are no less secure. In our testing, we find that a significant number of web applications do not enable this cookie property and this may include you. Now that this issue has grabbed your attention, now is a good time to ensure you have enabled this across your applications. We would normally rate this as a low impact finding.</p>
+<p>The HTTPOnly property provides protection against pretty much just one type of attack – session hijacking. A stolen cookie can typically be used by an attacker to access the application as the victim user until that user logs out – that is assuming your log out functions correctly, we find that sometimes it does not terminate the session properly.</p>
+<p>In order to ‘man-in-the-middle’ a network connection, the attacker needs to be positioned at a point on the network between the victim and the application server. This is not necessarily a difficult task as the use of Wi-Fi hotspots and mobile devices has increased. However it is a very limited one as the attacker must first target these points and gain access (or create rogue points that masquerade as legitimate access points). It would need to be a fairly targeted attack against groups of individuals. Another possibility is an attacker within an organisation, such as the victim’s workplace, ISP, or the application’s hosting environment.</p>
+<p>The BEAST attack utilises a flaw in TLS/1.0 that is mostly seen by the security community as one that needs to be remediated within the browser rather than the server. Although there are avenues you can take to offer a secure connection to those of your users who are more technically and security savvy, the take-up numbers will be low.</p>
+<p>Overall, due to the number and complexity of mechanisms needed by an attacker to take advantage of this vulnerability, and also the number of greater value attacks that could take place in these circumstances, I believe it is highly unlikely this attack will be used often, if at all in the wild.</p>
+<h2>References</h2>
+<p><strong>[1] - </strong><a href="http://www.theregister.co.uk/Print/2011/09/19/beast_exploits_paypal_ssl/">http://www.theregister.co.uk/2011/09/19/beast_exploits_paypal_ssl/print.html</a><br/>
+<strong>[2] - </strong><a href="http://vnhacker.blogspot.com/2011/09/beast.html">http://vnhacker.blogspot.com/2011/09/beast.html</a><br/>
+<strong>[3] - </strong><a href="http://www.educatedguesswork.org/2011/09/security_impact_of_the_rizzodu.html">http://www.educatedguesswork.org/2011/09/security_impact_of_the_rizzodu.html</a><br/>
+<strong>[4] - </strong><a href="http://www.statowl.com/">http://www.statowl.com</a><br/>
+<strong>[5] - </strong><a href="http://en.wikipedia.org/wiki/RC4#Security">http://en.wikipedia.org/wiki/RC4#Security</a><br/>
+<strong>[6] - </strong><a href="http://blogs.msdn.com/b/kaushal/archive/2011/10/03/taming-the-beast-browser-exploit-against-ssl-tls.aspx">http://blogs.msdn.com/b/kaushal/archive/2011/10/03/taming-the-beast-browser-exploit-against-ssl-tls.aspx</a><br/>
+<strong>[7] - </strong><a href="http://technet.microsoft.com/en-us/security/advisory/2588513">http://technet.microsoft.com/en-us/security/advisory/2588513</a><br/>
+<strong>[8] - </strong><a href="http://support.microsoft.com/kb/245030">http://support.microsoft.com/kb/245030</a></p>
+</article>
+{% endraw %}

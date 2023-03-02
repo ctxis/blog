@@ -1,0 +1,156 @@
+---
+layout: blogpost
+title: "Manipulating client-side variables in Java applications"
+author: "Lewis Stoate"
+author_role: "Lead Consultant"
+summary: "Penetration testing of thick client applications is a common service performed at Context. For those unfamiliar with the term, in the context of application penetration testing, thick clients are any applications run from a distinct executable on a client machine. By contrast, web applications are any applications accessed directly through a browser."
+tags: [Web applications]
+hero_banner: Manipulating_Client-Side_variables_in_java_applications_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Thick client applications are an uncertain target for pentesters; the scope of testing can vary wildly for applications of the same size, depending largely on how they communicate with the end server. Standard HTTP GET and POST requests are all well and good, but what happens when you start seeing serialized Java or binary protocols? HTTP proxies such as Burp and Fiddler will only get you so far.</p>
+<p>On a recent engagement, Context were contracted to test a suite of Java applications used for financial trading which communicated using a number of separate protocols, only some of which could be manipulated easily using Burp Suite. While it is possible to decompile, edit and recompile Java applications, doing so is awkward and not conducive to common testing methods which usually involve sending hundreds if not thousands of differently-formatted requests. So we needed an easier way.</p>
+<p>The setup we used was based on <a href="https://netbeans.org/">Netbeans</a>. By running the applications using a shared memory process, it is possible to attach Netbeans to the process and, assuming it decompiles neatly, set breakpoints within the application code. Once these breakpoints are hit, the process will be paused and Netbeans will display a list of in-memory variables and allow you to change their values before continuing.</p>
+<h2>Going for Gold</h2>
+<p>To demonstrate this technique, let's use the Java-based application <a href="http://www.freecol.org/">FreeCol</a>, an open-source clone of the game "Sid Meier's Colonization". The game is started by running the file "FreeCol.jar", and requires Java 8. To begin with we'll need to get all this set up in Netbeans. We first create a project using the "Java Project with Existing Sources" option, and specify the game install folder as the project folder. We then right-click the "Libraries" option on the left-hand panel in Netbeans under our project, select "Add JAR/Folder", and select the FreeCol.jar file.</p>
+<p>We then need to add the sources by right-clicking the JAR, selecting Edit, and specifying a .zip file containing the source within the "Sources" field. We could acquire the source by decompiling the file in a Java decompiler such as "<a href="http://jd.benow.ca/">jd-gui</a>" and exporting the results as a .zip file, but since the developers have been kind enough to release the source, we'll just use theirs.</p>
+<p>We now need to launch the Java file "FreeCol.jar" using a shared memory address. For this we create a batch file with some specific flags, that reads:</p>
+<pre class="prettyprint">java -jar -agentlib:jdwp=transport=dt_shmem,address=jdbconn,server=y,suspend=n FreeCol.jar</pre>
+<p>Running this batch file will start the process using shared memory with the name "jdbconn". A description of the flags used can be found on the <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/introclientissues005.html">Oracle website</a>.</p>
+<p>Next, we attach Netbeans to the running process by selecting "Debug", then "Attach Debugger", and setting the options as shown here:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/attach-debugger.width-800_800_388_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/attach-debugger.width-800_800_388_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/attach-debugger.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/attach-debugger.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If all goes well, we'll now see the "Debugging" tab in the middle left-hand panel in Netbeans. Our general setup will look like this:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041334im_/https://www.contextis.com/media/images/content/Netbeans.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041334im_/https://www.contextis.com/media/images/content/Netbeans.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/Netbeans.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/Netbeans.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Next up, we'll need to start setting breakpoints. To force the process to stop so we can change the variables, we'll need to set a breakpoint somewhere that we know we can trigger. The easiest way to do this is to find a string that you can search for in the code, and then follow it through to where it gets called. Let's take a look in the game:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/report-menu.width-800_800_696_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/report-menu.width-800_800_696_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/report-menu.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/report-menu.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We can see a list of Reports we can run. Let's take "Trade Advisor" and grep through the source code. We could search using Netbeans, but Netbeans is already working pretty hard and this whole process already likes to freeze on occasion.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/grep-screenshot-1.width-800_800_255_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/grep-screenshot-1.width-800_800_255_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/grep-screenshot-1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/grep-screenshot-1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Ok, so our string "Trade Advisor" gets set as the name for "reportTradeAction". Where is this called?</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/grep-screenshot-2.width-800_800_86_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/grep-screenshot-2.width-800_800_86_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/grep-screenshot-2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/grep-screenshot-2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>So it looks like we need to set breakpoints in "ReportTradeAction.java", using the "ReportTradeAction.class" file inside "net.sf.freecol.client.gui.action". Let's shove a few in there by clicking the line number next to each method we see, and see what gets triggered when we click the option in-game:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041334im_/https://www.contextis.com/media/images/content/breakpoint-hit.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041334im_/https://www.contextis.com/media/images/content/breakpoint-hit.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/breakpoint-hit.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/breakpoint-hit.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Success! Now we can edit variables. Let's browse through and give ourselves a big pile of gold:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424041334im_/https://www.contextis.com/media/images/content/Gold-5555-Variables.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424041334im_/https://www.contextis.com/media/images/content/Gold-5555-Variables.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/Gold-5555-Variables.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/Gold-5555-Variables.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>And it works!</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Gold-5555-InGame.width-800_800_250_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Gold-5555-InGame.width-800_800_250_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/Gold-5555-InGame.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424041334/https://www.contextis.com/media/images/content/Gold-5555-InGame.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We can now enter arbitrary values into these fields and attempt attacks such as authorisation bypasses, SQL injection, remote code execution and numerous others. Of course I've skipped out the trial-and-error process of finding a breakpoint that actually gets hit, simplified the searching through variables, and neglected to show the part where I accidentally gave that gold to France instead. A real-world application test will likely require a bit more grepping and fiddling around to find breakpoints that allow you to set the values you need.</p>
+<h2>Summary</h2>
+<p>To wrap up, this technique is useful when testing a thick client app that communicates using non-HTTP protocols, signed requests or serialized Java requests which are otherwise difficult to edit in transit. This technique can also be useful if the client-side application is not letting you create certain requests, as it believes you are not an administrator, or the application is running in "demo mode", or similar.</p>
+<p>In order to prevent debugging as described above, Java application code should be obfuscated so that variable names cannot easily be determined. However, a safer approach is to assume that anything client-side can be manipulated easily, and to implement all security server-side.</p>
+<h2>Some general notes:</h2>
+<ul>
+<li>Netbeans attaches to the running Java process and the connection is closed whenever the process stops. You'll need to reattach every time you restart the app.</li>
+<li>Breakpoints are saved and will be automatically reapplied when Netbeans is reattached.</li>
+<li>FreeCol includes a "Debug" option which would let you achieve all of this anyway. </li>
+<li>This was all done in Windows, though only out of preference. It probably works mostly the same in Linux, though you might have to use different Java flags, as per <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/troubleshoot/introclientissues005.html">this page</a>.</li>
+<li>I've not tried this technique against obfuscated code, but strongly suspect that it won't work well, if at all. This might be a future project.</li>
+</ul>
+<h2>Contact and Follow-Up</h2>
+<p>Lewis works in Context's Assurance team in our London office on a variety of projects, with a focus on application testing. See the <a href="https://www.contextis.com/en/contact">contact page</a> for ways to get in touch.</p>
+</article>
+{% endraw %}

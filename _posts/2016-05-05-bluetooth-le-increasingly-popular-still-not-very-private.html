@@ -1,0 +1,127 @@
+---
+layout: blogpost
+title: "Bluetooth LE - Increasingly popular, but still not very private | Context Information Security US"
+author: "Scott Lester and Paul Stone"
+author_role: ""
+summary: "In May last year we wrote a blog post on our initial research on Bluetooth Low Energy (BLE).  This covered our research into the new protocol, including what devices were using it, how it works, and how to collect data. The main point of our original work was that BLE devices can often be trivially detected and identified, affecting the privacy of their owners."
+tags: [Product Security]
+hero_banner: OpenDeviceBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>We also released a free Android application last year, called <a href="https://play.google.com/store/apps/details?id=com.contextis.android.BLEScanner">RaMBLE</a>, to help people see what BLE devices are out there. We've just released an updated version of the app, which is now available on the Play Store:</p>
+<p><img alt="" src="/blog/assets/media/ramble-playstoer.width-800.png" style="width: 400px; height: 118px;"/></p>
+<p>RaMBLE lets you scan for, record and map Bluetooth LE advertising packets, which are constantly broadcast by most devices that use BLE (see the <a href="https://www.contextis.com/us/blog/the-emergence-of-bluetooth-low-energy">previous blog post </a>for more details). It uses the contents of these packets to try to identify the manufacturer and product of a broadcasting device. The scanner view shows all devices in range, plus there's a history view, a filter/search dialog, and a map view:</p>
+<p><img alt="" src="/blog/assets/media/ramble_screenshots_400x600.width-800.png" style="width: 400px; height: 659px;"/></p>
+<p>Whilst we developed RaMBLE as a proof-of concept tool that we could use ourselves, we were pleased to see that people were using it to survey BLE devices: </p>
+<p><img alt="" src="/blog/assets/media/tweet.width-400.width-800.png" style="width: 400px; height: 411px;"/></p>
+<p>RaMBLE was used as part of some <a href="https://openeffect.ca/fitness-tracker-privacy-and-security/">recent research into fitness tracker security</a> and even got a mention in a book, albeit a <a href="http://www.amazon.co.uk/Meeting-People-via-WiFi-Bluetooth-ebook/dp/B0199YFDIG">book about tracking people</a>. Still, we've been pleasantly surprised to see our proof-of-concept application get over 1800 installs, including twelve current installs in Switzerland and one in Slovenia. Hello to that person in Slovenia.</p>
+<h2 class="section-title">Device Survey</h2>
+<p>There's no doubt that BLE is increasingly popular. It's become the protocol of choice for fitness trackers and proximity devices, and is increasingly common in IoT and maker platforms, for example in the new <a href="https://www.element14.com/community/docs/DOC-81266/l/setting-up-bluetooth-on-the-raspberry-pi-3">Raspberry Pi</a> and one of the new <a href="https://www.arduino.cc/en/Main/ArduinoBoard101">Arduino/Genuino devices</a>.</p>
+<p>We've been running RaMBLE for a year now - mostly in and around our office in Canary Wharf, on our commutes from East and South-East London, and around central London. Collating the databases together gives us BLE advertising data collected from over 55,000 unique Bluetooth addresses. As we'll explain, that doesn't equate to 55,000 unique devices, but it does still contain some interesting stats and trends. At a high level:</p>
+<ul>
+<li>The use of BLE is clearly increasing.</li>
+<li>There's a lot of Apple devices using BLE. More on this later.</li>
+<li>iBeacon deployments are starting to appear.</li>
+<li>Fitbit are the clear market leaders for fitness trackers, at least in London.</li>
+<li>BLE has been integrated into things that you might not expect to feature it.</li>
+</ul>
+<h3>Share of Popular Devices</h3>
+<p>RaMBLE is pretty good at identifying devices - somewhere over 90% of devices we've seen. From those 55,000 devices, 19,305 unique devices are recognised by RaMBLE (we'll explain the remainder in a sec). The main devices break down as follows:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/BLE_pie.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/BLE_pie.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/BLE_pie.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/BLE_pie.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The main players provide a good illustration of the main uses of BLE: Fitness trackers (Fitbit, Jawbone, Nike Fuelband), proximity trackers and notification (Tile, iBeacon, AirDrop), media devices (Samsung Smart TV, AirPlay) and headphones (Beats).</p>
+<h3>Apple Devices</h3>
+<p>So what about the 35,000+ devices missing from the above chart? They are iOS devices using <a href="https://support.apple.com/en-gb/HT204681">Handoff</a>, Apple's protocol that enables multiple Apple devices (Macs, iPads and iPhones) belonging to a single user (iCloud account) to notify each other about what the user is up to. This is how you can browse to a web page on your iPhone, switch to a Mac and see the same page open.</p>
+<p>We left these devices out of the above chart because they account for almost 70% of all the BLE traffic we've seen. The data from these devices isn't particularly interesting, because iOS devices are one of the few popular devices that properly implement Bluetooth LE privacy protections. iOS devices change their Bluetooth LE address every 15 minutes, which means that although more than 35,000 of the 55,000 unique addresses we've collected are from iOS devices, that doesn't translate to 35,000 unique iDevices. For example, if 10 people are browsing the web on their iPhones for 30 minutes, RaMBLE would see about 20 unique Bluetooth addresses transmitting handoff packets during that time. So while we can't say exactly how many iOS devices we've seen over the last year, we can say that it's a lot. But then everyone knows there's a lot of iPhones out there. We can see from our data that a lot of them have Bluetooth and Handoff turned on.</p>
+<p>Before moving on from Apple devices, we should mention the Apple Watch. Apple released their latest miniature wearable smart device in May last year, just after we began our Bluetooth survey. Context's London offices are based in Canary Wharf, home to many large banks and finance firms, so we thought we'd see a good number of the £260+ devices appear. Sure enough, since May last year, we've seen a gradually increasing number of Apple watches. While Apple haven't published any numbers on how many watches they've sold, they at least seem to be doing good business in Canary Wharf (unfortunately, we can't tell from our data how many of these are of the £8,000+ Apple Watch Edition variety).</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/apple_watches.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/apple_watches.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/apple_watches.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/apple_watches.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We're aiming to release a further blog focussing on Apple's use of BLE, as they use the technology in a variety of interesting ways.</p>
+<h3>Odd Survey Results aka "Everything is Better with Bluetooth™"</h3>
+<p>In addition to a lot of Fitbits and Samsung TVs, we've seen a few weird and wonderful devices that take advantage of BLE. Here are some that intrigued us:</p>
+<ul>
+<li><a href="http://www.scanomat.com/topbrewer">TopBrewer</a>, a bluetooth-controllable coffee machine</li>
+<li><a href="http://postscapes.com/bluetooth-activity-tracker-leaf">Leaf BLE jewellery</a>.</li>
+<li><a href="https://www.heat-outdoors.co.uk/shadow-xt-bluetooth-1-5kw-2kw-1160228.html">Bluetooth patio heaters</a> (seen somewhere on the Southbank).</li>
+<li><a href="http://lasers.leica-geosystems.com/uk/disto/d510">Leica Disto</a> distance measurer.</li>
+<li><a href="http://pavlok.com/hello.php">Pavlok</a>, a behavioural conditioning shock bracelet.</li>
+</ul>
+<h2 class="section-title">Beacon Deployments</h2>
+<h3>iBeacons</h3>
+<p>iBeacon was the technology that first got us interested us in BLE. It's Apple's protocol for using BLE to broadcast a beacon signal that a corresponding application can use for fine-grained geolocation. A nice example is the British Airways and <a href="http://www.businesstraveller.com/news/100888/ba-adds-push-notification-to-iphone-app">Virgin Atlantic apps</a>, which uses iBeacons to allow the application that already displays your boarding pass notify you at certain points in the airport, for example with the Wi-Fi password in the lounge or that your gate is now open. The 'low-energy' part of BLE enables iBeacons to run for up to 18 months on a coin-cell battery.</p>
+<p>iBeacons have a number of fixed data fields that make them easy to identify. In addition, their unique IDs can be broken down into three sections that identify the deployment, group and subgroup. This allows us to map single deployments together. We've seen several deployments of iBeacons in London, for example at the Natural History and Science Museums, Euston Station, and at Stratford station. </p>
+<p>The below map shows the location of <a href="https://mibeacon.net/">Onyx MiBeacons</a> at Stratford station, each of which has a unique device name, for example "MiBeacon_00965":</p>
+<p><img alt="" src="/blog/assets/media/beacon.width-800.width-800.png" style="width: 400px; height: 598px;"/></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset=""/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href=""></a>
+<a class="modal-img visible-xs" href=""></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It's worth noting that while it's easy to identify iBeacon deployments, it's not always possible to tell what their purpose is. Unless you happen to have an app installed that takes advantage of a particular set of beacons, the beacon IDs don't tell you anything by themselves.</p>
+<h3>Eddystone</h3>
+<p>Apple is not alone in seeing the potential of BLE for geolocation purposes. Google has released their <a href="https://developers.google.com/beacons/">Eddystone beacon specification</a> that allows website addresses to be broadcast to nearby phones, and even Facebook is handing out <a href="https://www.facebook.com/business/a/facebook-bluetooth-beacons">free beacons</a> to businesses.</p>
+<p>We've seen a few around London - most interestingly on some bus routes. Proxama have a test deployment on buses, which pushes a URL of the timetable of the bus you're on in the iBeacon advertising packet. <a href="http://www.proxama.com/news/proxama-partners-with-google-to-deliver-worlds-first-physical-web-experience-for-consumers/">Here's their press release</a>. Currently, if you have Chrome Beta installed on an iOS or Android device it will notify you if there's an Eddystone beacon in range. We've seen them on the <a href="http://a.prx.ma/xyrss">390</a> and the <a href="http://a.prx.ma/xyrsr">24</a> bus.</p>
+<h2 class="section-title">Privacy</h2>
+<p>Since we wrote the first blog there has been a lot of discussion on the privacy of BLE, for example <a href="http://www.cbc.ca/news/technology/fitness-trackers-monitoring-users-1.3428817">this survey on privacy by CBC</a>, which is based on a <a href="https://openeffect.ca/reports/Every_Step_You_Fake.pdf">Canadian research paper</a> on BLE fitness tracker security.<br/>
+We mentioned above that Apple are one of the few manufactures to properly implement the standard Bluetooth LE privacy features. All iOS devices change their Bluetooth address every 15 minutes, meaning they can't by uniquely identifed from their BLE advertising packets alone. Almost all other devices have either fixed addresses or are uniquely identifiable in some other way. The below table summarises the different types of addresses supported by Bluetooth LE:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/LE_table.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/LE_table.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/LE_table.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/LE_table.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>So what makes a BLE device trackable? Obviously if it never changes its address, then a device is trivially trackable. However, even if it does periodically change its address, LE advertising packets can contain other fields such as a name or manufacturer data. If a device follows the Bluetooth privacy guidelines and uses a private resolvable address, but has unique data in some other field, then it becomes trackable as we can simply look for the other data. </p>
+<p>One example of this is the Microsoft Band. The device has a private resolvable address - great! But the device name is something like 'Paul's Band AB:12 LE' - it contains both the user's first name, and two hex bytes, presumably part of the device's real address.</p>
+<p>The final column in the table above is produced from stats in our RaMBLE databases. iOS devices likely make up a good proportion of the devices with private resolvable addresses, ditto Fitbits for fixed random addresses.</p>
+<h3>A cautionary tale</h3>
+<p>Whilst we've not been actively tracking anyone, the data we've collected with RaMBLE shows many people are unknowingly making themselves trivially trackable by wearing fitness trackers, wireless headphones or by attaching <a href="https://www.google.co.uk/#q=bluetooth+tracker">bluetooth tags</a> to their keys and bags. Our data shows the same devices appearing across days, weeks and months (RaMBLE lets you filter on "days seen"), probably belonging to people who share portions of our daily commutes. Bluetooth LE joins technologies such as Wi-Fi and web cookies that make it increasingly easy for advertisers to track us both physically and online.</p>
+<p>The following anecdote from Paul demonstrates how gadgets using BLE can inadvertently make us more trackable than we might think: </p>
+<blockquote>
+<p><q>The closest time I've come to accidentally stalking someone was a few months ago whilst sitting on the train, using RaMBLE. I saw a BLE device appear with a name something like "John Smith's SmartWidget" (name and product has been changed to protect the innocent). Some BLE devices default to using a person's first name (e.g. "John's LG G4"), but I'd never seen a device advertising a full name and surname. Naturally I was unable to resist the urge to Google for "John Smith SmartWidget". The first search result was a Twitter post by John announcing that he'd just bought a SmartWidget and was looking forward to trying it out. Looking at John's profile picture, I realised he was sitting opposite me on the train - a particularly creepy moment I hope never to repeat.</q></p>
+</blockquote>
+<h2 class="section-title">Contact and Follow-Up</h2>
+<p>Scott and Paul both work in Context's Research team from their London office. See the <a href="https://www.contextis.com/us/contact">contact</a> page for how to get in touch.</p>
+</article>
+{% endraw %}

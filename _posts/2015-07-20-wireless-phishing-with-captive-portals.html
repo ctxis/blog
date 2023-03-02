@@ -1,0 +1,76 @@
+---
+layout: blogpost
+title: "Wireless Phishing with Captive Portals"
+author: "Jan Tudor"
+author_role: "Senior Researcher"
+summary: "In this post we describe a simple technique that has been around for some time that is still relevant today given the proliferation of open access wireless networks. Most people will have seen multiple freely accessible open wireless networks, for example at coffee shops, hotels, airports, etc."
+tags: [Security]
+hero_banner: Wireless_phishing_with_captive_portals_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Users can freely connect to these networks without a password and will often be directed to a login page where a password is required before being allowed to browse the web.   </p>
+<p>Less commonly this type of network access control method is used in enterprise environments to restrict access to corporate LANs such as a guest network.</p>
+<p>The danger in using these types of networks is that all the detail required to create a clone of the access point is freely available. It is trivial for an attacker to harvest information about the wireless network and to copy the entirety of the access control application and then use this to perform what is known as wireless phishing.  </p>
+<h2>What is Wireless Phishing?</h2>
+<p>Wireless phishing is any technique by which an attacker attempts to convince wireless network users to divulge sensitive information. As we previously mentioned the associated wireless network is generally open and access to network resources is mediated by a web application known as a captive portal. Typically the attacker creates their own access point with the same ESSID (wireless network name) and hardware address as an existing wireless network used by the target organisation or users. However, it is also possible to create a new access point ESSID which is related to the target. For example, if we are interested in Acme Corp which does not have a wireless network then our attack network could be named something like “AcmeCorp-GuestNet”.</p>
+<p>Assuming the access point has a captive portal, this application is cloned and stored on the attacker’s access point (a Linux based laptop, for example). The login page including dependencies can be easily cloned using a number of tools such as the Chrome extension SingleFile. This file can then be trivially modified with additional content aimed at convincing users to submit more sensitive information than the original portal asked for. Alternatively, any site that users visit can be modified in this way. For example, Context has on a number of occasions used this technique in bespoke wireless engagements where modified portals enticed users into submitting their enterprise domain credentials.</p>
+<p>With these pieces of information at hand, a cloned access point with a fake captive portal can easily be created on a Linux laptop using just a couple of packages such as hostapd, dnsmasq, iptables, Apache, and your favourite web scripting language. </p>
+<h2>Creating a Fake Access Point and Captive Portal</h2>
+<p>For the interested, we give a brief technical overview of the process of creating a phishing portal here. Hostapd is a user-land program that allows you to create a software wireless access point which is used in conjuction with a web server and iptables traffic capturing rules to create the phishing portal. Example configuration files for creating a simple open access point with hostapd and dnsmasq are given below. These files tell hostapd to set up a wireless access point named “AcmeCorp-GuestNet” and provide associated client stations with a DHCP lease from the attacker controlled server.</p>
+<p>Contents of /etc/hostapd/hostapd.conf:</p>
+<pre class="prettyprint">driver=nl80211
+ssid=AcmeCorp-GuestNet
+hw_mode=g
+channel=6</pre>
+<p>Contents of /etc/dnsmasq.conf:</p>
+<pre class="prettyprint">no-resolv
+interface=wlan0
+dhcp-range=10.0.0.2,10.0.0.101,12h
+server=8.8.8.8
+server=8.8.4.4</pre>
+<p>To emulate the captive portal behaviour so that users are redirected to the attackers cloned portal page, some initial iptables rules are set up to disallow all traffic except for that required to service DNS queries as well as a rule to rewrite the destination IP address of other traffic so that it is directed to the IP of the access point device. The idea is that no traffic is allowed out except DNS so that when a user attempts to browse the web, they obtain the correct DNS entry for the site they wish to browse to but are redirected to the captive portal page at the iptables level. The webserver on the access point will then respond with a temporary redirect to the captive portal page. Once the user authenticates or submits the desired sensitive information, then an iptables rule is created to bypass the blocking rules to allow free traffic flow. For Internet traffic to be successfully forwarded the attacker will need separate access to the Internet either by forwarding captured credentials to the real access point, or some other means such as mobile tethering, or wired Ethernet if no real access point exists.</p>
+<p>The iptables rules which are initially setup to block all traffic but DNS are collected into a custom chain and IP forwarding are set up as follows:</p>
+<p>Initial iptables rules:</p>
+<pre class="prettyprint">iptables -t mangle -N captiveportal
+iptables -t mangle -A PREROUTING -i wlan0 -p udp --dport 53 –j RETURN
+iptables -t mangle -A PREROUTING -i wlan0 -j captiveportal
+iptables -t mangle -A captiveportal -j MARK --set-mark 1
+iptables -t nat -A PREROUTING -i wlan0  -p tcp -m mark --mark 1 -j DNAT --to-destination 10.0.0.1
+sysctl -w net.ipv4.ip_forward=1
+iptables -A FORWARD -i wlan0 -j ACCEPT
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE</pre>
+<p>Then we can add some code to our cloned portal which allows users who have been successfully phished to bypass the captiveportal iptables chain and fully access the network the access point is connected to. In this example php is used, but of course your favourite language can be substituted to achieve the same effect.</p>
+<p>Example php Code for bypassing the traffic capturing rules:</p>
+<pre class="prettyprint">if( desired conditions are met ) {
+  $ip = $_SERVER['REMOTE_ADDR'];
+  $mac = shell_exec("sudo /sbin/arp -an " . $ip);
+  preg_match('/..:..:..:..:..:../',$mac , $matches);
+  $mac = @$matches[0];
+  $res=shell_exec("/usr/bin/sudo iptables -I captiveportal 1 -t mangle -m mac --mac-source $mac -j RETURN 2&gt;&amp;1");
+}</pre>
+<h2>What Can an Attacker Do / So What?</h2>
+<p>Although this technique has been around for a long time, it is still very much a practical easily useable attack. In the case that an existing active portal requests credit card details in order to charge a small fee for Internet access, e.g. in a coffee shop, those details could be easily stolen by a fake version of the portal. Since an attacker handles the network traffic of users connected to their access point, any communication which is unencrypted is vulnerable to eavesdropping. Anything sensitive which is thus unprotected can be stolen. Active social engineering of users is also possible by presenting fake versions of regularly visited sites.</p>
+<p>It is also not just limited to coffee shops and hotels but can be found in enterprise environments as well. For example, Context has been able to leverage it in bespoke wireless engagements where we have physical access, such as that of a cleaner, but no credentials. In this type of scenario, a disguised embedded device, set up as above, is plugged into an Ethernet port and hidden away effectively making it a rogue access point. If an open access point exists with a captive portal, then the portal is coped and modified to ask for further sensitive information, such as domain login credentials. If one doesn’t exist then a captive portal with an enticing access point name related to the target corporation is used. This has been leveraged in a number of real world engagements to gain significant sensitive information and access in enterprise environments. In this type of engagement Context will typically use a second authenticated web application on the rogue access point which has a difficult to guess virtual hostname and is restricted to a single IP address not in the DHCP lease set in dnsmasq. This is used by the consultant performing such an engagement to periodically connect to the rogue access point and gather the harvested information while performing other tasks. A screenshot of an example set up to specifically capture domain credentials is given below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210119152014im_/https://www.contextis.com/media/images/content/jtbp1_2.focus-none.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210119152014im_/https://www.contextis.com/media/images/content/jtbp1_2.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210119152014/https://www.contextis.com/media/images/content/jtbp1_2.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210119152014/https://www.contextis.com/media/images/content/jtbp1_2.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Consultant Web Application</p>
+<h2>What Precautions Should I Take?</h2>
+<p>The most effective method of protection is to not use captive portals at all. If you must use them then never enter any sensitive information into them. However, it should be noted that this is not always under the user’s control. For example, mobile device applications may send data over the network without explicit user interaction.</p>
+<p>In enterprise environments, open access points with captive portals should not be used as a method of network access control. Employees should also be made aware of the potential for data breaches if captive portals are used and to report any suspicious access points they notice.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Jan is a part of our Assurance team in Context's London office. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

@@ -1,0 +1,35 @@
+---
+layout: blogpost
+title: "Conducting Onsite Security Testing Remotely"
+author: "Carl Latimer"
+author_role: "Assurance Regional Lead"
+summary: "With COVID-19 forcing organisations around the World to quickly adopt remote working practices, not only may this pose a technical challenge, it may impact your day-to-day operations and project delivery pipeline."
+tags: [Security, Security assessment and testing]
+hero_banner: Communicating_a_cyber_attack_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p><em>Blog post updated on 21 April 2020 with information about our additional solution for remote testing using virtual devices.</em></p>
+<p>From a cyber-security perspective, it is as important as ever to ensure that your infrastructure and applications are secure. But how do you facilitate remote testing of internal infrastructure and applications that have been traditionally delivered onsite by your security provider?</p>
+<p>It may be possible to provide remote access to internal assets by utilising existing remote working technologies such as VPNs. However, with these gateways already under considerable strain, introducing further load may cause stability and access issues for the entire user base, ruling this option out.  In addition, depending upon the functionality of the existing remote working solution, utilising for security testing may not be feasible for various other reasons.</p>
+<p>Perhaps you could migrate projects to the cloud or expose services within your internal network to the internet, restricting access to these by mechanisms such as IP whitelisting and strong authentication?  Whilst theoretically possible, migration to the cloud and exposing of on-premise services may be an arduous technical task and be fraught with complications, including regulatory considerations. </p>
+<p>Context has come up with two different solutions to conduct “onsite” testing remotely. Both are described below – neither is better than the other, it depends on your environment and the existing remote connectivity solutions that your organization has implemented. In both cases the solutions have been designed to place a minimal load on a client’s communication gateways, with all security testing traffic being invoked from within the customer’s internal network.   </p>
+<p>The first solution that we have come up with at Context is to deploy a security testing platform within your physical estate that can be accessed remotely by your security provider over a secure communication channel. Our solution – called TRigER (Testing Rig for Engaging Remotely) – allows us to support our clients and deliver comprehensive security assessment remotely.</p>
+<p>TRigER is a physical appliance that, once installed on your network, allows Context security consultants to securely access your internal estate and perform routine security assessments, such as infrastructure testing and web application/services engagements.</p>
+<p>Key features of the TRigER appliance are:</p>
+<ul>
+<li><strong>Ease of installation </strong>– the device has been designed to be as easy as possible to deploy in your network and utilise your existing internet egress points.</li>
+<li><strong>Ease of operation</strong> - Once installed and operational, a Context consultant can securely connect and conduct an assessment as if they were in your premises. The time taken to perform the engagement should be broadly the same as if the test was conducted on site, with the added benefit that no onsite expenses will be incurred.</li>
+<li><strong>Secure by design</strong> – utilising our experience of investigating the <a href="https://www.contextis.com/en/blog/avivore" target="_blank" title="AVIVORE">AVIVORE threat group</a>, TRigER is designed as a ‘browse-down’ solution, restricting bi-directional traffic flows to protect your internal assets. The secure technical architecture implements encryption both of data in transit and data at rest, makes use of both Layer 4 and Layer 7 protocol breaks at key locations, aligning with recognised guidance on secure system design; with the inbuilt AAA model intended to be integrated into our customers SIEM deployments.</li>
+<li><strong>Remotely updates</strong> – the appliance is capable of being updated remotely, ensuring that the latest updates can be applied and the same machine used for multiple engagements over an extended period of time.</li>
+</ul>
+<p>Our second solution is based on two virtual machine images that a customer can download and install in their virtual environment. Here are the key features of this solution:</p>
+<ul>
+<li><strong>Use existing connections</strong> – unlike TRigER, the virtualised solution does not establish a secure connection back to Context and does not require internet access. The images are instead accessed via the customer’s existing remote access solution, e.g. through a VPN or VDI gateway. When the secure connection is established, the internal penetration assessment can be conducted remotely but as if the consultant were onsite.</li>
+<li><strong>No on-site installation required</strong> – the virtual machines do not require an onsite customer presence for installation or migration around the virtual environment.</li>
+<li><strong>Security controls </strong>– by making use of an existing remote access gateway, the access method is a known and approved quantity to the customer, with the connection being policed by existing security controls such Data Loss Prevention or internal traffic filtering rules.</li>
+<li><strong>Deployment profile</strong> – each image has 2 network interfaces; a management and a testing interface. The management interface is intended to be placed in a secure VLAN that can be accessed from the remote access gateway. The testing interface, which does not accept any incoming connection requests, is where all active penetration activities will be conducted from. </li>
+</ul>
+<p>For both solutions, to facilitate remote reporting, the test data is securely transferred to Context via a pre-agreed mechanism. With the transfer completed, the TRigER appliance or virtual machine images can be powered down until the next round of testing is due to commence.</p>
+</article>
+{% endraw %}

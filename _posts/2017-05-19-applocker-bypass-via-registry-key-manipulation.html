@@ -1,0 +1,212 @@
+---
+layout: blogpost
+title: "Applocker Bypass via Registry Key Manipulation"
+author: "Context"
+author_role: "Leading cyber security consultancy"
+summary: "AppLocker is the de-facto standard to locking down Windows machines. It is new to Windows 7 and Windows Server 2008 R2 and is the successor to Software Restriction Policies (SRP). Applocker is used by administrators to allow specific users or groups to run certain applications, while denying access to others."
+tags: [Security, Vulnerabilities and exploits]
+hero_banner: Alarm_bells_are_ringing_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>In this blog post we’ll be going through a simple AppLocker bypass via registry key manipulation.</p>
+<p>The goal is to run arbitrary code by leveraging any of the tools which are trusted by AppLocker’s default rules and are available on a default installation of Windows. We'll also exclude the usual suspects such as regsvr32, rundll32, InstallUtil, regsvsc, regasm and of course powershell, powershell_ise and cmd itself.</p>
+<h2>The Setup</h2>
+<p>The following shows the AppLocker rules set on the Windows 10 lab machine:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1.width-800__800_210_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1.width-800__800_210_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/1.width-800__601_158_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/1.width-800__601_158_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The diligent reader might notice that there are several ways of bypassing the rules listed above. For example one can use the 'ftp.exe' binary to execute arbitrary commands by preceding them with '!' or even copy any of the blocked executables to writable folders under 'C:\Windows' such as 'C:\Windows\Tasks\', which is writeable by the 'Authenticated Users' group by default. The defined rules are not meant to be impregnable by any other attack other than the one to be described in this blog post; their purpose is to ensure that the described attack does not make use of binaries which are already known to bypass AppLocker.</p>
+<p>Additionally, although the rules listed above are Path Rule Conditions, the bypass described below will work for Publisher Rule Conditions and File Hash Rules Conditions as well.</p>
+<h2>The Technique</h2>
+<p>It started with what I thought would be a trivial bypass using CPLs. CPLs are essentially .dll files which export the CPIApplet callback function. These are used by Control Panel to collate the settings into one place.</p>
+<p>I created a dll, changed the extension to .cpl and double clicked it. This is the same as running ‘control.exe <path_to_cpl>’ which executes anything in the MainDLL function. Unfortunately, in our lab setup, this triggers an AppLocker error on rundll32:</path_to_cpl></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/2.width-800__800_191_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/2.width-800__800_191_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/2.width-800__558_133_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/2.width-800__558_133_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Yet, launching Control Panel (with its default CPLs) on its own with rundll32 being blacklisted still works! This immediately raises 2 questions:</p>
+<ol>
+<li>How is Control Panel loading the default CPLs? and</li>
+<li>Where is it getting the list of CPLs from?</li>
+</ol>
+<p>The first question is not essential to achieve our goal as we already know at this point that it’s not using rundll32 or any of the other blacklisted binaries to load the default CPLs. For those of you would like to dive deeper into this, the functions for the COpenControlPanel COM object (06622D85-6856-4460-8DE1-A81921B41C4B) can be found in shell32.dll:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/3.width-800__800_391_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/3.width-800__800_391_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/3.width-800__563_275_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/3.width-800__563_275_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Interestingly enough, looking at the strings of control.exe binary shows that a selected few CPLs, such as joy.cpl, are still launched via rundll32. This can be confirmed by clicking on ‘Set up USB game controllers’ in the Control Panel which displays the AppLocker error on rundll32 again.</p>
+<p>Moving onto the more important question, where is Control Panel obtaining the list of CPLs from? With Procmon we obtain the answer pretty quickly</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/4_FHNCTbK.width-800__800_149_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/4_FHNCTbK.width-800__800_149_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/4_FHNCTbK.width-800__602_112_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/4_FHNCTbK.width-800__602_112_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The contents of HKLM\Software\Microsoft\Windows\CurrentVersion\Control Panel\CPLs contains a list of CPLs which are loaded when Control Panel launches:</p>
+<p><img alt="" src="https://web.archive.org/web/20210306053613im_/https://www.contextis.com/media/images/content/5.width-800_.jpg" style="width: 218px; height: 304px;"/></p>
+<p>We also notice that the same path in HKCU is checked! By default each user has write permissions to their own hive. MSDN has an interesting article (<a href="https://msdn.microsoft.com/en-us/library/windows/desktop/hh127454%28v=vs.85%29.aspx?f=255&amp;MSPPError=-2147217396">https://msdn.microsoft.com/en-us/library/windows/desktop/hh127454%28v=vs.85%29.aspx?f=255&amp;MSPPError=-2147217396</a>) on how to register dll control panel items. We’re only interested in loading our CPL so Step1 should suffice here.</p>
+<p>We can write to our own registry in multiple ways:</p>
+<ul>
+<li>With 'reg'</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/6.width-800__800_87_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/6.width-800__800_87_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/6.width-800__600_65_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/6.width-800__600_65_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<ul>
+<li>With'regedit' or 'regedt32'</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/7.width-800__800_184_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/7.width-800__800_184_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/7.width-800__600_138_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/7.width-800__600_138_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<ul>
+<li>With VBScript</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/8.width-800__800_497_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/8.width-800__800_497_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/8.width-800__600_373_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/8.width-800__600_373_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<ul>
+<li>With JScript</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/9.width-800__800_185_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/9.width-800__800_185_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/9.width-800__600_139_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/9.width-800__600_139_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Both ‘reg’ and ‘regedit’ are Microsoft signed binaries, located in a trusted folder and allowed by AppLocker by default:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/10.width-800__800_843_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/10.width-800__800_843_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/10.width-800__537_566_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/10.width-800__537_566_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If these are blocked by Group Policy, JScript and VBScript should do the trick.</p>
+<p>Conveniently there are also multiple ways of launching Control Panel</p>
+<ul>
+<li>C:\windows\system32\control.exe</li>
+<li>%APPDATA%\Microsoft\Windows\Start Menu\Programs\System Tools\Control Panel.lnk</li>
+<li>Directly from the CLSID
+	<ul>
+<li>shell:::{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}</li>
+<li>shell:::{26EE0668-A00A-44D7-9371-BEB064C98683}</li>
+<li>shell:::{ED7BA470-8E54-465E-825C-99712043E01C}</li>
+</ul>
+</li>
+<li>Using Junction Folders
+	<ul>
+<li>My Control Panel.{ED7BA470-8E54-465E-825C-99712043E01C}</li>
+</ul>
+</li>
+</ul>
+<p>We not have all the ingredients required for the AppLocker bypass. Firstly, create a DLL which, for example, launches command prompt; any payload will do but we'll keep it simple. Copy it to a writeable location such as the Desktop or the temp folder, rename it accordingly, chose one of the techniques described above to write the CPL path to HKCU and launch Control Panel using any of the methods listed above. This will load the DLL which in turn loads command prompt:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/11.width-800__800_433_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/11.width-800__800_433_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/11.width-800__600_325_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/11.width-800__600_325_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>Conclusion</h2>
+<p>The technique described in this blog post might not be the cleanest or the most straight forward of the methods to bypassing AppLocker, nevertheless it demonstrates yet another vector attackers can utilise to load arbitrary libraries, and hence run arbitrary code on locked down machines.</p>
+<p>For the defenders amongst you, this attack can be mitigated, at the cost of performance, by enabling the "DLL Rule Collection" under the "Advanced" tab:</p>
+<p><img alt="" src="https://web.archive.org/web/20210306053613im_/https://www.contextis.com/media/images/content/tete.width-500_.png" style="width: 360px; height: 326px;"/></p>
+<h2>Contact and Follow-Up</h2>
+<p>Francesco works in our Assurance team from our Basingstoke office. He maintains a personal blog at vulnerable.space, and has delivered Windows privilege escalation training/workshops at various conferences including DEFCON 24 and BruCon 2017. See the <a href="https://www.contextis.com/en/contact">contact page</a> for how to get in touch. </p>
+</article>
+{% endraw %}

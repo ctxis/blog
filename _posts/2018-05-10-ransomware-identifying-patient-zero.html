@@ -1,0 +1,232 @@
+---
+layout: blogpost
+title: "Ransomware - Identifying Patient Zero"
+author: "Context"
+author_role: "Leading cyber security consultancy"
+summary: "This blog post aims to provide IT teams with a guide to combat on-going ransomware infections, and highlight the source of an infection where it is not immediately obvious and has not been flagged by an end user."
+tags: [Incident Response, Malware]
+hero_banner: Ransomware_What_is_it_how_can_I_defend_against_it_and_what_do_I_do_if_my_business_has_been_hit_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>While having a ransom note dropped within plain sight of a user is a pretty clear sign that you have been hit, a ransomware attack in its early stages may not be as immediately obvious. Malware authors often construct their ransomware to wait until encryption is complete before letting the victim know. This is usually to avoid giving them a chance to limit the effect of the attack. Much of the time, if infected within a business environment, ransomware will affect a network share, on which it methodically encrypts files it has access to, silently, and in the background.</p>
+<p>The identification of ransomware typically begins with users alerting the IT team that files are corrupted or files with unknown file extensions are being created. It will then be up to the IT team to find the source of infection in order to contain and limit the effect of an on-going attack. Considerations for containment of ransomware are outlined in <a href="https://www.contextis.com/en/blog/ransomware-first-steps-to-take-after-identifying-an-infection">Part 3</a> of this series.</p>
+<p>The following sections aim to provide IT teams with a guide to combat on-going ransomware infections, and highlight the source of an infection where it is not immediately obvious and has not been flagged by an end user.</p>
+<p>These tasks can be run in parallel and can be followed whether the infection is on-going or looks to have ceased. We recommend using a combination of multiple tasks to eliminate false positives. </p>
+<p>It is best to be familiar with these tasks (like all Incident Response processes) before engaging them in a real scenario, to make sure any kinks are identified, and expected behaviour (for your environment) is known ahead of time.</p>
+<h2>Review Security Alerts</h2>
+<p>Utilising existing security tools already embedded in the environment is a must. This includes reviewing AV logs for references to ransomware, incoming email logs (for malicious attachments) and proxy logs (for malware related alerts). Whilst this could provide a lot of data, these results can be correlated with other tasks in this article to increase accuracy of results.</p>
+<h2>Appeal for Information from Users and IT Support Teams</h2>
+<p>An often overlooked aspect to determine the root cause of an incident is consultation with the IT helpdesk and/or employees. Employees may often know well in advance if something strange is occurring on their computer, before the IT team. Users should always know who they can contact ahead of time should they notice anything strange on their computer.</p>
+<p>It is best to provide a single point of contact, either a group email address or support number, which users can report issues to. This limits a flood of calls to individual members of the IT support team, which may take time off the investigation in hand.</p>
+<p>Things to look out for when a user reports an issue:</p>
+<ul>
+<li>Files cannot be opened/found or are corrupted;</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware_-_Files_cannot_be_opened_found_or_corrupted_Example_800_587_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware_-_Files_cannot_be_opened_found_or_corrupted_Example_800_587_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200619201555/https://www.contextis.com/media/images/content/Ransomware_-_Files_cannot_be_opened_found_or_corrupted_Example.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware_-_Files_cannot_be_opened_found_or_corrupted_Example_800_587.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Example: Files cannot be opened/found or are corrupted</em></p>
+<ul>
+<li>Files with strange extensions appearing;</li>
+<li>Desktop background changed to ransom note;</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware_-_Desktop_Change_Example_800_461_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware_-_Desktop_Change_Example_800_461_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200619201555/https://www.contextis.com/media/images/content/Ransomware_-_Desktop_Change_Example.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware_-_Desktop_Change_Example_800_461.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Example: Desktop change</em></p>
+<ul>
+<li>Unbootable computer displaying a ransom note</li>
+</ul>
+<p>If it is shown that the affected system is a user’s endpoint, an investigator may choose to ask the following questions of the user. Did they:</p>
+<ul>
+<li>Open any new documents around the timeframes involved;</li>
+<li>Click on an attachment or link in an email;</li>
+<li>Have any software crash recently;</li>
+<li>Visit any unfamiliar websites; or</li>
+<li>Have they had any popups relating to encryption?</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware-_NanoLocker_Example_800_480_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware-_NanoLocker_Example_800_480_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Ransomware-_NanoLocker_Example_1280_768_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware-_NanoLocker_Example_800_480_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Example: NanoLocker</em><examokes 2.3=""></examokes></p>
+<p><examples: 2.3="">Whilst this may generate lots of noise with users reporting any computer related problems, these leads may also be invaluable to the investigation. It is generally best to let users know it is better to come forward with and report unfamiliar events, than keeping quiet and hoping the problem fixes itself.</examples:></p>
+<p><examples: 2.3="">Once the threat has been identified and the risk remediated, users should be made aware of what to look for to limit exposure in the future.</examples:></p>
+<h2>Is The File Server Infected?</h2>
+<p>From the off, it may not always be clear whether the infection is running on a file share server or a host utilising the share. The following points may be followed to determine if the infection is taking place on the file server:</p>
+<ul>
+<li>Run an AntiVirus scan on the file server;</li>
+<li>Look for encrypted files in locations that are not exposed as shares, such as the local users’ desktop and system drive (usually C:). If these locations are infected/encrypted, it is likely that the fileserver is infected;</li>
+<li>Query the process listing for unknown processes (ideally comparing against a previously taken baseline);</li>
+<li>If the fileserver is taken offline, does the encryption stop?</li>
+</ul>
+<h2>Inspect File Ownership</h2>
+<p>To encrypt a file, ransomware must open and write back to a file, this means that the file ownership will change to the user who is infected. Additionally, the ransom note will also have the permissions of the infected user account. This file ownership information can assist in identifying the user and computers on which the ransomware is running. This step is mostly conducted on the file server on which the files are being encrypted.</p>
+<p>The quickest way to identify the owner is to open the file properties of an encrypted file and view the owner in the “Details” tab.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_username_identified_800_609_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_username_identified_800_609_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_username_identified_700_533_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_username_identified_700_533_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>CryptoLocker ransom note - username identified</em></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_SID_provided_800_609_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_SID_provided_800_609_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_SID_provided_700_533_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware_-cryptolocker_ransom_note_SID_provided_700_533_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>CryptoLocker ransom note - SID provided</em></p>
+<p>PowerShell can also be utilised to query the owner of the file:</p>
+<pre class="prettyprint">Get-Acl ‘.\2017-finance_report.doc.wncry’ | Select Owner</pre>
+<p>With a username in hand, the associated user can be contacted directly. If the infection is on-going, and it is unknown which computer the user is logged in on, the Active Directory can be queried. Whilst Active Directory does not provide a way to do this natively, the following script can be utilised to provide a list of computers where the user is currently logged on.</p>
+<p><strong>NB: Depending on the size of the domain, this may take a while.</strong></p>
+<pre class="prettyprint">$username = "infected_username"
+$computers = Get-ADComputer -Filter 'Enabled -eq $true' -Properties Enabled | Select Name
+foreach ($comp in $computers) {
+	$Computer = $comp.Name
+	$ping = new-object System.Net.NetworkInformation.Ping
+	$Reply = $null
+	$Reply = $ping.send($Computer)
+if ($Reply.status -like 'Success'){
+		$proc = gwmi win32_process -computer $Computer -Filter "Name = 'explorer.exe'"
+		ForEach ($p in $proc) {
+			$temp = ($p.GetOwner()).User
+				if ($temp -eq $Username){
+					write-host "$Username is logged on $Computer"
+				}
+		}
+}
+}</pre>
+<p>In addition, this username may be utilised within the next section “Current File Share Sessions”. The username can be used as a filter to provide a listing of current open files by that user.</p>
+<p>Once the offending user account or host is identified, processes in Part 3 of this series can be followed.</p>
+<h2>Current File Share Sessions</h2>
+<p>If the attack is currently ongoing against a network share, a query of open files and current sessions may often be useful. This will provide an overview of users, and the files they have open, which may include files being encrypted on the network share. Multiple connections to lots of files should be treated as suspicious, as should files of unknown file types being created.</p>
+<p>To show current sessions, open the Computer Management console. This can either be viewed from the server exposing the file shares, or using the remote connection options from within the Computer Management console.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware_-_system_tools_sessions_800_541_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware_-_system_tools_sessions_800_541_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Ransomware_-_system_tools_sessions_603_408_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware_-_system_tools_sessions_603_408_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>System Tools &gt; Shared Folders &gt; Sessions</em></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware_-_system_tools_open_files_800_519_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware_-_system_tools_open_files_800_519_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Ransomware_-_system_tools_open_files_631_409_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware_-_system_tools_open_files_631_409_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>System Tools &gt; Shared Folders &gt; Open Files</em></p>
+<p>Alternatively, PowerShell could also be used to query open files. If the malware has a file extension that is associated with the encrypted files, a query parameter (-Match “extension_of_encrypted_files”) can be added to limit the amount of results returned:</p>
+<pre class="prettyprint">Get-SmbOpenFile | Where-Object -Property ShareRelativePath -Match "extension_of_encrypted_files" | Select-Object ClientUserName,ClientComputerName,Path</pre>
+<p>Additionally, <em>Get-SmbOpenFile</em> output can be filtered based on the username:</p>
+<pre class="prettyprint">Get-SmbOpenFile | Where-Object -Property ClientUserName -Match "infected_username" | Select-Object ClientComputerName,Path</pre>
+<h2>Correlate File Access</h2>
+<p>Correlating the variety of shares being encrypted could also be used to identify a group of users that may be infected. For example, if files are being encrypted on the finance share and only finance users have access to that share, it is likely that the source of infection is utilising a finance user account.</p>
+<p>However if there are multiple shares affected, determining which group is the common factor is critical. For the example below, if the Finance <strong>and</strong> Sales file shares are being encrypted, it is likely that the source is a Finance user because they are the only department that have access to both shares:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Ransomware_-User_group_and_file_shares_800_401_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Ransomware_-User_group_and_file_shares_800_401_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200619201555/https://www.contextis.com/media/images/content/Ransomware_-User_group_and_file_shares.PNG"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Ransomware_-User_group_and_file_shares_800_401.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>Targeted Anti-Virus Definition</h2>
+<p>Your anti-virus vendor can usually help with the creation of a targeted definition update (or manual signature creation) for the file extension associated with the encrypted files. This will assist investigators in identifying what systems are affected by the infection.</p>
+<p>The definition update needs to be set to <strong>log</strong> the alert, and <strong>not</strong> delete or quarantine the file; otherwise files that could potentially be decrypted at a later stage will be lost. This update can then be pushed to all systems, which may provide a list of systems infected and may identify the source of infection.</p>
+<p>Whilst in contact with your AV vendor, cover the following topics so they have a good overview of the present situation:</p>
+<ul>
+<li>Describe the problems you are having – access to, and corrupted files;</li>
+<li>Describe any current steps taken against the infection – have you disconnected hosts from the network or identified a user involved?;</li>
+<li>Describe the files being encrypted, and their extension;</li>
+<li>Location of files being encrypted – is it on a file share or a user’s computer?; and</li>
+<li>Size of business and the amount of hosts affected.</li>
+</ul>
+<h2>Examine Internet Facing Hosts</h2>
+<p>Context's Response team have investigated many instances involving externally facing services such as Terminal Services/Remote Desktop that have been compromised with weak passwords or worming malware, then infected with ransomware.. These types of attacks are usually automated, and an attacker has the ability to scan several million IP addresses each day looking for vulnerable systems. Check for recent logins to these services, and identify any user accounts who have connectivity to the wider corporate network to limit lateral movement of the infection.</p>
+<h2>Examples of Ransomware</h2>
+<p>Throughout the investigation against a new piece of malware, Context Response analysts will often submit the potentially malicious samples to a sandbox designed to conduct quick and automated analysis. This, in many cases provides a good starting point for analytical work to be conducted. Context have a purpose built, open source tool named CAPE (Configuration and Payload Extraction) which assists in our efforts to provide a quick snapshot of whether a sample is malicious. Should an unknown executable be discovered on the network, it may be uploaded for analysis at <a href="https://cape.contextis.com/submit/">https://cape.contextis.com/submit/</a>.</p>
+<p>Below are a couple of examples held on our public CAPE instance, which relate to ransomware in particular.<br/>
+Most exhibit behaviours of writing files to disk, and changing file extensions of user documents:</p>
+<p><strong>WannaCryptor:</strong> <a href="https://cape.contextis.com/analysis/7240/">https://cape.contextis.com/analysis/7240/</a><br/>
+<strong>CryptoShield:</strong> <a href="https://cape.contextis.com/analysis/4509/">https://cape.contextis.com/analysis/4509/</a><br/>
+<strong>Locky:</strong> <a href="https://cape.contextis.com/analysis/3579/">https://cape.contextis.com/analysis/3579/</a><br/>
+<strong>BadRabbit:</strong> <a href="https://cape.contextis.com/analysis/3007/">https://cape.contextis.com/analysis/3007/</a><br/>
+<strong>NanoLocker:</strong> <a href="https://cape.contextis.com/analysis/806/">https://cape.contextis.com/analysis/806/</a></p>
+<p>If you would like to build a CAPE instance, the project is hosted on GitHub – pull requests welcomed: <a href="https://github.com/ctxis/CAPE">https://github.com/ctxis/CAPE</a></p>
+<p>A dedicated blogpost regarding CAPE is upcoming – follow the blog roll to be notified!</p>
+<p>In <a href="https://www.contextis.com/en/blog/ransomware-first-steps-to-take-after-identifying-an-infection">Part 3</a> of this series we will be identifying the steps to take if ransomware has been detected in your environment...</p>
+</article>
+{% endraw %}

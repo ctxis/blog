@@ -1,0 +1,182 @@
+---
+layout: blogpost
+title: "Make a Django app insecure? It's not easy and that's a good thing!"
+author: "Patrick Craston"
+author_role: "Head of Software Development"
+summary: "The OWASP Top 10 describes the most critical and most commonly occurring security flaws in web applications. This list is published every three years and although some issues move up the list and others move down, it broadly stays the same."
+tags: [Web applications]
+hero_banner: Make_a_Django_app_insecure_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Here is the latest OWASP Top 10:</p>
+<ul>
+<li>A1 - Injection</li>
+<li>A2 - Broken Authentication and Session Management</li>
+<li>A3 - Cross-Site Scripting (XSS)</li>
+<li>A4 - Insecure Direct Object References</li>
+<li>A5 - Security Misconfiguration</li>
+<li>A6 - Sensitive Data Exposure</li>
+<li>A7 - Missing Function Level Access Control</li>
+<li>A8 - Cross-Site Request Forgery (CSRF)</li>
+<li>A9 - Using Known Vulnerable Components</li>
+<li>A10 - Unvalidated Redirects and Forwards</li>
+</ul>
+<p>(from <a href="https://www.owasp.org/index.php/Top_10_2013-Top_10">https://www.owasp.org/index.php/Top_10_2013-Top_10</a>)</p>
+<p>Although the most recent list is from 2013, my colleagues in <a href="/web/20200424032907/https://www.contextis.com/services/assurance/">our Assurance department</a> tell me it remains a good reflection of the issues that we find in our clients' web applications on a daily basis. So why is it that, across the board, web applications are vulnerable to the same security issues, all the way from small projects to big corporate environments? Because web application security is hard! </p>
+<p>A typical web application is made up of many layers and each layer provides a whole host of attack vectors. As seen in the OWASP Top 10, vulnerabilities can crop up anywhere from server configuration to database interaction and front-end functionality. And often it is exactly this complex interplay of the various components that leads to unforeseen security issues.</p>
+<p>On top of that, programmers are constantly working with limited budgets and tight deadlines, hence securing an application can often be lower on the priority list than getting new features rolled out to users.</p>
+<h2>Building an insecure Django web app...</h2>
+<p>In this blog post, I will argue that by building web applications using a modern web framework like <a href="https://www.djangoproject.com/">Django </a>(Disclaimer: Other modern web frameworks are available!) this problem can be alleviated. I will show how Django comes with a number of built-in features that not only help developers code more securely but actually make it really difficult to add some of the most common and most severe security vulnerabilities to a web application.</p>
+<p>So to demonstrate this, I will show how to add some of the most commonly found security vulnerabilities to a Django web application. This isn't just an intellectual exercise, as we were asked to do exactly this in a recent engagement for one of our clients. It turns out that by trying to build an insecure application you actually learn a lot about web application security.</p>
+<h3>Step 1: Leak some information</h3>
+<p>That one is easy: Leave DEBUG = True set in your project settings.py and deploy your project to production.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/settings_debug_true.width-800_800_62_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/settings_debug_true.width-800_800_62_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424032907/https://www.contextis.com/media/images/content/settings_debug_true.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424032907/https://www.contextis.com/media/images/content/settings_debug_true.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It seems like an obvious one and Django does its best to remind you both<a href="https://docs.djangoproject.com/en/1.8/howto/deployment/checklist/#debug"> in the Django documentation</a> and when you create a new project (see above code snippet), but there are still plenty of Django sites out there running in debug mode (7% of 3703 websites <a href="https://speakerdeck.com/erik/eriks-pony-checkup-djangocon-eu-2013">according to a survey performed by Erik Romijn</a>).</p>
+<p>Running your production application in debug mode means that should a server error occur, the user can see your source code and local variables (hence you're leaking potentially sensitive data, i.e. OWASP A6) and also what 3rd party libraries your app is using (which means you're potentially exposed to OWASP A9 if you haven't updated those libraries in a while).</p>
+<h3>Step 2: Add some Cross-site Scripting (XSS)</h3>
+<p>Adding <a href="https://en.wikipedia.org/wiki/Cross-site_scripting">XSS </a>is another easy one: Disable Django's automatic escaping of variables in templates. </p>
+<p>This can be done by rendering a database variable that can be modified via the user interface into a template and either</p>
+<ul>
+<li>Applying the <a href="https://docs.djangoproject.com/en/1.8/ref/templates/builtins/#safe">safe template tag</a> to the variable:</li>
+</ul>
+<pre class="prettyprint">&lt;p&gt;
+  {{ my_var_with_nasty_code|safe }}
+&lt;/p&gt;</pre>
+<p>Or wrapping the template code that contains the variable in an <a href="https://docs.djangoproject.com/en/1.8/ref/templates/builtins/#autoescape">autoescape </a>block:</p>
+<pre class="prettyprint">&lt;p&gt;
+  {% autoescape off %}
+    {{ my_var_with_nasty_code }}
+  {% endautoescape %}
+&lt;/p&gt;</pre>
+<p>If an attacker inserts HTML or JavaScript into the database of the application, any user viewing a page that renders a (unescaped) compromised database field into its template would have the code executed in their browser.</p>
+<p>The crucial bit here is that unless you explicitly tell Django not to, it escapes all variables in templates automatically thus adopting the principle of <a href="https://en.wikipedia.org/wiki/Secure_by_default">security by default</a>. So even if a user could insert malicious HTML into your database, that code would be escaped and not executed in the browser when displayed back to the user. Happy days - by default we're protected from the Cross-site Scripting (OWASP A3).</p>
+<h3>Step 3: Add SQL injection</h3>
+<p><a href="https://en.wikipedia.org/wiki/SQL_injection">SQL injection</a>, together with the other injection flaws included in OWASP A1, headed up the top 10 list both in <a href="https://www.owasp.org/index.php/Top_10_2010-Main">2010</a> and <a href="https://www.owasp.org/index.php/Top_10_2013-Top_10">2013</a> (and came <a href="https://www.owasp.org/index.php/Top_10_2007">second in 2007</a>). When it comes to the damage an attacker can do with regards to stealing sensitive data or even deleting it, SQL injection is probably one of the worst ones out there.</p>
+<p>As always, xkcd explains it best:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/exploits_of_a_mom_800_246_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/exploits_of_a_mom_800_246_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424032907/https://www.contextis.com/media/images/content/exploits_of_a_mom.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424032907/https://www.contextis.com/media/images/content/exploits_of_a_mom.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>(reproduced from <a href="https://xkcd.com/327/">https://xkcd.com/327/</a>)</p>
+<p>SQL injection most commonly occurs in when processing user input from web forms. In Django, to create a form you typically have a template that renders the HTML form and any output, a Form class that captures the form properties and its input fields and a View that renders the form into the template and then processes the user input when the form is submitted (See the <a href="https://docs.djangoproject.com/en/1.8/topics/forms/#building-a-form">Django documentation for details</a>).</p>
+<p>The good news for the Django developer is that, if the standard form-processing approach is adopted, it's really hard to add SQL injection to a Django app. On the flip side, that's bad news for me so here's what I had to do to make our app vulnerable to SQL injection.</p>
+<p>First, let's start with an HTML template:</p>
+<pre class="prettyprint">&lt;html&gt;
+  &lt;form method="get" action=""&gt;
+    &lt;input type="date" name="start_date" /&gt;
+    &lt;input type="date" name="end_date" /&gt;
+    &lt;input type="submit" value="Search date range" /&gt;
+  &lt;/form&gt;
+  &lt;table&gt;
+    &lt;thead&gt;
+      &lt;tr&gt;
+        &lt;th&gt;Date&lt;/th&gt;
+        &lt;th&gt;Some other attribute&lt;/th&gt;
+      &lt;tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+    {% for item in model_items %}
+      &lt;tr&gt;
+        &lt;td&gt;{{ item.date }}&lt;/td&gt;
+        &lt;td&gt;{{ item.other_attribute }}&lt;/td&gt;
+      &lt;/tr&gt;
+    {% endfor %}
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+&lt;/html&gt;</pre>
+<p>Then we need the view:</p>
+<pre class="prettyprint">def search_form(request):
+    if 'start_date' in request.GET and 'end_date' in request.GET:
+        query = "SELECT * from myapp_mymodel WHERE myapp_mymodel.date "\
+                "BETWEEN '{} 00:00:00' AND '{} 23:59:59'".format(request.GET.get('start_date'),
+                                                                 request.GET.get('end_date'))
+        model_items = MyModel.objects.raw(query)
+    else:
+        model_items = MyModel.objects.all()
+    return render(request, 'template.html', {'model_items': model_items})</pre>
+<p>Note how I cannot use a Form class and also cannot make use of <a href="https://docs.djangoproject.com/en/1.8/topics/db/">Django's database framework</a>. The <a href="https://docs.djangoproject.com/en/1.8/ref/forms/validation/">Form class' validation framework</a> comes with a clean method that would automatically check that the date input fields are actually valid dates (and thus scrub any nasty SQL that the attacker might have added as GET parameters). And if I use the <a href="https://docs.djangoproject.com/en/1.8/topics/db/queries/#retrieving-specific-objects-with-filters">Django database framework filter statement</a> (e.g.  MyModel.objects.filter(date__range=(request.GET.get('start_date'), request.GET.get('end_date'))), Django would reject any GET parameters that are not valid dates, hence malicious SQL statements would have no effect.</p>
+<p>Instead, I have to create our SQL query manually and then feed it into the <code>raw()</code> function. It looks nasty (it's an unwelcome reminder of the bad old days when we built web apps using basic PHP!) and a lot more effort than applying a filter to a <a href="https://docs.djangoproject.com/en/1.8/topics/db/queries/">Django queryset</a>, so hopefully that would put anyone off doing this by mistake.</p>
+<p>By manipulating the GET parameters, the view is now vulnerable to <a href="http://www.sqlinjection.net/union/">UNION based SQL injection</a>. This would allow an attacker to enumerate the database and, depending on how the type of database and how it was configured, potentially run system commands.</p>
+<h3>Step 4: Add Cross-site Request Forgery (CSRF)</h3>
+<p>Like XSS, Django's default behaviour with regards to <a href="https://en.wikipedia.org/wiki/Cross-site_request_forgery">Cross-site Request Forgery</a> protection is secure, as the <a href="https://docs.djangoproject.com/en/1.8/ref/csrf/">CSRF protection middleware</a> is automatically enabled when processing POST data.</p>
+<p>However, making the view susceptible to CSRF is easy. All we have to do is add the <code>@csrf_except</code> decorator to the view (or in fact disable the CSRF middleware in the project settings) and it will happily process POST requests without a valid CSRF token.</p>
+<p>Having said that, because Django provides a <code>{% crsf_token %}</code> template tag and adds automatic protection to views through its CSRF middleware, the developer does not need to worry about CSRF (as long as default guidelines are followed). This is a good thing! CSRF protection is a hard problem to deal with as exemplified by its continuing presence in the OWASP top 10 (A5 in 2010 and A8 in 2013).</p>
+<h3>Step 5: Escalate some privileges</h3>
+<p>Finally, I'll look at adding <a href="https://en.wikipedia.org/wiki/Privilege_escalation">privilege escalation</a> through Missing Function Level Access Controls (OWASP A7) into our Django application. Specifically, by means of Authorisation Bypass, a low privileged user will be able to add themselves as an "owner" of a hypothetical alarm system that is run by a Django web application. This imposes a serious risk and such an operation should only be available to application administrators/superusers. I will implement this vulnerability by adding controls that prevent a low privileged user from accessing a view using a GET request, but then "forget" to implement those same controls if that user sends data to the same view using a POST request.</p>
+<p>The good news is that this is really hard to implement in Django. If form processing is implemented in the recommended way using a <a href="https://docs.djangoproject.com/en/1.8/topics/forms/#building-a-form-in-django">Form class</a>, the web framework automatically ensures that any data values submitted via a POST match the form fields that were rendered in the form when the view was requested using GET. If they do not, the POST request gets rejected and Django throws a <code class="prettyprint lang-py">ValidationError</code>.</p>
+<p>Anyway, for anyone who's interested in how to get around this (not that you'd ever really want to this in the real world!), this is how you would do it. </p>
+<p>Our database model stores information about these hypothetical alarm systems that allow their owners to arm and disarm them remotely via the internet (the model has additional fields but they are omitted here for the sake of readability):</p>
+<pre class="prettyprint">class AlarmSystem(models.Model):
+    owners = models.ManyToManyField(User, null=True)
+    pointless_text = models.TextField()</pre>
+<p>The Form class allows all users to edit the pointless_text attribute of the alarm system. However, only superusers can add or remove owners for alarm systems.</p>
+<pre class="prettyprint">class AlarmOwnerForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request', None)
+        super(AlarmOwnerForm, self).__init__(*args, **kwargs)
+        # The following code ensures that normal users do not see a ValidationError if they submit 
+        # the form containing just the pointless_text field (i.e. if they are not tampering 
+        # with the form!)
+        if not self.request.user.is_superuser:
+            self.fields['owners'].required = False
+    class Meta:
+        model = AlarmSystem
+        fields = ('owners', 'pointless_text',)</pre>
+<p>The basic template that renders the form. All users can see and edit the pointless_text field, only superusers can see and edit the owners field.</p>
+<pre class="prettyprint">&lt;html&gt;
+  &lt;form method="post" action=""&gt;
+    {% if user.is_superuser %}
+      {{ form.owners }}
+    {% endif %}
+    {{ form.pointless_text }}
+    &lt;button type="submit"&gt;Submit&lt;/button&gt;
+  &lt;/form&gt;
+&lt;/html&gt;</pre>
+<p>And the view that renders and processes the form:</p>
+<pre class="prettyprint">def my_form_view(request, serial_number):
+    alarm_system = AlarmSystem.objects.get(serial_number=serial_number)
+    if request.method == 'POST':
+        # As we are not adjusting the Form class based on the user, we need to add the previous owners
+        # to the request.POST to prevent ValidationErrors for normal users submitting the form
+        request_post = request.POST.copy()
+        if 'owners' not in request_post:
+            request_post.setlist('owners', [unicode(owner.id) for owner in alarm_system.owners.all()])
+        form = AlarmOwnerForm(request_post, instance=alarm_system, request=request)
+    else:
+        form = AlarmOwnerForm(instance=alarm_system, request=request)
+        if form.is_valid():
+            form.save()
+    return render(request, 'template.html', {'form': form}</pre>
+<p>A lot of (pretty ugly) code, but basically what I am doing is directly modifying the form in the template depending on whether the user is a superuser or not. The secure way of implementing this would have been to dynamically modify the Form class based on the user's superuser status. Hence, Django requires us to add a whole lot of hacks to both the form and the view to make it process the vulnerable form.</p>
+<h2>Conclusion</h2>
+<p>Although some vulnerabilities are easy to add (and others are definitely hard), a modern web framework like Django protects the developer from the security risks described above. In all cases, the framework's default recommended approach is secure. </p>
+<p>For issues like CSRF or XSS, it is easy to make the application vulnerable, however, in most cases the developer would actively have to disable or amend the standard behaviour of the framework. A robust <a href="https://en.wikipedia.org/wiki/Code_review">code review</a> performed as part of the System Development Life Cycle (even if done by team members rather than security professionals) should detect any of these vulnerabilities.</p>
+<p>Other vulnerabilities like SQL injection and privilege escalation - which for a long time have been amongst the most prevalent risks when it comes to web application security - are actually really hard to add when using a modern web framework such as Django as the developer has to actively work around the security functionality built into the framework. By using tools such as the ORM for database interaction and the forms framework for form processing, the developer is automatically protected from these risks (at least for many of the most common scenarios).</p>
+<h2>Contact and Follow-Up</h2>
+<p>Patrick is a Principal Software Engineer and leads the Software Development team in Context's London office. See the <a href="https://www.contextis.com/en/contact">Contact</a> page for how to get in touch.</p>
+</article>
+{% endraw %}

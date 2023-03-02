@@ -1,0 +1,154 @@
+---
+layout: blogpost
+title: "Hardware Encryption Weaknesses and BitLocker"
+author: "Robert Nicholls"
+author_role: "Managing Consultant, Assurance"
+summary: "Hardware encryption implemented within certain Solid State Drives (SSDs) can be exploited to recover all encrypted data without needing to know any secrets."
+tags: []
+hero_banner: Hardware_Encryption_Weaknesses_1700x700_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>These weaknesses were discovered by researchers from the Radboud University and the Open University of Netherlands in early 2018, and were recently published in <a href="https://www.ru.nl/publish/pages/909275/draft-paper_1.pdf">a draft paper</a>. One mitigation is to enable the use of software encryption such as Microsoft’s BitLocker using specific configuration settings.</p>
+<h3>Full Disk Encryption Methods</h3>
+<p>An increasingly common method of implementing full disk encryption involves the native hardware encryption capability of a self-encrypting drive (SED). Drive manufactures typically meet the Trusted Computing Group’s (TCG) Opal core specification for their SEDs, which mandates the use of either 128-bit or 256-bit encryption using Advanced Encryption Standard (AES). Some of the advantages of using hardware encryption include:</p>
+<ul>
+<li>Encryption is invisible so it can be used with any operation system</li>
+<li>Encryption key cannot be accessed by the host</li>
+<li>There is no performance overhead</li>
+<li>Data can be wiped by erasing the data encryption key </li>
+</ul>
+<p>An alternative to hardware encryption is the use of software encryption. This allows traditional hard drives and SSDs that don’t support hardware encryption to provide full disk encryption. Some of the disadvantages of software encryption include:</p>
+<ul>
+<li>Encryption software has to be supported by the operating system</li>
+<li>Encryption key is cached in the host's memory</li>
+<li>There is a performance overhead</li>
+</ul>
+<p>However, there are some advantages to using software encryption as some software, such as Microsoft’s BitLocker, can support multifactor authentication using a device’s unique Trusted Platform Module (TPM). Depending on the TPM implementation, this can offer tamper-resistance and protection from certain software bugs.</p>
+<h3>Hardware Encryption Vulnerabilities</h3>
+<p>The draft research paper identified that some common SSDs have critical security weaknesses that can allow the recovery of all encrypted data without needing to know any secrets. The following drives were reviewed and found to contain weaknesses:</p>
+<ul>
+<li>Crucial MX100</li>
+<li>Crucial MX200</li>
+<li>Crucial MX300</li>
+<li>Samsung 840 EVO</li>
+<li>Samsung 850 EVO</li>
+</ul>
+<p>Additionally, Samsung T3 and T5 USB external storage devices were affected.</p>
+<p>Methods of exploitation involved modifying the disk’s firmware, typically using a Joint Test Action Group (JTAG) debugging device. This allowed password verification routines to be tricked into unlocking the drive using its data encryption key (DEK). This could occur on some devices because there was no cryptographic binding between the password and the DEK.</p>
+<h3>Manufacturer Responses</h3>
+<p>Samsung confirmed the vulnerability and have recommended installing compatible software encryption.</p>
+<p>Micron have developed firmware patches for their Crucial drives, with MX100 and MX200 <a href="http://uk.crucial.com/gbr/en/support-ssd">firmware updates available now</a>. The firmware update for the MX300 will be added on November 13<sup>th</sup>. The Crucial Team have stated that MX500 drives are unaffected as they have protections that prevent an attacker from accessing decrypted user data via a bypass of TCG password checking.</p>
+<h3>BitLocker</h3>
+<h4>Background</h4>
+<p>When using BitLocker Drive Encryption to protect a self-encrypting drive, computers running Windows 8 and Server 2012 onwards will try to use hardware encryption by default. This may result in BitLocker users unintentionally using hardware encryption.</p>
+<p>If the hardware encrypted drive loses power, such as when the system goes to sleep using Suspend-to-RAM, it needs to be unlocked again. BitLocker retains a copy of the secret key in memory in order to do this when resuming from sleep, which could allow an attacker with physical access to the device to obtain the key using Direct Memory Access (DMA).</p>
+<p>In order to use hardware encryption on the start-up drive, the computer must boot natively from a modern version of Unified Extensible Firmware Interface (UEFI). Windows 10 also requires support for SecureBoot when the computer has a TPM 2.0 chip.</p>
+<p>Modern computer processors typically support Advanced Encryption Standard New Instructions (AES-NI), which significantly improve the performance of software encryption. Newer Intel processors offer further improvements using XTS-AES compared to AES in CBC mode, making the performance impact less noticeable relative to using hardware encryption or no encryption at all.</p>
+<h4>Encryption Method</h4>
+<p>The command “manage-bde -status” can be executed from an elevated Command Prompt (or elevated PowerShell) to verify the encryption method in use for each volume.</p>
+<p>For systems using hardware encryption, the value will begin with “Hardware Encryption” followed by an object identifier (OID) code that indicates the type of AES encryption in use.</p>
+<p>If software encryption is in use, the value will be one of the following:</p>
+<ul>
+<li>AES 128 with Diffuser</li>
+<li>AES 256 with Diffuser</li>
+<li>AES 128</li>
+<li>AES 256</li>
+<li>XTS-AES 128</li>
+<li>XTS-AES 256</li>
+</ul>
+<p>Certain versions of Windows do not support an Elephant Diffuser or XTS. These are mitigations to improve permutation in the AES block cipher mode that would otherwise allow practical attacks on disk encryption in Cipher Block Chaining (CBC) mode.</p>
+<p>The drive encryption method used for software encryption can be specified under the relevant “Choose drive encryption method and cipher strength” setting for the operating system. These can be found under Administrative Templates &gt; Windows Components &gt; BitLocker Drive Encryption.</p>
+<p>If removable drives need to be used with older versions of Windows the use of AES-CBC should be configured for compatibility. For example:</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px;">
+<tbody>
+<tr>
+<td><strong>Group Policy</strong></td>
+<td><strong>Value</strong></td>
+</tr>
+<tr>
+<td>Choose drive encryption method and cipher strength (Windows 10 [Version 1511] and later)</td>
+<td>
+<p>Enabled</p>
+<p>Select the encryption method for operating system drives: XTS-AES 128-bit (default) </p>
+<p>Select the encryption method for fixed drives: XTS-AES 128-bit (default)</p>
+<p>Select the encryption method for removable data drives: AES-CBC 128-bit (default)</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p><br/>
+These settings only apply to BitLocker when using software encryption. Changes made to the encryption method will not be applied until BitLocker is turned off and the volume fully decrypted before BitLocker is activated again.</p>
+<h4>Prevent BitLocker from Using Hardware Encryption</h4>
+<p>Group Policy settings can be configured to Disabled in order to enforce the use of BitLocker’s software encryption. These can be found within Administrative Templates &gt; Windows Components &gt; BitLocker Drive Encryption:</p>
+<ul>
+<li>Configure use of hardware-based encryption for fixed data drives</li>
+<li>Configure use of hardware-based encryption for operating system drives</li>
+<li>Configure use of hardware-based encryption for removable data drives</li>
+</ul>
+<p>If the drive is already using BitLocker with hardware encryption (sometimes referred to as eDrive), switching to software encryption will require that BitLocker is turned off completely before enabling BitLocker again.</p>
+<h4>Encryption Vulnerabilities</h4>
+<p>Direct Memory Access (DMA) is possible from peripherals connected to some external interfaces such as FireWire and Thunderbolt. To help mitigate the disclosure of private keys held in memory, prevent the installation of specific device IDs and device setup classes, and disable new DMA device when the computer is locked. These settings can be found under Computer Configuration &gt; Administrative Templates &gt; System &gt; Device Installation &gt; Device Installation Restrictions.</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px;">
+<tbody>
+<tr>
+<td><strong>Group Policy</strong></td>
+<td><strong>Value</strong></td>
+</tr>
+<tr>
+<td>Prevent installation of devices that match these device IDs</td>
+<td>
+<p>Enabled: PCI\CC_0C0A</p>
+<p>Also apply to matching devices that are already installed: Disabled</p>
+</td>
+</tr>
+<tr>
+<td>Prevent installation of drivers matching these device setup classes</td>
+<td>
+<p>Enabled: </p>
+<p>{d48179be-ec20-11d1-b6b8-00c04fa372a7}</p>
+<p>{7ebefbc0-3200-11d2-b4c2-00a0C9697d07}</p>
+<p>{c06ff265-ae09-48f0-812c-16753d7cba83}</p>
+<p>{6bdd1fc1-810f-11d0-bec7-08002be2092f}</p>
+<p>Also apply to matching devices that are already installed: Disabled</p>
+</td>
+</tr>
+<tr>
+<td>Disable new DMA devices when this computer is locked</td>
+<td>Enabled</td>
+</tr>
+</tbody>
+</table>
+<p><br/>
+Some devices may encounter issues when the “Disable new DMA devices when this computer is locked” Group Policy setting is set to Enabled.</p>
+<h3>Conclusion</h3>
+<ul>
+<li>Install manufacture firmware security updates, where available, for affected solid state drives. </li>
+<li>Verify that devices relying upon BitLocker use software encryption on vulnerable drives. </li>
+<li>Enable BitLocker with specific Group Policy settings to prevent the use of hardware encryption on all drives, and mitigate known direct memory attacks that could expose private keys. Windows 10 devices should enforce the use of XTS-AES for the software encryption method on fixed and operating system drives, as it was specifically designed for encrypting data on storage devices. </li>
+</ul>
+<p>Organisations may wish to consider <a href="https://www.ncsc.gov.uk/guidance/eud-security-guidance-windows-10-1803#bitlockerconfiguration">NCSC guidance for configuring BitLocker</a>, along with <a href="https://www.ncsc.gov.uk/guidance/eud-security-guidance-windows-10-1803#systemhardening">suitable system hardening settings</a>.</p>
+<h3>Further reading and references</h3>
+<p>ADV180028 | Guidance for configuring BitLocker to enforce software encryption: <a href="https://portal.msrc.microsoft.com/en-US/security-guidance/advisory/ADV180028">https://portal.msrc.microsoft.com/en-US/security-guidance/advisory/ADV180028</a></p>
+<p>BitLocker Group Policy settings: <a href="https://docs.microsoft.com/en-us/windows/security/information-protection/bitlocker/bitlocker-group-policy-settings#bkmk-hdefxd">https://docs.microsoft.com/en-us/windows/security/information-protection/bitlocker/bitlocker-group-policy-settings#bkmk-hdefxd</a></p>
+<p>BitLocker Security FAQ: <a href="https://docs.microsoft.com/en-us/windows/security/information-protection/bitlocker/bitlocker-security-faq">https://docs.microsoft.com/en-us/windows/security/information-protection/bitlocker/bitlocker-security-faq</a></p>
+<p>Consumer Notice regarding Samsung SSDs: <a href="https://www.samsung.com/semiconductor/minisite/ssd/support/consumer-notice/">https://www.samsung.com/semiconductor/minisite/ssd/support/consumer-notice/</a></p>
+<p>EUD Security Guidance: Windows 10 – 1803: <a href="https://www.ncsc.gov.uk/guidance/eud-security-guidance-windows-10-1803">https://www.ncsc.gov.uk/guidance/eud-security-guidance-windows-10-1803</a></p>
+<p>Locking up Your BitLocker: <a href="https://blogs.technet.microsoft.com/motiba/2017/05/24/locking-up-your-bitlocker/">https://blogs.technet.microsoft.com/motiba/2017/05/24/locking-up-your-bitlocker/</a></p>
+<p>Self-encrypting deception: weaknesses in the encryption of solid state drives (SSDs): <a href="https://www.ru.nl/publish/pages/909275/draft-paper_1.pdf">https://www.ru.nl/publish/pages/909275/draft-paper_1.pdf</a></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset=""/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset=""/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href=""></a>
+<a class="modal-img visible-xs" href=""></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+</article>
+{% endraw %}

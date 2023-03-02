@@ -1,0 +1,24 @@
+---
+layout: blogpost
+title: "Bad Rabbit: What you need to know"
+author: "Kevin O’Reilly"
+author_role: "Principal Consultant"
+summary: "The recent outbreak of a ransomware variant known as Bad Rabbit has caused widespread concern, and has been covered extensively on social media and in the news."
+tags: [Incident Response, Malware]
+hero_banner: ransomware_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>The initial delivery vector is via a drive-by-download from a number of legitimate compromised Russian web sites, delivered as a fake Adobe Flash update. The download is from http://1dnscontrol[.]com. The download is an executable with the Adobe Flash icon which requires the user to run it.</p>
+<p>Once installed, the ransomware will attempt to spread via the network. It uses DHCP to find other machines on the same subnet, and attempts to connect to them over SMBv1 using usernames and passwords either from an internal list, or that it has extracted from the host via mimikatz functionality. Bad Rabbit is also reported to contain the Eternal Romance exploit which takes advantage of the Windows vulnerability described in MS17-010. Bad Rabbit can thus be thwarted by ensuring all systems are patched and up-to-date, SMBv1 is disabled and a strong password policy is in place.</p>
+<p>The malware will reboot the system in order to encrypt files. It may be possible to prevent the reboot using the command: shutdown -a, which will prevent encryption, allowing an opportunity to remove the malware. If the system is allowed to reboot, a variety of files across the system are encrypted with a ransom note that is in the same format as that seen with Petya/NotPetya. </p>
+<p>Our advice with this malware variant is the same as that for the earlier WannaCry outbreak. Read our blog post here: <a href="https://www.contextis.com/resources/blog/wannacry-what-you-need-know/">WannaCry: What you need to know</a>.</p>
+<h4>Notes: </h4>
+<p>We conducted the analysis of the malware's behaviour using our CAPE tool:</p>
+<ul>
+<li>If you are interested in seeing the resulting extracted payload go to: <a href="https://cape.contextis.com/analysis/3007">https://cape.contextis.com/analysis/3007</a>. </li>
+<li>You can also upload attachments you may be suspicious of to our public CAPE instance: <a href="https://cape.contextis.com/submit">https://cape.contextis.com/submit</a>.</li>
+<li>If you would like your own instance of CAPE to help in the fight against malware, you may find it on Context’s github at <a href="https://github.com/ctxis/CAPE">https://github.com/ctxis/CAPE</a>.</li>
+</ul>
+</article>
+{% endraw %}

@@ -1,0 +1,127 @@
+---
+layout: blogpost
+title: "The Perils of Public Wireless Networks: How I Stole Your Hash"
+author: "Russell Hole"
+author_role: ""
+summary: "It’s a question that gets asked all the time – “How Do I keep my computer secure online?” By now we should all know the usual recommendations, such as using unique and secure passwords and keeping your software patched and up to date. More tech-savvy users may also be aware of the dangers of connecting to public Wi-Fi networks, for example those found on trains and in hotels and coffee shops."
+tags: [Security]
+hero_banner: The_perils_of_public_wireless_networks_how_I_stole_your_hash_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Projects such as <a href="https://codebutler.github.io/firesheep/">Firesheep</a> and techniques like <a href="https://en.wikipedia.org/wiki/ARP_spoofing">ARP cache poisoning</a> and <a href="/web/20210226101218/https://www.contextis.com/resources/blog/attacks-https-malicious-pac-files/">PAC file injection</a> have shown how easily an attacker can intercept your data on these networks, however increased use of encryption and advancements in antivirus software have helped defend against this to an extent. Unfortunately the problem with public Wi-Fi networks runs deeper than just the person sat next to you, and it could be the network itself which is after your data. While train companies and hotels can provide a wireless network for customers to connect to, so could a person with malicious intent pretending to be them.</p>
+<p>Context has <a href="/web/20210226101218/https://www.contextis.com/resources/blog/wireless-phishing-captive-portals/">previously released a blog post</a> on some of the phishing opportunities available to attackers using similar techniques. This blog post is designed to highlight how easily this could be achieved using cheap hardware and the kind of dangers it could pose to unsuspecting users. In particular we demonstrate how easily we could steal the hash of your Windows password – something that could potentially be used to access your whole computer.</p>
+<h2>The Setup</h2>
+<p>For this experiment we built a cheap wireless access point using a Raspberry Pi and a wireless adapter, with the aim to automatically steal Windows password hashes from any users that connect by exploiting a quirk of Microsoft applications such as Internet Explorer and Outlook. We will not be discussing the technical details of setting up the rogue access point, but will instead focus on the potential for exploitation and its impact, as well as recommendations on how to protect against such an attack.</p>
+<p>The first step in this process was to perform a clean installation of <a href="https://www.raspbian.org/">Raspbian</a> on the Raspberry Pi. We chose Raspbian due to its stability and software availability. The picture below shows all the required hardware for the project (note the Ethernet cable is only required for the initial setup):</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/raspian.width-800_800_573_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/raspian.width-800_800_573_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>After installing the operating system the next step was to configure the Wi-Fi adapter to broadcast its own wireless network for people to connect to. The simplest way to achieve this was to install the Linux hostapd daemon and configure it to advertise as an open public Wi-Fi service. The SSID of the network could be modified depending on where it was being run, for example on a train or coffee shop, in order to mislead users into thinking they are connecting to a legitimate service.</p>
+<p>Once the Wi-Fi network was broadcasting we set up a DHCP server to assign an IP address to anyone connecting. The DHCP server was also configured to advertise the Raspberry Pi as the DNS server which allows custom content to be sent to browsers when they connect.</p>
+<p>In order to direct users to our Pi we installed the bind9 DNS server and configured it to respond to all DNS queries with the IP address of the Raspberry Pi. This is a common technique used by captive portals to ensure that users sign in or pay before using the service, and so is not at all unusual or unexpected when connecting to a public Wi-Fi network and would not arouse suspicion.</p>
+<p>Finally we need to serve content to users when they connect. This was achieved using the Apache webserver and creating some basic HTML files in the web root to be served. We were now ready to launch an attack against anybody who connects to our rogue access point.</p>
+<h2>The Exploitation</h2>
+<p>Since we are able to serve any content to people who connect, there are a wide range of possible attack vectors available to us. Since we are impersonating a legitimate public Wi-Fi network, a phishing page could be tailored to the situation, for example requesting payment details for internet access on a train. For the purpose of this blog post we have decided to instead exploit a feature of Internet Explorer to obtain and log the password hash and user information of anybody connecting. This would be the username and the hash of the password the user uses to log into their computer.</p>
+<p>The issue is with Internet Explorer’s handling of resources stored on network shares. Other browsers such as Firefox and Chrome will refuse to load such resources, however Internet Explorer will instead attempt to authenticate against the share using the credentials of the currently logged in user.</p>
+<p>Since this issue only affects Internet Explorer we will need to request that users who connect with other browsers retry with Internet Explorer instead. This is easily achieved by checking the User Agent they are connecting with and displaying an error message if it is not Internet Explorer.</p>
+<p>Once we have the correct browser, we can serve a page with an image tag crafted to point to a share on a remote machine. The location of this share does not matter, as all DNS requests will be resolved to the IP address of the Raspberry Pi.</p>
+<p>The code for the page including this image tag is shown below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/raspian2_jvtM1Oc.width-800_800_386_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/raspian2_jvtM1Oc.width-800_800_386_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian2_jvtM1Oc.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian2_jvtM1Oc.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The final step is to configure an SMB server to listen on the Raspberry Pi so that incoming authentication requests can be logged. We could install a Linux SMB daemon such as Samba and manually intercept the credentials, however for simplicity we decided to instead use the open source project <a href="https://github.com/SpiderLabs/Responder">Responder.py</a> by SpiderLabs. This program simulates a large number of protocols and records credentials from authentication requests to a local database. SMB is one of the protocols it simulates, so we can use it to log the requests from users. Once Responder.py is running we’re ready to test the system.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/raspian3.width-800_800_1124_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/raspian3.width-800_800_1124_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian3.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian3.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>First we connected a Windows laptop to the network and were immediately greeted with a popup from Windows to say additional logon information may be required for the network:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/raspian4.width-800_800_169_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/raspian4.width-800_800_169_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian4.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian4.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>After connecting to this network, a user would not only be open to attack, but actively encouraged by Windows to open their web browser.</p>
+<p>Clicking this popup opens our crafted web page displaying an error message to the user. We opted to use a basic error message to indicate that the service was just not working at the moment to avoid raising unnecessary suspicion, however we could have tailored this page to any scenario and even attempted to phish details from the user using this method.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/raspian5.width-800_800_410_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/raspian5.width-800_800_410_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian5.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian5.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In addition to the error message and unknown to the user, our page has also caused the browser to load a hidden image supposedly stored on a local network share. This image does not actually exist, but the HTML tag is enough to cause Windows to attempt to authenticate to the Raspberry Pi by sending the username and password hash of the currently logged on user. This is automatically stored by Responder.py in its database. The output of Responder.py from the Raspberry Pi, including the password hash of the user, is shown below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/raspian6.width-800_800_461_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/raspian6.width-800_800_461_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian6.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210226101218/https://www.contextis.com/media/images/content/raspian6.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This was the point at which we ended this exercise, however a motivated attacker could use the captured hash for a variety of malicious activities.</p>
+<p>For example, hash cracking techniques could be used to try and identify the original password, which if successful may give access to further resources where the user has reused their password. For a corporate user, this could be Internet-facing services such as corporate webmail or SharePoint.</p>
+<p>Depending on what services the computer is offering, it may even be possible for the attacker to immediately <a href="https://en.wikipedia.org/wiki/Pass_the_hash">pass the hash</a> and gain access to the computer itself as if they were the user.</p>
+<h2>Summary</h2>
+<p>This exercise was intended to highlight the problems with public wireless networks and the ease by which an attacker could stand up a rogue network to trick victims into connecting to it. </p>
+<p>The main issue with captive portals is that there is no viable way of verifying who is running the service, whether it’s your train provider, a hotel service or a person sat nearby with a laptop. </p>
+<p>Unfortunately, the inherent problem with public wireless networks is that there is no reliable method to ensure that the network you are connecting to is run by the claimed organisation. Technologies such as VPNs will provide protection against other people on the network viewing your traffic, however they will be of little help against a rogue access point. While the potential impact of this problem is high, it is important to clarify that this is not a commonly used technique by criminals so the vast majority of people connecting to these services are safe. That said, it is always important to be vigilant and question whether the network you have just connected to is a legitimate one and be wary of who you are giving your details to.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Russell is a member of our Response team in Context’s Cheltenham office. He has been working for Context for three years, primarily performing a protective monitoring role in the Targeted Attack Detection Service (TADS) team. He has a particular interest in web-based exploitation techniques and analysis of exploit kits.</p>
+<p>See the<a href="/web/20210226101218/https://www.contextis.com/contact/"> contact page</a> for how to get in touch.</p>
+</article>
+{% endraw %}

@@ -1,0 +1,160 @@
+---
+layout: blogpost
+title: "WebGL – More WebGL Security Flaws"
+author: "Context"
+author_role: "Leading cyber security consultancy"
+summary: "In this blog post Context demonstrates how to steal user data through web browsers using a vulnerability in Firefox’s implementation of WebGL. This is a continuation of our research into serious design flaws that could affect any browser which implements WebGL, currently Chrome and Firefox."
+tags: [Web applications]
+hero_banner: Webgl_more_webgl_security_flaws_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Context has been researching the new 3D graphics technology, WebGL, which allows web pages to draw fast 3D graphics in a similar manner to computer games. This exciting technology has the capability to deliver a much richer experience to web users.</p>
+<p>However, to enable this impressive breakthrough in online technology, web browsers (currently Chrome and Firefox) have had to expose low level parts of their operating systems which previously could not be directly accessed by potentially malicious web pages, thus creating a number of potential security vulnerabilities.</p>
+<p>Context identified this (and other) issues with WebGL by evaluating Chrome and Firefox WebGL implementations against the conformance test suite devised by Khronos, the consortium which draws up the WebGL specification. We have established that none of the current implementations comply with this standard.</p>
+<p>Furthermore, Context’s research found that Khronos’ recommended defence against the DoS issue (WebGL_ARB_robustness) is not fit for purpose. First, only certain chipsets and operating systems (NVidia on Windows and Linux) support this feature. Moreover, this extension only offers mitigation, not a comprehensive solution to WebGL DoS issues.</p>
+<p>In the video below, we show how anyone running Firefox 4 with WebGL support is vulnerable to having malicious web pages capture screenshots of any window on their system. These screenshots could be of other web pages, the user’s desktop and other applications that run on their system.</p>
+<p><a href="https://www.contextis.com/documents/74/video.xspf">WebGL-Trailer.flv</a></p>
+<h2>Background</h2>
+<p>In our first <a href="https://www.contextis.com/resources/blog/webgl-new-dimension-browser-exploitation/">blog</a> Context outlines serious security concerns related to the use of WebGL. We were able to steal images from other web pages and crash people’s machines (Denial of Service, or DoS) from a malicious website. These examples showed the danger of allowing malicious code to run on graphics cards which were never designed to defend against this threat. After reviewing our previous work Firefox has now removed support for cross-domain images (<a href="https://hacks.mozilla.org/2011/06/cross-domain-webgl-textures-disabled-in-firefox-5/">https://hacks.mozilla.org/2011/06/cross-domain-webgl-textures-disabled-in-firefox-5</a>); while Khronos is updating the WebGL specification to include protection from DoS (using a new OpenGL extension GL_ARB_robustness) and Cross-Origin Resource Shading (CORS) attacks (<a href="https://www.khronos.org/news/permalink/webgl-security">http://www.khronos.org/news/permalink/webgl-security</a>). The fact that it is doing so begs the question as to whether this technology was specified, designed and implemented with security in mind.</p>
+<p>The problems we identified in our first blog were examples of the types of issues that can be created as a result of WebGL use. It is not totally unexpected or unusual for there to be security issues associated with a new technology, but it is crucial that the standard and the correct mitigation processes are quickly adjusted once such problems are identified to ensure that end user security is not compromised. To this end Context reviewed the conformance tests that Khronos has provided for WebGL vendors to use in assessing compliance to the standard. Through this work Context has discovered that neither Chrome nor Firefox passed the Khronos tests, including a number that are directly related to security. Context then explored the consequences of one of the failed conformance tests: the issue it identified allowed us to extract images containing data from the user’s desktop and from other web browser sessions such as authenticated pages. This issue was specific to Firefox and will be fixed in the next version of the browser.</p>
+<p>If you are concerned by WebGL based attacks see our <a href="https://www.contextis.com/resources/blog/update-webgl-faq/">FAQ</a> for details on whether you are vulnerable and if so how to protect yourself.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-more-WebGL-1.width-800_800_501_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-more-WebGL-1.width-800_800_501_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/blog-more-WebGL-1.width-800_605_379_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/blog-more-WebGL-1.width-800_605_379_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Figure 1 - Stealing Graphics Memory from the Desktop</p>
+<h2>Cross-platform testing against the Khronos solution</h2>
+<p>One important aspect of our research has been to examine the testing standards that exist to help ensure the effective operation of WebGL, to determine the extent to which they help or hinder efforts to ensure end user security.</p>
+<p>To this end, Context set up machines to test responses from WebGL and Khronos to the issues we have already raised about security and WebGL. We tested Google Chrome and Mozilla Firefox using different operating systems and graphic cards.</p>
+<p>We performed three sets of tests:</p>
+<p>Each browser-operating system-graphics combination was inspected for the GL_ARB_robustness extension. This is Khronos’ proposed solution to fix the denial of service issues we had previously reported. It is interesting to see how widely the extension is deployed today.<br/>
+We ran the proof of concept (as mentioned in the original blog) to see if users are vulnerable even with the robustness extension.<br/>
+Finally we ran Khronos’ own WebGL conformance suite (http://www.khronos.org/webgl/wiki/Testing/Conformance), which has been developed to try and test adherence to the WebGL specification. It should be expected that the browser developers would be running this suite as part of their standard release testing, so it ought to test a suitable range of features to determine whether or not there is significant platform dependence.<br/>
+We used one of each of the main graphics cards (Intel, NVidia, and ATI/AMD), on Windows XP SP3, Windows 7 and Ubuntu Linux 11.04. We also tested one Mac which had an NVidia 9400M graphics card. For the Windows platforms the latest driver available at the time was installed; for Ubuntu and OSX we used the latest proprietary driver available with the distribution. The tests were split into two groups. On Windows platforms Firefox and Chrome use ANGLE (which is an OpenGLES implementation on top of Direct3D); while on Linux and OSX OpenGL is used directly. This is why only NVidia was tested on Linux (as we did not have anything but an NVidia based Mac) while Chrome had WebGL force-enabled to produce a comparison between Windows platforms. The following table contains the driver versions on each platform which was tested.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/webgl_1.width-800_800_203_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/webgl_1.width-800_800_203_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_1.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_1.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The following table shows on which platforms and drivers Chrome and Firefox WebGL implementations can expect to find the GL_ARB_robustness extension implemented.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/webgl_2.width-800_800_181_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/webgl_2.width-800_800_181_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_2.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_2.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The following table is the results of running Chrome and Firefox against the denial of service proof of concept on each platform.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/webgl_3.width-800_800_485_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/webgl_3.width-800_800_485_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_3.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_3.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The conformance suite consists of 144 main tests, each of which can contain one or more sub tests. The table below only records main test failure, because generally if one subtest fails most fail with a similar error so it makes sense to record at this level. Each browser, platform and graphics card is reported separately.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/webgl_4.width-800_800_255_s_c1.PNG"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/webgl_4.width-800_800_255_s_c1.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_4.width-800.PNG"></a>
+<a class="modal-img visible-xs" href="/web/20210227231115/https://www.contextis.com/media/images/content/webgl_4.width-800.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>A few conclusions can be drawn from these results. At present it seems only NVidia supports the GL_ARB_robustness extension, which on XP doesn’t stop the denial of service attack (this is likely to be because the extension is not enabled by any web browser). But only Windows XP and OSX configurations suffered from the denial of service condition. The driver for the ATI card on XP seems to have implemented its own reliability mechanism, managed to reset the device and was then able to resume operation. This would seem to indicate a better result than perhaps could be expected. Furthermore Mozilla have stated in a recent post that “forthcoming GL_ARB_robustness_2 extension will help even more” (<a href="http://blog.jprosevear.org/2011/05/13/webgl-security/">http://blog.jprosevear.org/2011/05/13/webgl-security/</a>) which rather undermines any claims made about the benefits offered by the earlier version.</p>
+<p>As for the conformance test results, it would seem that no browser can claim to offer full support for WebGL, based on the Khronos specification, as all fail some part of the conformance suite. Comparison of the failures between similar platforms reveals a degree of commonality. For example, Chrome on XP exhibits the same bugs as Chrome on 7. Between disparate platforms the browser must be exposing some aspect of the underlying graphics implementation to the web page for problems to arise, even if it is something trivial such as incorrect return values. The results on OSX are especially anomalous: Chrome has the second best result out of all the platforms yet Firefox has the worst.</p>
+<h2>The case of the ATI failure</h2>
+<p>The results of the conformance tests are one thing, but where does security come into the picture? Well as Khronos indicates at <a href="https://www.khronos.org/webgl/wiki/Testing/Conformance">http://www.khronos.org/webgl/wiki/Testing/Conformance</a> the primary purpose of the conformance test is to find incompatibilities between platforms. But some of the tests do also have a security assessing function.</p>
+<p>The structuring of the WebGL conformance test suite ensures that no one test is marked out as being any more significant than any of the others. They are all seemingly arbitrary test cases with no specific purpose in mind from a standard adherence point of view. That makes this suite quite different from, say, the CSS conformance test suite (<a href="http://test.csswg.org/suites/css2.1/20110323/xhtml1/toc.xht">http://test.csswg.org/suites/css2.1/20110323/xhtml1/toc.xht</a>) which has tests for each important parts of the standard, all referred directly back to the original description in the standard.</p>
+<p>So are any security issues addressed directly in this testing regime? From the table of the Windows platforms all the tests seem to match for a given browser on a particular card, except for one extra failure, for ATI on XP in Firefox. From a statistical point of view it doesn’t significantly change the results for Firefox on XP, up from around 15% failure to 16%.</p>
+<p>If the conformance suite did relate directly to the standard it might have been possible to see that the failing test was actually testing for a critical security requirement, in this case testing to ensure that that certain operations do not expose uninitialised data to an untrusted web page. But it doesn’t, so the test becomes lost in the noise of 22 other issues, most of which relate to the return of trivial incorrect error codes.</p>
+<p>In fact, this wasn’t just a failure on ATI cards on XP, it was an issue that just happened to become visible during this test. Further inspection confirmed it also affected NVidia cards on XP in the same way. And it wasn’t limited to the Microsoft platform either: OSX also had the issue and the way in which the graphics card is used under OSX actually made the problem even more significant.</p>
+<p>It turned out that this “failure” was known to Mozilla developers, who seem to have chosen to ignore the results of these tests on XP and OSX. Perhaps if the conformance suite had made it clear that failing this test could indicate a serious security issue the developers might have flagged this up earlier?</p>
+<p>The bug itself was the result of a relatively simple mistake in clearing graphics memory which did not take into account some of the pre-existing state of the graphics layer. It isn’t clear why Linux or Windows 7 were not affected by this; it seems likely that it was down to some specific implementation feature which eliminated the issue. Context contacted Mozilla’s security team who have committed themselves to resolving this issue in time for the next release (expected 21st June 2011).</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/blog-more-WebGL-2.width-800_800_490_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/blog-more-WebGL-2.width-800_800_490_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/blog-more-WebGL-2.width-800_606_371_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/blog-more-WebGL-2.width-800_606_371_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Figure 2 Graphics Memory Stealing</p>
+<h2>Exploiting the vulnerability</h2>
+<p>The vulnerability we discovered enables any graphics image that has been displayed on the system to be stolen by an attacker by reading uninitialised data from graphics memory. This is not limited to WebGL content but includes other web pages, a user’s desktop and other applications.</p>
+<p>To prove that it was possible to exploit this bug, we developed a proof of concept exploit that would be able to steal web page data. As we feel this solution was quite novel it is presented here for interest. From the original vulnerability, an attacker would have no control over which specific region was read. The memory accessible was allocated based on a number of different properties, but it wasn’t necessarily predictable.</p>
+<p>An attacker would face two main challenges in trying to exploit this vulnerability: getting the data an attacker wants into graphics memory, and then finding it again afterwards.</p>
+<p>As an example target, let’s use an authenticated LinkedIn session. To be certain of getting the data which would be of interest to an attacker into the graphics memory we used Firefox’s 2D compositing features. This means Firefox will render the element to a texture and upload it to the graphics card to speed up compositing, so populating the graphics memory with the data we wish to steal.</p>
+<p>The second issue seems a bit more difficult to solve. Certainly it would be possible to just capture any data we can and use a human to decipher whether it is the data we required, but that isn’t especially efficient. Instead we want to somehow key the data in memory so that when we read it out we can be reasonably certain it is the data we requested. Obviously we cannot directly manipulate the contents of the IFRAME (otherwise this would be a pointless exercise), so another approach is necessary.</p>
+<p>This is where SVG filters come into play. It is possible to create a filter which will manipulate the colour values of the texture we are trying to capture. As this is pre-composited the texture in video memory is coloured appropriately. The following SVG filter when applied to the IFRAME will convert each pixel to greyscale and store the value in the blue channel. Then it sets the red channel to a known value between 0 and 1. For each run the red channel value is randomly generated and video memory searched for that colour value. So when we find a significant proportion of pixels with that red channel value we know we have struck a seam of interesting data.</p>
+<p><svg></svg><br/>
+ <filter> <br/>
+<!-- Convert to greyscale in the green channel --> <br/>
+<fecolormatrix style="color-interpolation-filters:sRGB"> values="0 0 0 0 0<br/>
+                  0 0 0 0 0<br/>
+                  0.333 0.333 0.333 0 0 <br/>
+                  0 0 0 1 0"/&gt; <br/>
+<fecomponenttransfer><br/>
+ <!-- Set intercept to the red channel value we want --> <br/>
+<fefuncr intercept="1" slope="0" type="linear"> </fefuncr></fecomponenttransfer><br/>
+ </fecolormatrix></filter><br/>
+<br/>
+ </p>
+<p> </p>
+<p>Of course, there are no guarantees that the data is in any sort of order. For our proof of concept this wasn’t that much of an issue, because most of the time the data was at least readable. But the technique could be taken further to encode positional information into the texture, to allow reconstruction of the original arrangement. One improvement we did make was to compress the colour information into the unused blue channel. This made it possible to extract a reasonable looking colour image from the captured data.</p>
+<p>The following is a video showing the process in action. In the video we show the loading of LinkedIn into an IFRAME and then the application of the filter to tag the memory. The image is then rotated to spray the graphics card’s memory. By exploiting the graphics memory leakage bug we can then trawl the memory for the colour we have tagged the image with and extract an image of the web page. This image is then in our control and can be sent to a web server under the attacker's control. To exploit this issue in the real world a malicious link would be sent to a user and this process of stealing images of authenticated web pages would occur without the user’s knowledge.</p>
+<p><a href="https://www.contextis.com/documents/74/video.xspf">WebGL_Stealing.flv</a><br/>
+<strong>There is no audio track on this video.</strong></p>
+<h2>Conclusions</h2>
+<p>It would be unreasonable to expect full conformance to the complete specification of a new standard: there are always likely to be edge cases. But, as we have stressed before, some areas of WebGL need to be carefully implemented to prevent security issues arising and unfortunately in this case, because security-related conformance tests are not clearly identified, it is not possible to determine if an implementation is secure. This has been a contributory factor in security issues being missed by developers of the current browser implementations of WebGL, which has in turn created serious security flaws. Browser developers should start banning non-conformant configurations as they are identified until the security issues that have been highlighted are resolved.</p>
+<p>Context therefore recommends that users and system administrators disable WebGL.</p>
+<p>See <a href="https://www.contextis.com/resources/blog/update-webgl-faq/">FAQ</a> for more details.</p>
+<p>For a report containing the contents of our blogs click here.</p>
+</article>
+{% endraw %}

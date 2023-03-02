@@ -1,0 +1,124 @@
+---
+layout: blogpost
+title: "Hacking the Virgin Media Super Hub"
+author: "Context Research"
+author_role: ""
+summary: "Update: Following several queries we can confirm that all Super Hub 2 devices use 'changeme' as the default password for administrative access. The Super Hub 2AC also uses this password by default, but has the additional requirement of a per-device WPS PIN. Users are prompted, but not required, to change the default password. An attacker would not need access to an existing backup to exploit this vulnerability."
+tags: [Product Security, Vulnerabilities and exploits, Reverse Engineering]
+hero_banner: Virgin_Media_Hub_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Context’s Research team have looked at a large number of off-the-shelf home routers in the past and found them to be almost universally dreadful in terms of security posture. However, flagship routers from large ISPs such as BT, Sky and Virgin Media are notably absent from the regular stream of router vulnerabilities in the press. We were curious to discover if these routers were significantly more secure than their off-the-shelf cousins, so we decided to dedicate some of our public research time into looking at one of these devices.</p>
+<p>A straw poll of the office revealed that most of us are Virgin Media customers, so we set about looking for second hand Super Hubs. At the time of the research (October 2016) the latest Super Hub (SH) was the  SH2AC (VMDG490), but given the prevalence of the SH2 (VMDG485) we got hold of a couple of these as well. This blog details our approach to vulnerability research and our findings, which included the ability to get a root shell from the LAN.</p>
+<h2>Approach</h2>
+<p>Depending on the type of product we are asked to evaluate, Context’s Product Security Evaluations typically follow these steps:</p>
+<ul>
+<li>Determine the available attack surface, which may include network interfaces, input devices, and external ports such as USB. At this point we would look for ‘quick wins’ such as command injection via administrative interfaces.</li>
+<li>Understand the software running on the device. This includes looking at any open source components, attempting to obtain firmware from the vendor (if provided), enumerate versions of various components and check for existing CVEs.</li>
+<li>Perform a hardware teardown, including identifying any debugging interfaces, understanding the type and form factor of any storage devices (e.g. NAND flash modules). If necessary attempt to extract firmware.</li>
+<li>Vulnerability Research and exploit development. Using the source/firmware for the product – attempt to gain unauthorised code execution on the device.</li>
+</ul>
+<p>We quickly discovered that the Super Hub’s web-based administrative interface had been subject to security testing, as input appeared to be well sanitised – a refreshing change from your standard off-the-shelf home router.</p>
+<p>We decided to move on to a more detailed analysis of the running software. As both Super Hubs are manufactured by Netgear the source code for all GPL components is available from their website for both the <a href="http://www.downloads.netgear.com/files/GPL/CG4000TD-1VGUKS_GPL.zip">Super Hub 2</a> and <a href="http://www.downloads.netgear.com/files/GPL/C6250TD-1VGUKS_GPL.zip">2ac</a>.</p>
+<p>While the source code was useful to understand what was running on the Hubs, we were still after specific information on the internal workings of these devices. The firmware update process is completely automated and is conducted, quite correctly, using secure channels. This meant we needed to look to the hardware in order to retrieve a representative firmware image for analysis.</p>
+<h2>Obtaining a Firmware Image</h2>
+<p>Connecting to the serial interface of most home routers using a 3.3v USB-to-Serial adaptor is fairly straight forward, particularly for those of you that follow our blog regularly, so we won’t labour the point here. Suffice to say that there are a couple of UART interfaces: one for the main System-on-Chip (SoC), an ARM-based Intel Puma V, and another for the Atheros Wireless chip (AR9344).</p>
+<p>After a cursory look at the Atheros chip which appeared pretty sparse, we moved on to the main SoC. While we could see output from the U-Boot bootloader, it appeared that the ‘autoboot cancel’ feature had been disabled, meaning we couldn’t interact with the bootloader.</p>
+<p>The screenshot below shows the initial u-Boot output.</p>
+<p><img alt="" src="https://web.archive.org/web/20210412114859im_/https://www.contextis.com/media/images/content/VM1.width-800_.png" style="width: 477px; height: 577px;"/></p>
+<p>This configuration is sensible as it would dissuade most people from continuing, however we like to be thorough so we considered how to interrupt the boot process without spending too much time and effort. The output in Figure 1 suggested that U-Boot is executing a boot script, which was definitely something we wanted to investigate.</p>
+<p>The first step was to obtain a copy of the bootloader by reading the Flash memory. Given we didn’t have the ability to input characters this would be somewhat tricky via software, so we fired up the hot air gun and removed the Spansion (S25FL129P) NAND flash chip.</p>
+<p>There are a number of ways to read data from a flash chip, all of which we will be detailing in another blog shortly. In our case, as our preferred I2C/Serial Peripheral Interface (SPI) reader was in another office we used a BeagleBone Black and a bit of Python to manually drive the chip’s SPI bus, as seen in the photo below.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20210412114859im_/https://www.contextis.com/media/images/content/VM2.width-800_.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20210412114859im_/https://www.contextis.com/media/images/content/VM2.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412114859/https://www.contextis.com/media/images/content/VM2.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412114859/https://www.contextis.com/media/images/content/VM2.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Now that we had a 32MB flash image we could see the U-Boot boot loader in all its glory.</p>
+<p>Both Super Hubs used U-Boot scripts to perform the second stage of the boot process and initialise and run the Linux kernel. By making minor modifications to the U-Boot script in the flash image we were able to redirect kernel output to the UART connection and force the boot script to exit, enabling the U-Boot console. Once these modifications were made the flash chip was re-soldered to the board. For the Super Hub 2 this was sufficient. For the Super Hub 2AC, which splits its boot process between a NAND and a NOR chip the U-Boot console was additionally used to patch parts of the second stage loader in memory, including fixing up several checksums, before executing it during the boot sequence.</p>
+<p>Finally, via the U-Boot console, we were able to modify the kernel command line parameters to enable verbose kernel boot messages via the serial cable.</p>
+<h3>Identifying the Vulnerability</h3>
+<p>Now that we had access to both a firmware image and kernel debug output via the UART interface, we were able to examine the cgi-bin binaries that service the administrative web interface. These binaries are responsible for implementing actions the user requests via the web interface, such as adding firewall rules or pinging IP addresses, which could be vulnerable to command injection. After a reasonably detailed examination of these interfaces we were able to confirm our suspicion that the user interface had been subject to hardening and that input was appropriately sanitised. Just as we were about to abandon this line of investigation we took a look at the backup and restore mechanism, as we had seen success in this area in previous vulnerability assessments.</p>
+<p>The backup/restore interface is used to take a copy of the custom configuration settings a user has made to a Super Hub, for instance firewall or port forwarding rules. The user can then later re-submit this configuration file to the router to restore their settings; useful if a factory reset of the device is needed without lots of manual reconfiguration. This functionality was intriguing as it potentially allowed attacker controlled data (a malicious configuration file) to be uploaded directly into the Super Hub for parsing.</p>
+<p>To begin investigation we retrieved a configuration from our Super Hub to try to discern the data format, to give us an idea how we might craft a malicious configuration. Once we exported a configuration file it quickly became apparent that the file was encrypted; the file contained 120KB of structure-less binary data with entropy close to 1. Our interest was piqued and we decided to investigate further.</p>
+<p>The binary file responsible for encrypting and decrypting the configuration blob, <em>libunihan_utilities.so</em>, contains two functions for dealing with the configuration blobs, <em>des3_encrypt_backup</em> and <em>des3_decrypt_backup</em>. This library is compiled against OpenSSL and uses the function <em>DES_ede3_ofb64_encrypt</em> to perform a Triple-DES encryption/decryption of the blob before it is sent in/out of the router. Crucially, the keys used for this process are hardcoded in the binary, which meant, with knowledge of the keys and algorithm in use, we were able to write a small C program to decrypt the configuration blobs we had retrieved from our Super Hub. </p>
+<p>Once we were in possession of a decrypted configuration blob we attempted to determine its structure. The Linux command line tool file rather unhelpfully tells us the file is “data”. Dumping the first handful of bytes from the file using xxd and head showed us that the backup file appeared to be a TAR file with some unknown data appended to the front. Running the venerable binwalk tool confirmed these suspicions, finding a valid TAR file at offset 0x4.</p>
+<p>After reverse engineering the file <em>VmRgBackupCfgCgi</em>, the binary responsible for processing the configuration file once it has been uploaded to the router, we discovered the first 4 bytes represent a CRC-32 checksum of the adjacent TAR file. The contents of the TAR file appeared to be a partial backup of Non-Volatile RAM (or NVRAM). This is a common way to store configuration information on embedded devices across power cycles. The contents of these files clearly contained various snippets of sensitive configuration information such as the credentials for the administrative interface. These files will be discussed in more detail later in this post. </p>
+<p>As we control both the contents of the TAR file and the CRC32 checksum we have all we need to craft our own backup files which will be accepted and parsed by the router.</p>
+<p>At this point we know how to construct a valid configuration blob and have it processed by the router, but what can we <strong>actually do</strong> with this knowledge? Delving back into <em>VmRgBackupCfgCgi </em>tells us how the file is processed and is the starting point of our vulnerability. Once a valid configuration file has been verified and the TAR written to /var/tmp/backup_var on the router, the following command is run:</p>
+<pre class="prettyprint">tar -xf /var/tmp/backup_var -C /</pre>
+<p>This command is very powerful. It will untar the TAR file we provide to the root of the Super Hub file system as the root user, giving us what appears to be an arbitrary file write/overwrite. This is more general than the command needs to be, all of the configuration files it replaces are contained within <em>/nvram</em>. So what can we overwrite? Whilst this appears at first glance to be an arbitrary file overwrite, we do have some restrictions. The majority of the Super Hub file system is mounted as read-only squashFs. Only a few interesting areas are actually writeable while the hub is running:</p>
+<ul>
+<li>/nvram</li>
+<li>/var</li>
+<li>/tmp (symlink to /var/tmp)</li>
+<li>Some files within /etc (they are actually symlinks to /tmp)</li>
+</ul>
+<p>So within these writeable portions of the file system we need to find a file we can write/overwrite to give us some further access into the router. Fortunately for us, within /<em>etc/init.d/ </em>we found that the start-up script rcS provides a suitable candidate. </p>
+<p>The rcS file is used by the Super Hub router to start key services, setting kernel parameters and other general system setup. It is invoked every time the router powers on. In amongst the various functions of files a section grabbed our attention:</p>
+<p><img alt="" src="https://web.archive.org/web/20210412114859im_/https://www.contextis.com/media/images/content/VM3.width-800_.png" style="width: 540px; height: 212px;"/></p>
+<p>This section of the script checks for the existence of a file, <em>/nvram/0/sys_setup.sh</em>, and executes the contents if it is present on the file system. The Super Hub does not contain this file within its firmware and so the “else” clause executes and performs a few service start up commands. This section of script is incredibly useful; we have write permissions to /nvram and it is persistent across reboots, it gives reliable and guaranteed execution at every boot. We can now combine our arbitrary file write with this remnant of a script (possibly leftover from debugging or individual system customisation) to gain full control of the Super Hub.</p>
+<p>To exploit this flaw we create a local directory structure of /<em>nvram/0/</em> and create the file <em>sys_setup.s</em>h within it. This can then be tar’d, CRC32’d and encrypted to create a valid configuration backup. Once submitted to the router it will be decrypted, validated and then untar’d to the root of the file system. Consequently our script will get execution when the Super Hub reboots, which usefully happens as part of the backup/restore procedure. To test our theory we created a script to drop firewall rules and created a little C program to properly package it for backup. Uploading it appeared to be successful as seen below.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/VM4.width-800__800_344_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/VM4.width-800__800_344_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412114859/https://www.contextis.com/media/images/content/VM4.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412114859/https://www.contextis.com/media/images/content/VM4.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>After waiting for the system to fully boot we re-scanned the Super Hub to see if our modifications to the firewall rules had the desired effect (see below). It’s worth nothing that this is a port scan of the LAN interface, as we didn’t have the cable WAN connection connected in our lab, but the telnet daemon is listening on all interfaces.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/VM5.width-800__800_287_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/VM5.width-800__800_287_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412114859/https://www.contextis.com/media/images/content/VM5.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412114859/https://www.contextis.com/media/images/content/VM5.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Attempting to connect showed some unusual behaviour. The connection was accepted by the Super Hub but then immediately torn down before any prompts were displayed. This was unusual behaviour and we turned to the customised <em>utelnetd</em> binary to find out why. </p>
+<p><em>utelnetd</em> is a small binary which implements the telnet protocol and connects an external TCP stream to an internal program, the default (used on the Super Hub) being <em>/bin/sh</em>. The version present on the Super Hub has been modified from the default open source version to add some new features. By reverse engineering the binary to find where the connection is accepted we can see one of these modifications:</p>
+<p><img alt="" src="https://web.archive.org/web/20210412114859im_/https://www.contextis.com/media/images/content/VM6.width-800_.png" style="width: 298px; height: 510px;"/></p>
+<p>The top block in this disassembly shows the connection being accepted with a call to the library function accept(). The second basic block of this disassembly is where the code has been modified. The decision as to whether the connection will proceed or be terminated is based on the return value from a function call (the BLX instruction). This function call clearly checks some sort of internal status to see if telnet access is allowed. What exactly is it checking and is there any way we can modify this setting from within our malicious script?</p>
+<p>The implementation of the function in question resides in a shared library that is imported by <em>utelnetd</em>. The majority of this shared library consists of helper functions to get and set various persistent parameters for the Super Hub. Further reverse engineering showed us that it implemented an in-memory database of settings that was read from a set of configuration files in the <em>/nvram</em> directory on start-up and persisted back on reboot/shutdown. As previously mentioned the <em>/nvram </em>directory consists of a series of numbered directories and files and is what a legitimate backup writes to disk. It turns out that each file is a Type-Length-Value (TLV) file encoding.</p>
+<p>Looking inside some of these files we can see a number of familiar strings such as our administrative username and password.</p>
+<p><img alt="" src="https://web.archive.org/web/20210412114859im_/https://www.contextis.com/media/images/content/VM7.width-800_.png" style="width: 581px; height: 182px;"/></p>
+<p>The image above shows the partial contents of one of the configuration files, this one specifically backs the <em>ManagementDb</em> (other files back other aspects e.g. <em>PortForwardingDb</em>,<em> MacFilteringDb </em>etc.). Each file starts with a 28-byte header (in red) before being followed by a series of TLVs. The “type” in this case specifies the record number (in green). The “length” value follows (in green), both this and the type are 2-byte values. Next follows length-bytes of the value (in orange). Each record has the configuration details for a certain aspect of the Super Hub. From reversing the various binaries involved in managing the nvram configuration we know that the 10th record is responsible for flagging whether telnet access is available or not. It is a single byte value and is set to 0 to disable telnet and 1 to enable telnet.</p>
+<p>The configuration files are read at system start up and then managed in memory for the run time of the Super Hub. If we can flip the telnet enabled byte before the nvram service starts and processes the files then we can enable telnet for the device. The following line inserted into our malicious script file can achieve this:</p>
+<pre class="prettyprint">printf ‘\x01’ | /bin/dd of=/nvram/9/5 bs=1 seek=534 count=1 conv=notrunc</pre>
+<p>This forces telnet access on and when we drop the firewall we can finally connect to the telnet service on any interface and at last, using credentials gleaned from the configuration files, we are rewarded with our root shell:</p>
+<p><img alt="" src="https://web.archive.org/web/20210412114859im_/https://www.contextis.com/media/images/content/VM8.width-800_.png" style="width: 519px; height: 181px;"/></p>
+<h2>Disclosure</h2>
+<p>On discovering these issues, Context reported them to Virgin Media and provided proof-of-concept code. After verifying our findings, Virgin Media worked with us to develop mitigations which were released as part of their existing firmware patching cycle. We would like thank Virgin Media for their professionalism and responsiveness in working with Context to fix this issue.</p>
+<p>The following shows the main events in the disclosure timeline:</p>
+<ul>
+<li>20 Oct 2016: Initial disclosure via http://virginmedia.com/netreport</li>
+<li>20 Oct 2016: VM’s Internet Security Team request further detail which Context provide</li>
+<li>24 Oct 2016: Context and Virgin Media hold conference call to discuss disclosure in detail. Context provide proof-of-concept code.</li>
+<li>Nov 2016 - Feb 2017: Virgin Media work with Netgear and Context to develop and test patch across both devices</li>
+<li>May 2017: Virgin Media roll out patch as part of scheduled firmware update</li>
+</ul>
+</article>
+{% endraw %}

@@ -1,0 +1,25 @@
+---
+layout: blogpost
+title: "KRACK Attack: What you need to know"
+author: "Sebastien Jeanquier"
+author_role: "Principal Consultant, Assurance"
+summary: "The recently-disclosed Key Reinstallation Attacks (KRACK) are a series of serious weaknesses in the WPA2 protocol that is used to secure the vast majority of modern Wi-Fi networks."
+tags: []
+hero_banner: using-tablet_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>The vulnerabilities are within the Wi-Fi standard itself, and not individual products or implementations. As such, all Wi-Fi enabled devices should be considered affected, and vulnerable, until a patch is made available by their respective vendors.</p>
+<p>An attacker within range of a Wi-Fi client can trick that client into using a cryptographic key that the attacker is able to calculate, thus allowing the attacker to decrypt and eavesdrop on all of the network traffic between the Wi-Fi client and the Access Point. This could allow the attacker to steal usernames and passwords, as well as personal or financial information.</p>
+<h4>How worried should I be?</h4>
+<p>Although this is a significant attack against the WPA2 protocol, and the details of these vulnerabilities have been disclosed, no tooling has been made available thus far, although it is not inconceivable that attackers could create their own tools to perform such an attack.</p>
+<p>Furthermore, an attacker wishing to target you would need to be within Wi-Fi range of your devices, making this very much a local attack.</p>
+<h4>How do I protect myself?</h4>
+<p>As previously mentioned, any Wi-Fi enabled device (computer, phone, tablet, e-reader, watch, etc) is likely to be affected. The only way to fully mitigate these vulnerabilities is to wait for device manufacturers to release software patches and then install those as soon as possible.</p>
+<p>In the interim, the only way to mitigate an attack using KRACK is to avoid using Wi-Fi (in favour of Ethernet or 4G). Users for whom this is not an option, additional effort and awareness should be put into ensuring connections are made using encryption. Two ways to do this are to use a Virtual Private Network (VPN), either one provided by your company for corporate use, or a reputable VPN service for private use. Alternatively, ensuring all websites are visited using SSL/TLS (i.e. URLs start with https://), and being vigilant for ‘insecure website’ browser warning, which could indicate the connection is being tampered with.</p>
+<p>Two tools that can help in this regard are HTTPS Everywhere from the Electronic Frontier Foundation (https://www.eff.org/https-everywhere), or the Brave browser for iOS devices (https://brave.com/).</p>
+<p>This guidance/information is correct at the time of writing (2pm, 16 October 2017).</p>
+<p>If you are unsure what immediate actions you need to take to ensure your organisation is protected, please get in touch and we can provide advice.</p>
+<p>As always, if you suspect a breach has happened, contact our incident response team as soon as possible. </p>
+</article>
+{% endraw %}

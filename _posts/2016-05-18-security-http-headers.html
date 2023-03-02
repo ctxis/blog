@@ -1,0 +1,224 @@
+---
+layout: blogpost
+title: "The Security of HTTP-Headers | Context Information Security US"
+author: "Michael Skiba"
+author_role: "Security Consultant"
+summary: "When it comes to web application security one often thinks about the obvious: Sanitize user input, transmit data over encrypted channels and use secure functions. Often overlooked are the positive effects that HTTP-Response-Headers in conjunction with a modern web browser can have on web security."
+tags: [Vulnerabilities and exploits]
+hero_banner: Keyboard.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>This blog tries to shed a light on both headers that actively increase security as well as headers that might have a passive impact on security.</p>
+<h2 class="section-title">Active Security</h2>
+<p>Here we will take a look at the headers recommended by the Open Web Application Security Project (<a href="https://www.owasp.org/index.php/Main_Page">OWASP</a>). These headers can be utilised to actively increase the security of the web application.</p>
+<h3>X-Frame-Options</h3>
+<p>This header gives instructions to the browser if and when a page should be displayed as part of another page (i.e. in an IFRAME). Allowing a page to be loaded inside an IFRAME opens up the risk of a so called Clickjacking attack. In this attack the target site is loaded in the background, hidden to the victim. The victim is then enticed to perform clicks on the website (e.g. through a survey or a price draw), these clicks are secretly executed on the target site in the background. If the victim is currently logged in to the target site then those clicks are performed in the context of this user’s session. Via this method it is possible to execute commands as the user, as well as exfiltrating information from the user’s context.</p>
+<p>If you want to experiment with clickjacking yourself, we've previously released <a href="https://www.contextis.com/services/research/clickjacking-tool/">a tool to help you do so</a>.</p>
+<p>The X-Frame-Options can be used with the following options:</p>
+<ul>
+<li>DENY</li>
+<li>SAMEORIGIN</li>
+<li>ALLOW-FROM <uri> (<uri> is your desired URI, including protocol handler)</uri></uri></li>
+</ul>
+<p>Unless your application explicitly requires to be loaded inside an IFRAME you should set the header to deny.</p>
+<pre class="prettyprint">X-Frame-Options: DENY</pre>
+<p>If your application uses IFRAMEs within the application itself, then you should set the header to SAMEORIGIN: </p>
+<pre class="prettyprint">X-Frame-Options: SAMEORIGIN</pre>
+<p>If you want your page to be frameable across a different origin, then you should explicitly define the external origin:</p>
+<pre class="prettyprint">X-Frame-Options: ALLOW-FROM contextis.co.uk</pre>
+<p>Please note that the ALLOW-FROM directive of the X-Frame-Options header expects exactly one domain. No protocol, no port, no path and no wildcard.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/http_headers_table1.width-800_.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/http_headers_table1.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/http_headers_table1.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/http_headers_table1.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>Strict-Transport-Security</h3>
+<p>This header, often abbreviated as HSTS (HTTP Strict Transport Security), tells the browser to enforce an HTTPS connection whenever a user tries to reach the site sending this header.  All major browsers <a href="http://caniuse.com/#feat=stricttransportsecurity">support this feature</a>, and should:</p>
+<ol>
+<li>Only connect to the site via HTTPS</li>
+<li>Convert all HTTP references on the site (e.g. JavaScript includes) to HTTPS and</li>
+<li>Refuse to load the website in case of errors with the SSL certificate (e.g. Certificate expired, broken certificate chain, …)</li>
+</ol>
+<p>It is important to notice that as this header can only be set via an HTTPS response, the user therefore needs to connect to the site at least once via HTTPS, unless you make some special preparations, more on that in a few sentences. It is also important to note that the header is only valid for a certain amount of time: the lifetime is specified in seconds. Context recommends the following setting, which tells the browser to obey the STS-Setting for half a year:</p>
+<p>Strict-Transport-Security: max-age=15768000</p>
+<p>Should this rule be extended to cover all subdomains, then the header can be extended by adding the attribute ‘includeSubDomains’:</p>
+<pre class="prettyprint">Strict-Transport-Security: max-age=15768000; includeSubDomains</pre>
+<p>Some browsers (at least Chrome, Firefox, IE11/Edge and Safari) ship with a “preload list”, a list of URLs that have explicitly declared that they want to use HSTS. If the users tries to access a listed URL, then the browser automatically enforces the HSTS rule, even for the very first connection, that otherwise would have been vulnerable to a man-in-the-middle attack. To enter your own websites to this preload list you have to submit the URL on <a href="https://hstspreload.appspot.com/">this page</a>, and append the preload directive to the header, e.g.:</p>
+<pre class="prettyprint">Strict-Transport-Security: max-age=15768000; includeSubDomains; preload</pre>
+<h3>X-XSS-Protection</h3>
+<p>This header is surrounded by a little controversy and different people recommend different settings, some even recommend to explicitly disabling it. So what is the deal with this header?</p>
+<p>The purpose of this header is to instruct the web browser to utilize its Cross-Site Scripting protection, if present (X-XSS-Protection: 1). Currently only Chrome, Internet Explorer and Safari have such an engine built-in and understand this header (Firefox seems to rely on the third party addon NoScript).</p>
+<p>It might seem like a good idea to try and filter malicious requests where the attack happens, at the browser, but filtering is very hard. Especially when one tries to heuristically detect malicious code, sanitize it and at the same time try to maintain a working site. This lead to several filter bypasses and even introduced Cross-Site Scripting vulnerabilities on previously healthy sites.</p>
+<p>Once it became apparent that a building a heuristic filter that tries to sanitize unknown code is a Sisyphus task, a new all or nothing approach was invented: X-XSS-Protection: 1; mode=block. If this mode is set the browser is instructed not to render the page at all, but instead displays an empty page (about:blank). But even that approach had flaws in its early implementations, leading some major sites (such as facebook.com, live.com and slack.com) to explicitly disable the XSS filter (X-XSS-Protection: 0).</p>
+<p>So while it is difficult to give a definitive recommendation for this header, it seems that the variant ‘X-XSS-Protection: 1; mode=block’ has matured rather well and has outgrown its early flaws. Besides that, the best protection against Cross-Site Scripting is still sanitizing all your in- and output ;-).</p>
+<p>To explicitly enable the filter that tries to sanitize malicious input set the following header:</p>
+<pre class="prettyprint">X-XSS-Protection: 1;</pre>
+<p>To use the all-or-nothing approach that blocks a site when malicious input is detected set the following header:</p>
+<pre class="prettyprint">X-XSS-Protection: 1; mode=block</pre>
+<p>Additional one can set a parameter ‘report’ that contains an URL. If one of the Webkit-XSS-Auditors (Chrome, Safari) encounters an attack it will send a POST message to this URL, containing details about the incident:</p>
+<pre class="prettyprint">X-XSS-Protection: 1; mode=block; report=https://domain.tld/folder/file.ext</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/http_headers_table2.width-800_.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/http_headers_table2.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/http_headers_table2.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/http_headers_table2.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>X-Content-Type-Options</h3>
+<p>This header can be used to prevent certain versions of Internet Explorer from ‘sniffing’ the MIME type of a page. It is a feature of Internet Explorer to interpret sites of ‘Content-Type: text/plaintext’ as HTML when it contains HTML-tags. This however introduces cross-site scripting risks, when one has to deal with user provided content. The X-Content-Type-Options knows only one option - ‘nosniff’ - which prevents the browser from trying to sniff the MIME type.</p>
+<pre class="prettyprint">X-Content-Type-Options: nosniff</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/http_headers_table3.width-800_.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/http_headers_table3.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/http_headers_table3.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/http_headers_table3.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>Public-Key-Pins</h3>
+<p>Public-Key-Pinning, also known as HTTP Public Key Pinning (short HPKP), is still relatively new and is not yet widely used. However it has great security potential as it allows site operators to specify (‘pin’) a valid certificate and rely less on CAs – that in the past have proven to be susceptible to attack (e.g. any CA could create a technically valid and trusted certificate that has not been issued by you) . Similar to HSTS, the browser is then supposed to remember this pin and only accept connections to a site if the certificate pin matches the pin provided by the header. This however means that an unexpected certificate change can leave visitors locked out of the web presence. For this reason it is required to provide a backup certificate pin that can be used when the first one fails. It also must include a max-age attribute, which once again, specifies the lifetime in seconds. Please bear in mind that this is also the potential lockout time for an unaware user.</p>
+<pre class="prettyprint">Public-Key-Pins: pin-sha256="&lt;sha256&gt;"; pin-sha256="&lt;sha256&gt;"; max-age=15768000;</pre>
+<p>Should this rule be extended to cover all subdomains, then the header can be extended by adding the attribute ‘includeSubDomains’:</p>
+<pre class="prettyprint">Public-Key-Pins: pin-sha256="&lt;sha256&gt;"; pin-sha256="&lt;sha256&gt;"; max-age=15768000; includeSubDomains</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/http_headers_table4.width-800_.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/http_headers_table4.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/http_headers_table4.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/http_headers_table4.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>Content-Security-Policy (Supersedes X-Content-Security-Policy and X-WebKit-CSP)</h3>
+<p>The Content-Security-Policy (short CSP) is a flexible approach to specify which content in a site may be executed and which not. One of the current problems is that the web browser does not know which sources to trust and which not to trust, e.g. is a third-party JavaScript include from apis.google.com good or bad? The only proper solution to this is source whitelisting, where the developer specifies legitimate resource locations. A very basic example on how to allow JavaScript (script-src) from both the local site (‘self’) and apis.google.com:</p>
+<pre class="prettyprint">Content-Security-Policy: script-src 'self' https://apis.google.com</pre>
+<p>CSP has a few additional keywords that allow for a very granular access control. It is important to notice that CSP is intended as a per-site model so that every site needs an own http-headers set.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/http_headers_table5.width-800_.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/http_headers_table5.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/http_headers_table5.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/http_headers_table5.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">Passive Security</h2>
+<p>The following headers do not actively enable any security related features, but rather have a passive impact on security, typically by revealing more information than necessary. By now it is well established that security by obscurity is a more than questionable security concept if you rely solely on it. However there is little to no gain to leave the cards lying open on the table and provide an attacker with valuable information, just don’t think that this alone would be enough.</p>
+<h3>Cookie attributes (HttpOnly and Secure)</h3>
+<p>Often overlooked are the special attributes that can be associated with cookies, which can drastically reduce the risks of cookie theft. </p>
+<p><strong>HttpOnly</strong></p>
+<p>The HttpOnly attribute tells the browser to deny JavaScript access to this cookie, making it more difficult to access via cross-site scripting.</p>
+<pre class="prettyprint">Set-Cookie: cookie=xxxxxxxxx; HttpOnly</pre>
+<p><strong>Secure</strong></p>
+<p>The secure attribute tells the browser to send this cookie only over an HTTPS connection. This should be the norm for all session and authentication related cookies, as it prevents easy intercepting via an unencrypted HTTP connection.</p>
+<pre class="prettyprint">Set-Cookie: cookie=xxxxxxxxx; Secure</pre>
+<p>Of course these attributes can be combined:</p>
+<pre class="prettyprint">Set-Cookie: cookie=xxxxxxxxx; HttpOnly; Secure</pre>
+<h3>Server / X-Powered-By</h3>
+<p>Both of these headers advertise the server software in use and its version number. While these headers might be nice for debugging purposes they do not contribute to the user experience in any way and should either be omitted entirely or reduced to an amount that does not leak any version details.</p>
+<h3>Caching directives</h3>
+<p>Another issue that is often overlooked is the caching of sensitive information by the browser. A browser frequently stores elements of a website to a local cache to speed up the browsing experience. While this behaviour is fine for non-sensitive sites and elements like graphics and stylesheet information it has to be avoided for sensitive information (e.g. pages from an authenticated area of a web application). This problem gets worse in a shared computing environment (e.g. office, school, internet café …), where other users can easily access your browser cache. To tell the browser (and possible intermediate caches such as proxies) not to store anything in its cache one should use the following directives:</p>
+<pre class="prettyprint">Cache-Control: no-cache, no-store
+Expires: 0
+Pragma: no-cache</pre>
+<p>It is important to notice that the often encountered directive “Cache-Control: private” cannot be considered secure in a shared computing environment, as it allows the browser to store these elements in its cache.</p>
+<p><strong>ETag</strong></p>
+<p>The “Entity Tag” (short ETag) header is used for caching purposes. The server uses a special algorithm to calculate an individual ETag for every revision of a file it serves. The browser is then able to ask the server if the file is still available under this ETag. If it is, the server responds with a short HTTP 304 status telling the browser to use the locally cached version, otherwise it sends the full resource as part of an HTTP 200 status.</p>
+<p>While this is a useful header you’ll sometimes find a reference to it in vulnerability related articles or reports. The problem is that certain versions of Apache (versions before 2.3.14) used to disclose the inode for the file that is being served in their default configuration. The inode can be used for further attacks, e.g. via the Network File System (NFS), that uses these inodes to create file handles. The problematic default configuration has been corrected in more recent Apache versions, but you should nonetheless make sure that your corresponding FileETag setting in httpd.conf does not contain the INode attribute. The following line is fine:</p>
+<pre class="prettyprint">FileETag MTime Size</pre>
+<p>The following line is <strong>NOT: </strong></p>
+<pre class="prettyprint">FileETag INode MTime Size</pre>
+<h3>X-Robots-Tag and Robots.txt</h3>
+<p>The X-Robots-Tag header can be used to give search engines, which support this header, directives on how a page or file should be indexed. The advantage of the X-Robots-Tag over a single robots.txt file or the robots-meta-tag is that this header can be set and configured globally, can be adjusted to a very granular and flexible level (e.g. a regular expression that matches certain URLs). Sending a meta-tag with a media file – not possible. Sending an HTTP-header with a media file – no problem. It also has the advantage of disclosing information on a per request basis instead of a single file. Just think about the secret directories that you don’t want anyone to know about: Listing them in a robots.txt file with a disallow entry? Probably a bad idea since this lets everyone immediately know what you want to hide – you might as well just put a link on your website.</p>
+<p>So should you ditch the robots.txt altogether and rely solely on the X-Robots-Tag? Probably not, instead combine them for the greatest compatibility. However keep in mind that the robots.txt file should only contain files and directories that you want to be indexed. You should <strong>never</strong> list files that you want to block, instead place a general disallow entry in the robots.txt:</p>
+<p>An example to block everything:</p>
+<pre class="prettyprint">User-Agent: *
+Disallow: /</pre>
+<p>An example that tells the crawler to index everything under /Public/ but not the rest:</p>
+<pre class="prettyprint">User-Agent: *
+Allow: /Public/
+Disallow: /</pre>
+<h3>Adding custom headers in various HTTP servers</h3>
+<p>Below you can find a general example on how to set a static custom HTTP header in different HTTP server software, as well as links to a more in-depth manual for setting more complex header rules.</p>
+<p><strong>Apache</strong></p>
+<p>For apache it is recommended to use the apache module ‘mod_headers’ to control http headers. The directive ‘Header’ can be placed almost anywhere in the configuration file, e.g.:</p>
+<pre class="prettyprint">&lt;Directory "/var/www/dir1"&gt;
+    Options +Indexes
+    Header set X-XSS-Protection “1; mode=block”
+&lt;/Directory&gt;</pre>
+<p>For a more detailed guide on how to set HTTP headers with mod_headers please refer to <a href="http://httpd.apache.org/docs/current/mod/mod_headers.html">this page</a>.</p>
+<p><strong>Internet Information Services (IIS)</strong></p>
+<p>For IIS 6.0-10.0 there are two ways to set custom headers:</p>
+<p>1. Via command line:</p>
+<pre class="prettyprint">appcmd set config /section:httpProtocol /+customHeaders.[name='X-XSS-Protection',value='1; mode=block']</pre>
+<p>2. Via graphical interface Open IIS Manager and use the Connections pane to find the appropriate level you want to enable the header for. In the Home pane, double-click on <strong>‘HTTP Response Headers’</strong>. Now look for the <strong>Actions</strong> pane and click on <strong>‘Add…’</strong> and set both the name and the value for the header you want to set. In our example the name would be ‘X-XSS-Protection’ and the value would be ‘1; mode=block’.</p>
+<p>For a more detailed guide on how to set HTTP headers with IIS please refer to <a href="https://www.iis.net/configreference/system.webserver/httpprotocol/customheaders">this page</a>.</p>
+<p><strong>Lighttpd</strong><br/>
+<br/>
+For Lighthttpd it is recommended to use the module <strong>‘mod_setenvs’</strong> to control apache headers. The directive <strong>‘setenv.add-response-header’</strong> can be placed almost anywhere in the configuration file, e.g.:</p>
+<pre class="prettyprint">setenv.add-response-header = (
+      "X-XSS-Protection" =&gt; "1; mode=Block" 
+    )</pre>
+<p>For a more detailed guide on how to set HTTP headers with NGINX please refer to this page. </p>
+<p><strong>NGINX</strong><br/>
+<br/>
+For NGINX it is recommended to use the module ‘ngx_http_headers_module’ to control http headers. The directive <strong>‘add_header’</strong> can be placed in the appropriate location in the configuration file, e.g.:</p>
+<pre class="prettyprint">server {
+    listen       80;
+    server_name  domain1.com www.domain1.com;
+    root         html;
+
+    location / {
+      add_header X-XSS-Protection “1; mode=Block” always
+    }
+  }</pre>
+<p>For a more detailed guide on how to set HTTP headers with NGINX please refer to this page. </p>
+<h2 class="section-title">Summary and Conclusions</h2>
+<p>We have seen that there are quite a few more or less new HTTP headers that can actively contribute to a web site’s security. We have also seen that there are a few well-established headers that might be worth revisiting to decrease the amount of information that is leaked.</p>
+<h2 class="section-title">References</h2>
+<p>Following are a few references for the technically interested reader that wants to get a more in-depth understanding of the different headers as well as HTTP headers in general. Please refer to ‘Adding custom headers in various HTTP servers’ above, if you simply want to know how to activate the various headers in your HTTP server software.</p>
+<ul>
+<li><a href="https://www.chromium.org/hsts">HTTP Strict Transport Security Pre-Load.</a></li>
+<li><a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers">Mozilla Developer Network – HTTP Headers.</a></li>
+<li><a href="https://tools.ietf.org/html/rfc6797">RFC6797: HTTP Strict Transport Security (HSTS).</a></li>
+<li><a href="https://tools.ietf.org/html/rfc7034">RFC7034: HTTP Header Field X-Frame-Options.</a></li>
+<li><a href="http://tools.ietf.org/html/rfc7469">RFC7469: Public Key Pinning Extension for HTTP.</a></li>
+</ul>
+<h2 class="section-title">Contact and Follow-Up</h2>
+<p>Michael is part of our Assurance team in Context's Germany office.  He joined Context after graduating from the Ruhr-University Bochum and is working primarily on testing Web applications and Infrastructure. He has a particular interest in novel exploitation techniques, and is a keen runner in his spare time.</p>
+<p>See the <a href="https://www.contextis.com/us/contact">Contact page</a> for how to get in touch.</p>
+</article>
+{% endraw %}

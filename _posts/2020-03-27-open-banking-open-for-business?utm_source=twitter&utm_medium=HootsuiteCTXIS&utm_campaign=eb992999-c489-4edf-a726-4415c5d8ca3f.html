@@ -1,0 +1,31 @@
+---
+layout: blogpost
+title: "Open Banking: Open for Business"
+author: "Margus Lind"
+author_role: "Lead Security Consultant"
+summary: "Context have worked with a number of organisations to help them integrate securely with the Open Banking ecosystem, both banks (ASPSPs) and third party providers (TPPs). This post is the first in a series of articles where we will share some of the knowledge accumulated in the process. Future posts in this series will cover challenges with Open Banking, the permission model in use, and tooling available for testing."
+tags: [Product Security, Web applications]
+hero_banner: Obfuscation,_Encryption_and_Unicorns_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Before we begin, let’s define a few acronyms:</p>
+<ul>
+<li><strong>ASPSP </strong>Account Servicing Payment Service Provider (let’s call it a bank)</li>
+<li><strong>TPP </strong>Third Party Provider (e.g. a FinTech startup)</li>
+<li><strong>PSD2 </strong>Revised Payment Services Directive (new rules created by the European Union to foster integrated, safer and open banking)</li>
+</ul>
+<p>A full glossary is available <a href="https://www.openbanking.org.uk/about-us/glossary/">here</a>.</p>
+<h2><strong>An Introduction to Open Banking</strong></h2>
+<p>Open Banking is the UK implementation for PSD2. On top of the PSD2 regulations, Open Banking provides a detailed specification for banks and third parties to follow when communicating with one another. This allows companies (TPPs) to build their applications and integrate with online services exposed by any bank (ASPSP) in a standardised way. A common interface for all banks, if you will.</p>
+<p>The below diagram illustrates how the components and roles fit together in a simplified fashion:</p>
+<p><img alt="" src="https://web.archive.org/web/20201208121045im_/https://www.contextis.com/media/images/heros/Open_Banking_image_1.jpg" style="width: 561px; height: 291px;"/></p>
+<p><em>Figure 1 - Artistic rendition of Open Banking</em></p>
+<p> </p>
+<p>For example, Open Banking enables the end user to view their current account balances held with different banks and allows applications to display the information all together in one coherent dashboard. This gives the user an overview of all their finances in one place. At the same time, there are grave risks associated with trusting third parties with excessive access to banking information, or even worse the full online banking portal. Using the Open Banking APIs, the user is able to manage granular access permissions to each of their accounts directly through the bank for the account in question. This access, enabled through Open Banking, is how banks' mobile applications can show account details from other banks. As implied by this model, a bank can perform as both an ASPSP and a TPP simultaneously, albeit as different entities. Alternatively, they might rely on a third party to provide the platform for accessing account data from other banks.</p>
+<p>Open Banking is revolutionary in allowing third party providers to access data and interact with customer bank accounts. At the same time, Open Banking sets strict guidelines to ensure customers have an overview and control of who is able to access their data. As such, a third party can legitimately operate on bank accounts, providing an alternative interface or richer features than the bank itself. This is a fundamental change in how customers interact with their banks, which attempts to introduce sweeping changes and innovation within traditional financial institutions.</p>
+<p>Implementing the required changes internally to support a common API is a complex undertaking as it introduces a whole new channel for external entities to interact with the bank. The final PSD2 compliance deadline was 14 September 2019, however many banks are experiencing difficulties with fully implementing the APIs and integrating with the Open Banking ecosystem within the strict deadlines set out (<a href="https://openbanking.atlassian.net/wiki/spaces/AD/pages/1135346433/Transparency+Calendar">see here</a>). For urgent complex projects affecting core services, it is essential that development and testing (functional and security) are performed to the highest standards. This requires both the Banking and Security industries to innovate new ways to work together and deliver large scale projects.</p>
+<p>Providing the APIs is only the first step of the whole endeavour. Following this, next steps will be for organisations to start using the APIs to provide advanced services and the public to understand what consenting to an access request entails. Both of these facets reveal additional interesting security concerns that, once solved through collaboration, should lead to a brighter future for bank customers.</p>
+<p><a href="https://www.contextis.com/en/blog/open-banking-the-challenges">In the next post of the series</a>, we will be delving deeper into the technical and social challenges associated with introducing Open Banking based services.</p>
+</article>
+{% endraw %}

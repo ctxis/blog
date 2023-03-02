@@ -1,0 +1,814 @@
+---
+layout: blogpost
+title: "Common Language Runtime Hook for Persistence | Context Information Security US"
+author: "Paul Laîné"
+author_role: "Security Consultant, Assurance"
+summary: "This blog post explains how it is possible to execute arbitrary code and maintain access to a Microsoft Windows system by leveraging the Common Language Runtime application domain manager."
+tags: [Tools, Security assessment and testing]
+hero_banner: CodeBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+<style type="text/css">td {
+vertical-align:top;
+}
+</style>
+<p>During scenario-based assessments or digital-based Red Team assessments, gaining initial access to the internal network of an organisation is challenging, requires time, and effort. Therefore, losing this initial access or entry into a network could be detrimental to the success of an attack.</p>
+<p>To address this, there are multiple persistence techniques that can be used. These techniques ensure that losing access is only temporary and can be regained after a specific amount of time or after a specific action is executed. The importance of being able to maintain reliable access to targeted endpoints is what motivated this research.</p>
+<p>This blog post explains how it is possible to execute arbitrary code and maintain access to a Microsoft Windows system by leveraging the Common Language Runtime application domain manager.</p>
+<p>Throughout this post you will be introduced to:</p>
+<ul>
+<li>Basic .Net internals knowledge (e.g. Common Language Runtime, Global Assembly Cache);</li>
+<li>Basics of PowerShell scripting; and</li>
+<li>Basics of C# programming</li>
+</ul>
+<p>It should be noted that the research that resulted in this blog post were inspired by <a href="https://gist.github.com/caseysmithrc/4bb34d28fa9d4071596cf2417fee5e37">C# code published by Casey Smith (@subTee)on GitHub Thursday 25th July</a></p>
+<h2>.Net Overview</h2>
+<p>It is necessary to be familiar with the basics of .Net internals before being able to fully understand this persistence technique. For this reason, the following sections provide a groundwork to aid in understanding the basics.</p>
+<p>.Net is a development platform released by Microsoft in February 2002 and supports three languages: C#, F#, and Visual Basic .Net (VB.NET).</p>
+<p>C# 1.0 was first released in January 2002 and is now one of the most popular and most used .Net languages. This a high-level object-oriented programming language that is primarily used to develop thick client applications, web applications and mobile applications (Xamarin).</p>
+<p>F# 1.x was released in May 2005 and is a strong-type functional language used for scientific and data analysis.</p>
+<p>Finally, VB.NET, the first version of which was released in 2002, is based on Visual Basic 7.0, and used for developing desktop applications.</p>
+<p>The reason .Net became so popular over the years is because it offers multiple interesting features, such as:</p>
+<table border="0" cellpadding="0" cellspacing="0" style="width:100.0%;" width="100%">
+<thead>
+<tr>
+<th style="width:30%;">
+<p><strong>Feature</strong></p>
+</th>
+<th style="width:70%;">
+<p><strong>Description</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<p>Automatic memory management</p>
+</td>
+<td>
+<p>The Garbage Collection (GC) automatically de-allocates allocated memory used by .Net applications. The GC also ensures that only allocated memory can be accessed, which ensures memory safety.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Use of unmanaged resources</p>
+</td>
+<td>
+<p>Resources that are not maintained by .Net are called unmanaged resources. .Net applications can use those unmanaged resources through a managed Type (e.g. MemoryStream, CryptoStream, UnmanagedMemoryStream, etc …)</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Type safety</p>
+</td>
+<td>
+<p>Every object of a Type has defined methods and properties, with different accessibility levels (e.g. private, public, protected, internal, protected internal, private internal). .Net ensures type safety by throwing run-time or compilation-time exceptions when trying to access non-defined or non-accessible methods or properties.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Delegates and lambdas</p>
+</td>
+<td>
+<p>Used to pass methods as parameters of other methods, a delegate is a Type that represents references to methods with parameter and return type.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Generics</p>
+</td>
+<td>
+<p>A class can leverage generics to allow the programmer to specify a Type while constructing the class. For example, a Type that implements a generic data structure is List<t> which can be used to construct a strong-typed list of strings List<string> or integers List<int></int></string></t></p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Asynchronous programming</p>
+</td>
+<td>
+<p>Through the async and await keywords in C# it is fairly easy to write I/O-bound and CPU-bound asynchronous code, which drastically helps to improve the execution time and performance of applications.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Language Integration Query (LINQ)</p>
+</td>
+<td>
+<p>Projection operations used to modify the shape of an object can be challenging. Regardless of the data (e.g. in-memory object, SQL database or XML document), LINQ can be used to operate (e.g. Select<tsource,tresult>, Where<tsource>, ToList(IEnumerable<tsource>) ) in those objects.</tsource></tsource></tsource,tresult></p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Interoperability</p>
+</td>
+<td>
+<p>Operating systems offer Application Programming Interfaces (API) that can be leveraged to access the hardware of operating system-managed functions and information. .Net offers multiple ways to call the system's API. Moreover, on Windows, interoperability allows the use of Component Object Model (COM) components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Unsafe code</p>
+</td>
+<td>
+<p>Accessing native memory is necessary in order to manipulate chunks of memory (e.g. API calls, pointers, algorithms). It is possible to use unsafe keywords in C# to execute unsafe code.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Please note that further information about the above can be found in the following Microsoft documentation [1].</p>
+<p>Over the years, different implementations of .Net were born, however, there are only four main implementations of .Net:</p>
+<table border="0" cellpadding="0" cellspacing="0" style="width:100.0%;" width="100%">
+<thead>
+<tr>
+<th style="width:30%;">
+<p><strong>Name</strong></p>
+</th>
+<th style="width:70%;">
+<p><strong>Description</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<p>.Net Framework</p>
+</td>
+<td>
+<p>This is the original implementation of .Net from back in 2002. This implementation is only available for Windows systems and is used to develop applications for web, Windows, Windows Phone, Windows Server, and Azure.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>.Net Core</p>
+</td>
+<td>
+<p>This is an open-source and cross-platform implementation of .Net, which is mostly used to build device, cloud, and Internet of Things (IoT) applications.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Mono</p>
+</td>
+<td>
+<p>Mono is an open-source and cross-platform implementation of .Net based on the .Net Framework that originally, was developed to use .Net Framework applications on Unix systems. Now Mono is mostly used by Xamarin for Android, iOS, tvOS and watchOS applications.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Universal Windows Platform (UWP)</p>
+</td>
+<td>
+<p>This last implementation tends to be used for developing modern IoT, mobile, tablets, phablets or Xbox applications.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Further information about the .Net implementation can be found in the following Microsoft documentation [2].</p>
+<p>All implementations share two things; the .Net Standard, and one or more runtimes. The .Net standard is a set of APIs that every .Net Base Class Library implements. This API ensures the uniformity of any .Net implementation and therefore allows cross-implementation libraries. The different runtimes, which are execution environments of managed applications, are for example: Common Language Runtime (CLR) for the .Net Framework; Core CLR for .Net Core; .Net Native for UWP and the Mono runtime for Mono-based applications.</p>
+<p>.Net is a broad topic and contains a lot of interesting subjects; however, the remaining post will focus on the CLR.</p>
+<h2>Common Language Runtime</h2>
+<p>Net Framework-based applications use a common runtime, which is an environment in which the code is executed, named the Common Language Runtime (CLR). When .Net Framework-based applications are compiled, the source code, in C#, F# or VB.Net, is compiled into a file that can be a Dynamic Data Library (DLL) or a Portable executable (PE) file. Moreover, the output of the compilation contains Microsoft Intermediate Language (MSIL) code and metadata rather than native code.</p>
+<p>Metadata describes types, members, and references used by the application. The CLR uses metadata during runtime to ensure that applications have everything they need (e.g. load assemblies, allocate memory, generate native code) and to set runtime context boundaries.</p>
+<p>The MSIL code, also known as Common Intermediate Language (CIL) is consumed by the CLR in conjunction with metadata to generate the native machine code that will be executed by the CPU.</p>
+<p>The below diagram summarises the above paragraphs:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/CLR-MSIL-diagram.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/CLR-MSIL-diagram.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/CLR-MSIL-diagram.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/CLR-MSIL-diagram.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It is possible to get the MSIL code of .exe, .dll, .obj, .lib, and .winmd files by using the Intermediate Language disassembler (ILDASM) binary. Note that this binary is available from the Windows Software Development Kit (SDK).</p>
+<p>For example, the following C# can be compiled into a file named Tool.exe and then analysed with Ildasm.exe:</p>
+<pre class="prettyprint">using System;
+
+namespace Tools {
+    class Program {
+        static void Main(string[] args) {
+            Console.WriteLine("Hook my Common Language Runtime");
+        }
+    }
+}</pre>
+<p>The screenshot below shows the MSIL code of the Main method extracted from the above C# compiled code though Ildasm.exe.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/MSIL-code.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/MSIL-code.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/MSIL-code.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/MSIL-code.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It should be noted that any .Net application that uses the CLR is considered a managed application. Code that can be consumed by the CLR is also considered as managed code. The main advantage of managed applications is that they benefit from CLR's services and functionalities, such as:</p>
+<ul>
+<li>Cross-language integration</li>
+<li>Cross-language exception handling</li>
+<li>Enhanced security</li>
+<li>Versioning and deploying support</li>
+<li>Simplified model for component interaction</li>
+<li>Debugging and profiling services</li>
+</ul>
+<p>In the above list, one of the most interesting features is the cross-language integration. Indeed, any managed application can load and use any managed library, regardless of the language used to develop the library.</p>
+<p>Beside the aforementioned, a crucial query remains; how does Windows use the CLR to execute applications? In fact, Windows uses runtime hosts, such as Microsoft Internet Explorer, APS.Net or Windows shell to execute managed applications. These runtime hosts are processes that load the CLR's DLLs into their process space.</p>
+<p>The main DLL used by the CLR is ‘mscorlib.dll’, which stands for Multilanguage Standard Common Object Runtime Library (MS COR LIB). However, there are many other DLLs used by the CLR and they are all prefixed by ‘mscor’. Consequently, it is possible to list all the DLLs used by the CLR on a system by listing all the DLLs name that start with ‘mscor’.</p>
+<p>The following PowerShell cmdlet will go through the ‘C:\Windows\Microsoft.Net\Framework’ folder, which contains .Net Framework DLLs and filters the name with ‘mscor*’.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/mscor-dlls.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/mscor-dlls.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/mscor-dlls.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/mscor-dlls.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Please note; the main DLL in the .Net Framework 4.0 and onwards is ‘clr.dll’.</p>
+<p>Additionally, runtime hosts are not only loading CLR’s DLLs. When a runtime host is started, a default application domain is created which then loads and executes the managed code in the default application domain.</p>
+<p>This diagram shows the above.</p>
+<p>As shown, the runtime host creates an application domain, loads the managed code and then executes the managed code compiled by the JIT compiler inside the application domain.</p>
+<h2>Application Domain and Application Domain Manager</h2>
+<p>An application domain is a security boundary. When a managed application is executed, the runtime host will automatically create a default application domain. Multiple application domains can reside in the same runtime host. This security boundary provides isolation between application domains, meaning that application domain A cannot directly access code or resources of application domain B.</p>
+<p>This isolation between application domains within the same runtime host offers several benefits:</p>
+<ul>
+<li>If one application is faulty, it will not affect other application domains</li>
+<li>Application domains can be separately stopped/restarted without stopping/restarting the runtime host</li>
+<li>Each application domain's code has a set of granted permissions, which can differ from other application domains</li>
+<li>Every application domain has their own non domain-neutral assembly list and can load/unload assemblies as desired.</li>
+</ul>
+<p>It should be noted that accessing code or resources from one application domain to another is possible; however, a proxy is required. Further information about application domains can be found in the following Microsoft documentation [3].</p>
+<p>Every application domain has one type of application domain manager and an application domain manager can have X number of application domains. An application domain manager is the System.AppDomainManager class and is responsible for the creation and customization of newly created application domains. In total, this class exposes four properties and six methods that can be overridden in order to modify the default CLR behaviour.</p>
+<p>The following screenshot shows the properties and methods of the System.AppDomainManager class.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/application-domain-manager-prototype.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/application-domain-manager-prototype.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/application-domain-manager-prototype.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/application-domain-manager-prototype.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<style type="text/css">td {
+vertical-align:top;
+}
+</style>
+<p>Properties and methods marked as virtual can be overridden and therefore implemented in a custom assembly in order to modify a new application domain prior to execution of any managed code.</p>
+<p>The following table describe the properties and methods that can be overridden based on <a href="https://docs.microsoft.com/en-us/dotnet/api/system.appdomainmanager?view=netframework-4.8#examples">Microsoft's documentation</a>:</p>
+<table border="0" cellpadding="0" cellspacing="0" style="width:100.0%;" width="100%">
+<thead>
+<tr>
+<th style="width:25%;">
+<p><strong>Name</strong></p>
+</th>
+<th style="width:20%;">
+<p><strong>Method or Property</strong></p>
+</th>
+<th style="width:55%;">
+<p><strong>Description</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<p>ApplicationActivator</p>
+</td>
+<td>
+<p>Property</p>
+</td>
+<td>
+<p>Gets the application activator that handles the activation of add-ins and manifest-based applications for the domain.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>HostSecurityManager</p>
+</td>
+<td>
+<p>Property</p>
+</td>
+<td>
+<p>Gets the host security manager that participates in security decisions for the application domain.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>HostExecutionContextManager</p>
+</td>
+<td>
+<p>Property</p>
+</td>
+<td>
+<p>Gets the host execution context manager that manages the flow of the execution context.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>EntryAssembly</p>
+</td>
+<td>
+<p>Property</p>
+</td>
+<td>
+<p>Gets the entry assembly for an application.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>CreateDomainHelper</p>
+</td>
+<td>
+<p>Method</p>
+</td>
+<td>
+<p>Provides a helper method to create an application domain.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>CheckSecuritySettings</p>
+</td>
+<td>
+<p>Method</p>
+</td>
+<td>
+<p>Indicates whether the specified operation is allowed in the application domain.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>CreateDomain</p>
+</td>
+<td>
+<p>Method</p>
+</td>
+<td>
+<p>Returns a new or existing application domain.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>InitializeNewDomain</p>
+</td>
+<td>
+<p>Method</p>
+</td>
+<td>
+<p>Initialises the new application domain.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Furthermore, because System.AppDomainManager class inherits from System.MarshalByRefObject, the following methods can also be overridden:</p>
+<table border="0" cellpadding="0" cellspacing="0" style="width:100.0%;" width="100%">
+<thead>
+<tr>
+<th style="width:25%;">
+<p><strong>Name</strong></p>
+</th>
+<th style="width:20%;">
+<p><strong>Method or Property</strong></p>
+</th>
+<th style="width:55%;">
+<p><strong>Description</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<p>ApplicationActivator</p>
+</td>
+<td>
+<p>Property</p>
+</td>
+<td>
+<p>Gets the application activator that handles the activation of add-ins and manifest-based applications for the domain.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>CreateObjRef</p>
+</td>
+<td>
+<p>Method</p>
+</td>
+<td>
+<p>Creates an object that contains all the relevant information required to generate a proxy used to communicate with a remote object</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>InitializeLifetimeService</p>
+</td>
+<td>
+<p>Method</p>
+</td>
+<td>
+<p>Obtains a lifetime service object to control the lifetime policy for this instance.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Methods and properties that can be overridden are now known; however, it is not yet clear how to change the default application domain manager used by the CLR.</p>
+<p>To address this, both "APPDOMAIN_MANAGER_ASM" and "APPDOMAIN_MANAGER_TYPE" environment variables must be set. They respectively represent the full name of the custom assembly that inherits from System.AppDomainManager and that override the methods and properties, and, the type name of the Type that the custom assembly use to implement the System.AppDomainManager class.</p>
+<p>Finally, due to the fact the application domain manager can modify the security decisions of the CLR, the custom assembly needs to be fully trusted and therefore must be a strong-name assembly and must be installed into the Global Assembly Cache (GAC).</p>
+<h2>Assembly and Global Assembly Cache</h2>
+<p>As mentioned, the strong-name assembly that implements the System.AppDomainManager must be installed into the GAC; however, a lot of questions remain:</p>
+<ul>
+<li>What’s an assembly?</li>
+<li>What’s the Global Assembly Cache (GAC)?</li>
+<li>Why and how can a strong-name assembly be installed into the GAC?</li>
+</ul>
+<p>For the .Net Framework, an assembly is a unit and each assembly can contain MSIL code, Types, resources and a manifest. All this data can be grouped in to one single file (e.g. assembly.dll) or split into multiple files (e.g. assembly.dll, assembly.dll.manifest and picture.png). It should be noted that only the manifest is required for this.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/file-assembly-diagram.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/file-assembly-diagram.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/file-assembly-diagram.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/file-assembly-diagram.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The manifest contains all information used to describe the assembly; i.e. the assembly name (e.g. Context.CLRHooking), version (e.g. 1.0.0.0), culture (e.g. neutral), strong-name information, the list of all files in the assembly, Type reference information and information on referenced assemblies. The combination of the name, version, culture and strong-name represents the identity of the assembly.</p>
+<p>A strong-name assembly is nothing more than an assembly that was signed with a strong-name key (SNK) file, which uses public-key encryption and provides a unique identity to the assembly.</p>
+<p>Assemblies can be designed to be used by one application or can be shared between multiple applications. In this case, the Global Assembly Cache (GAC) comes into play. The GAC stores any assemblies that are meant to be shared system wide.</p>
+<p>In modern systems like Windows 10 or Windows Server 2019 there are two GAC, one located at “C:\Windows\assembly\” for applications that use the .Net Framework prior to version 4.0 and one located at “C:\Windows\Microsoft.NET\assembly” for applications that use .Net Framework 4.0 and onwards.</p>
+<p>There are two normal ways to install assemblies into the GAC;</p>
+<ul>
+<li>When installing an application, the Microsoft installer will automatically install into the GAC any assemblies that needs to be in the GAC; or</li>
+<li>By using the GAC tool “gacutil.exe” from the Windows Software Development Kit (SDK).</li>
+</ul>
+<p>Because it is unlikely that targeted systems have the Windows SDK installed and because it is not convenient to install an application, another solution should be adopted. It should be noted that administrative privileges are required in order to install a strong-name assembly into the GAC, regardless of the technique used.</p>
+<p>A manual installation is possible; however, that requires understanding of how the GAC stores assemblies.</p>
+<p>The root folder of the GAC contains three folders. ‘GAC_32’, which contains 32bits assemblies, ‘GAC_64’, which contains 64bits assemblies and ‘GAC_MSIL’, which contains assemblies that target any platform.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/gac-folders.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/gac-folders.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/gac-folders.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/gac-folders.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If the strong-name assembly is installed into the ‘AC_MSIL’ folder both 32bit and 64bit runtime hosts will be able to us it.</p>
+<p>By analysing a strong-name assembly already installed into the GAC the full name and the .Net Framework version used by the strong-name assembly can be found. The ‘LoadFrom’ static method from the ‘System.Reflection.Assembly’ is used to load and store an assembly into a variable.  From this variable, both ‘FullName’ and ‘ImageRuntimeVersion’ properties can be accessed.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/assembly-information.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/assembly-information.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/assembly-information.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/assembly-information.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The full name of the assembly is ‘Accessibility, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a’ and the .Net Framework version is ‘v4.0.30319’. The assembly is located under: ‘Accessibility\v4.0_4.0.0.0__ b03f5f7f11d50a3a’.</p>
+<p>Based on the above, it is possible to conclude that when installing an assembly into the GAC with either a Microsoft installer or the GAC tool, they first create a folder named from the name of the assembly under “GAC_32”, “GAC_64” or “GAC_MISL”, based on the platform that the assembly was compiled for. Then, a subdirectory is created, and the name of the directory is based on the identity of the assembly.</p>
+<p>Format is as follows:</p>
+<ul>
+<li> “v” character + the major version of the .Net Framework version + “_” character;</li>
+<li>The version of the assembly + “_” character;</li>
+<li>The culture if not neutral + “_” character; and</li>
+<li>The assembly strong name</li>
+</ul>
+<p>For example, if a strong-name assembly full name is “Context.Hook, Version=0.0.0.0, Culture=en, PublicKeyToken=343c81d3defacaa9” and the runtime version is “v4.0.30319”, the assembly should in theory be located under: “C:\Windows\Microsoft.Net\assembly\GAC_MSIL\Context.Hook\v4.0_0.0.0.0_en_343c81d3defacaa9\”</p>
+<p>To automate the installation of an assembly into the GAC, the following PowerShell script can be used: <a href="https://gitlab.com/snippets/1878274">https://gitlab.com/snippets/1878274</a></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/install-assembly.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/install-assembly.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/install-assembly.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/install-assembly.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Finally, the reason why assemblies need to be installed into the GAC is they need to be fully trusted but also because the runtime host has a specific way to locate and bind assemblies onto the system.</p>
+<p>In fact, there are four steps performed by the CLR. Firstly, the CLR examines the application configuration file, the publisher policy file and the machine configuration file in order to locate assemblies and dependences that must be loaded. Secondly, the CLR checks whether an assembly has already been loaded by the runtime host or the application domain. If already loaded, the CLR uses the previously loaded assembly. Thirdly, if a strong-name assembly is requested, the CLR searches the strong-name assembly in the GAC. Finally, if the assembly is not a strong-name assembly or was not found in the GAC, the CLR will probe the application base.</p>
+<p>The following directories are probed by the CLR if the strong-name assembly does not reference a culture (i.e. neutral):</p>
+<pre class="prettyprint">[application base] / [assembly name].dll
+[application base] / [assembly name] / [assembly name].dll</pre>
+<p>If a culture is referenced (e.g. en, en-GB, fr-FR), the following folders will be probed by the CLR:</p>
+<pre class="prettyprint">[application base] / [culture] / [assembly name].dll
+[application base] / [culture] / [assembly name] / [assembly name].dll</pre>
+<p>It should be noted that if, while examining the application configuration file, during step 1, a ‘codeBase’ element is found, the CLR will first check the location provided before probing the application base.</p>
+<p>For example, the following application configuration file can be used to load a strong-name assembly over HTTPS:</p>
+<pre class="prettyprint">&lt;configuration&gt;
+   &lt;runtime&gt;
+      &lt;assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1"&gt;
+         &lt;dependentAssembly&gt;
+            &lt;assemblyIdentity name="Context.CLRHooking" publicKeyToken="343c81d3defacaa9" culture="en"/&gt;
+            &lt;codeBase version="1.0.0.0" href="https://www.contextis.com/Context.CLRHooking.dll"/&gt;
+         &lt;/dependentAssembly&gt;
+      &lt;/assemblyBinding&gt;
+   &lt;/runtime&gt;
+&lt;/configuration&gt;</pre>
+<p>Further information can be found in the following official Microsoft documentation [4].</p>
+<h2>Wrapping Everything Up</h2>
+<p>At this point, we should be able to understand how, as an attacker, it is possible to gain persistence on a Microsoft Windows system by leveraging the CLR.</p>
+<p>To summarise:</p>
+<ul>
+<li>Runtime hosts always create a default application domain</li>
+<li>The default application domain manger can be overridden with a custom strong-name assembly that implements the System.AppDomainManager class</li>
+<li>The custom strong-name assembly must be installed into the GAC</li>
+<li>The APPDOMAIN_MANAGER_ASM, APPDOMAIN_MANAGER_TYPE, COMPLUS_Version environment variables must be set</li>
+</ul>
+<p>Consequently, if a strong-name assembly that implements the System.AppDomainManager class is installed into the GAC and if the aforementioned environment variables are set as system environment variables, any newly created application domain will execute the code within the strong-name assembly.</p>
+<p>According to the above, a strong-name assembly needs to be built. The following C# code can be used as an example:</p>
+<pre class="prettyprint">using System;
+
+namespace Context {
+    public sealed class CLRHooking : AppDomainManager {
+
+        public override void InitializeNewDomain(AppDomainSetup appDomainInfo) {
+            System.Windows.Forms.MessageBox.Show("Hook my CLR!");
+            return;
+        }
+    }
+}</pre>
+<p>Firstly, a namespace called 'Context' is created, which is only for organisation purposes. Secondly, a public class called 'CLRHooking' implements the 'System.AppDomainManager' class via the ':' operator. Please note that the class is sealed, which means that other classes cannot inherit from 'CLRHooking'. Finally, the 'InitializeNewDomain' method from the 'System.AppDomainManager' class is overwritten and will display a message box when called.</p>
+<p>In order to compile the above C# code into a strong-name assembly an SNK file is required. The Strong Name Tool 'sn.exe' from the Windows SDK can be used in order to create a new SNK file. The '-k' flag is used to specify the key length.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/create-snk-file.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/create-snk-file.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/create-snk-file.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/create-snk-file.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Finally, the C# compiler 'csc.exe' that comes with the .Net Framework can be invoked to compile the code into a strong-name assembly. The '/target:library' flag means that the code will be compiled into a library (aka DLL). For a Windows executable that would be '/target:winexe'. The '/keyfile:' flag is used to specify the SNK file that will be used to sign the assembly. The '/out:' flag is used to specify the name of the output file. The last parameter is the C# code that will be compiled</p>
+<p>The strong-name assembly is now ready to be installed into the GAC. Once again, <a href="https://gitlab.com/snippets/1878274" target="_blank">the PowerShell script we used earlier</a> can be used:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/install-assembly.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/install-assembly.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/install-assembly.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/install-assembly.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>To set system environment variables the following PowerShell cmdlets can be executed.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/set-environment-variables.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/set-environment-variables.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/set-environment-variables.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/set-environment-variables.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>At this point, any process that invokes the CLR will execute code within the overridden “InitializeNewDomain” method of the installed strong-name assembly, which will display a message box.</p>
+<p>Any process that invokes the CLR is vague; consequently, a reliable way to find processes that are using the CLR must be identified.</p>
+<h2>Identifying .Net Framework-Based Application</h2>
+<p>As mentioned, any .Net Framework-based application that invokes the CLR, should execute the code within the strong-name assembly; however, there is no list of these applications.</p>
+<p>DLLs used by the .Net Framework were previously identified and will be leveraged to enumerate applications that are loading them.</p>
+<p>A first solution is to use the “tasklist.exe” DOS command, which display all currently running processes, in conjunction with the “/m” flag that filter processes using a given DLL name.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/tasklist.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/tasklist.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/tasklist.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/tasklist.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As shown, applications like Microsoft Office Word, explorer or PowerShell are using CLR’s DLL, which means they should execute the code within the strong-name assembly.</p>
+<p>The problem with this solution is that 'tasklist.exe' only shows currently running processes. A better and more accurate way to list .Net Framework-based application needs to be found.</p>
+<p>A PowerShell Module is a group of functions and scripts that are based on the same purpose (e.g. reverse engineering, post-exploitation, active directory enumeration).</p>
+<p>Matt Graeber (@mattifestation) released a PowerShell module dedicated to reverse engineering: <a href="https://github.com/mattifestation/PowerShellArsenal">https://github.com/mattifestation/PowerShellArsenal</a></p>
+<p>The 'PowerShellArsenal' module contains one function called 'Get-PE' that can be used to parse the DOS header of a PE file in order to extract information such as the architecture, the module name or the list of imported DLLs; and their function name.</p>
+<p>In order to use the 'Get-PE' function, the module must to be installed in one of the following PSModulePath:</p>
+<ul>
+<li>%Windir%\System32\WindowsPowerShell\v1.0\Modules</li>
+<li>%UserProfile%\Documents\WindowsPowerShell\Modules</li>
+<li>%ProgramFiles%\WindowsPowerShell\Modules</li>
+</ul>
+<p>For this example, the module will be installed in the PowerShell module folder of the 'Context' user.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/download-and-unzip-powershell-arsenal.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/download-and-unzip-powershell-arsenal.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/download-and-unzip-powershell-arsenal.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/download-and-unzip-powershell-arsenal.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Then, the module can be imported and used to analyse a PE file; for example, powershell.exe</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/powershell-get-pe.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/powershell-get-pe.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/powershell-get-pe.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/powershell-get-pe.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As previously mentioned, the list of all the imports, which are all the DLLs and functions used by the PE file can be found via the following PowerShell Cmdlets:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/powershell-get-pe-imports.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/powershell-get-pe-imports.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/powershell-get-pe-imports.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/powershell-get-pe-imports.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Once again it has shown that the 'powershell.exe' PE file is importing 'mscoree.dll', meaning that starting a new PowerShell process will execute the code within the strong-name assembly.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/first-hook.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/first-hook.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/first-hook.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/first-hook.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Indeed, starting a new PowerShell process displays a message box.</p>
+<p>The previous PowerShell Cmdlets can be improved in order to analyse more than just one PE file. For example, the following PowerShell function lists all PE files in a given directory, then leverages the “Get-PE” function to get the list of all imported DLLs for each PE file. Finally, the function checks, with a regular expression for whether a .Net Framework DLL is imported.</p>
+<p><a href="https://gitlab.com/am0nsec/powertools/blob/master/misc/Find-DotNetFrameworkBinaries.ps1" target="_blank">The code can be found here on GitLab.</a></p>
+<pre class="prettyprint">function Find-DotNetFrameworkBinaries {
+        Param(
+        [parameter(Mandatory=$true)]
+        [string]$Location
+    )
+
+    Write-Host "[*] Paul Laîné (@am0nsec)"
+    Write-Host "[*] List all binaries that are using .Net Framework`n"
+
+    Try {
+        Import-Module PowerShellArsenal
+    } catch {
+        Write-Host "[-] PowerShellArsenal module not found!"
+        exit
+    }
+
+
+    $pes = Get-ChildItem $Location -Recurse -ErrorAction SilentlyContinue -WarningAction SilentlyContinue | Get-PE -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+    Foreach ($pe in $pes) {
+        $imports = ($pe.Imports | select ModuleName | Get-Unique -AsString).ModuleName
+        Foreach ($module in $imports) {
+            if ($module -match "^mscor(.)+\.dll" -or $module -match "^clr\.dll$") {
+                $pe.ModuleName
+                break
+            }
+        }
+    }
+}</pre>
+<p>The following PE files can be found within the 'C:\Windows\System32\' directory by importing and executing the above PowerShell function.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/find-dotnet-binaries.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/find-dotnet-binaries.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/find-dotnet-binaries.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/find-dotnet-binaries.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>This can then be confirmed by executing, for example ‘C:\Windows\System32\FileHistory.exe’.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/file-history.PNG" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/file-history.PNG"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/file-history.PNG"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/file-history.PNG"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It should be noted that a number of applications are using the .Net Framework on Windows. The most noticeable is “explorer.exe”, which is executed, at least, every time a user authenticates into the system.</p>
+<h2>Final Notes</h2>
+<p>We should now understand the basics of .Net internals and how it is possible to persist on a Microsoft Windows system by leveraging the Common Language Runtime. Moreover, we should be able to create our own strong-name assembly that implements the System.AppDomainManager class and searches for .Net-Framework-based applications on our system.</p>
+<p>For the purpose of this blog post the strong-name assembly only displays a message box; however, this hook of the CLR can be used to execute any C# code (e.g. platform invoke).</p>
+<h2>Appendices</h2>
+<h3>Appendix A.</h3>
+<p>This persistence technique was tested against the following versions of Windows</p>
+<table border="0" cellpadding="0" cellspacing="0" style="width:100.0%;" width="100%">
+<thead>
+<tr>
+<th style="width:50%;">
+<p><strong>Windows OS</strong></p>
+</th>
+<th style="width:50%;">
+<p><strong>Windows Version</strong></p>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<p>Microsoft Windows 10 Pro</p>
+</td>
+<td>
+<p>10.0.17763</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Microsoft Windows 10 Enterprise</p>
+</td>
+<td>
+<p>10.0.17763</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3>Appendix B.</h3>
+<p>The following PowerShell function can be used to automatically install a strong-name assembly into the GAC of a system and then change the system environment variables accordingly.</p>
+<p><a href="https://gitlab.com/am0nsec/powertools/blob/master/persistence/Invoke-ClrHooking.ps1">https://gitlab.com/am0nsec/powertools/blob/master/persistence/Invoke-ClrHooking.ps1</a></p>
+<h2>References</h2>
+<p>[1] Tour of .Net – <a href="https://docs.microsoft.com/en-us/dotnet/standard/tour#generics">https://docs.microsoft.com/en-us/dotnet/standard/tour#generics</a></p>
+<p>[2] .NET architectural components - <a href="https://docs.microsoft.com/en-us/dotnet/standard/components">https://docs.microsoft.com/en-us/dotnet/standard/components</a></p>
+<p>[3] Application domains - <a href="https://docs.microsoft.com/en-us/dotnet/framework/app-domains/application-domains">https://docs.microsoft.com/en-us/dotnet/framework/app-domains/application-domains</a></p>
+<p>[4] How the Runtime Locates Assemblies - <a href="https://docs.microsoft.com/en-us/dotnet/framework/deployment/how-the-runtime-locates-assemblies#step-1-examining-the-configuration-files">https://docs.microsoft.com/en-us/dotnet/framework/deployment/how-the-runtime-locates-assemblies#step-1-examining-the-configuration-files</a></p>
+</article>
+{% endraw %}

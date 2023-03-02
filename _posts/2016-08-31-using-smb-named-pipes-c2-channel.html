@@ -1,0 +1,87 @@
+---
+layout: blogpost
+title: "Using SMB named pipes as a C2 channel"
+author: "Ruben Boonen"
+author_role: "Security Consultant"
+summary: "Intrusion detection systems are becoming increasingly more capable of detecting malicious activity on the corporate perimeter, local network environment and on individual hosts. Commonly, when attackers move laterally on a network, new hosts communicate out using HTTPS. However with security appliances doing SSL termination and reputation-based filtering, suddenly having a bunch of hosts talking to relatively untrusted domains can easily trigger alerts."
+tags: [Vulnerabilities and exploits]
+hero_banner: Using_SMB_named_pipes_as_a_c2_channel_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>To get around this, a number of APT campaigns have set up a limited number of internal Command &amp; Control (C&amp;C) servers. All other implants communicate with these C&amp;C servers who handle the outbound traffic.  If peer-to-peer communication between implants can be made to look innocuous then this greatly reduces the attacker’s footprint on the local network.</p>
+<h2>It’s just SMB</h2>
+<p>In any large corporate environment the network will be swimming in SMB traffic. This makes peer-to-peer SMB communication an excellent candidate to obfuscate malicious content. This technique has been used by a number of actors in the past, such as <a href="https://securelist.com/files/2015/06/The_Mystery_of_Duqu_2_0_a_sophisticated_cyberespionage_actor_returns.pdf">Duqu</a> and more recently <a href="https://securelist.com/files/2016/07/The-ProjectSauron-APT_research_KL.pdf">ProjectSauron</a>. Additionally, the popular Red Team framework Cobalt Strike allows for beacons to communicate internally using SMB.</p>
+<h2>Invoke-SMBShell</h2>
+<p>To illustrate this technique I created a simple proof-of-concept SMB shell. The server component creates a <i>NamedPipeServerStream </i>and waits for a client to initiate a connection using a <i>NamedPipeClientStream</i>.</p>
+<p>Initiating a connection is very straight forward. The screenshot below shows the sever component of the script creating a named pipe and waiting for a client connection.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/smb1.width-800_800_384_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/smb1.width-800_800_384_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Once ready, a client can connect to the named pipe using the client component of the script.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/smb2.width-800_800_348_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/smb2.width-800_800_348_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>From a protocol perspective, the only thing that is visible on the network is SMB traffic as can be seen below. To protect the data in transit, AES-CBC is used (courtesy of the <a href="https://www.powershellempire.com/">Empire </a>framework).</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/smb3.width-800_800_711_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/smb3.width-800_800_711_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb3.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb3.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Invoke-SMBShell has support for commands which return output as well as commands that do not and will return error messages in case erroneous commands have been received by the client.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/smb4.width-800_800_500_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/smb4.width-800_800_500_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb4.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20210412121001/https://www.contextis.com/media/images/content/smb4.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>Caveats</h2>
+<p>In its current state the script has a few limitations:</p>
+<ul>
+<li>The named pipe is not asynchronous so only one client can communicate with the server at any given time.</li>
+<li>The shell has no concept of long-running commands. All commands received are handed off as PowerShell jobs and the output is returned once the job completes.</li>
+<li>This proof of concept differs from our initial scenario where an internal host is used as a C&amp;C sever, but should serve well to illustrate using SMB as a C2 channel.</li>
+</ul>
+<h2>Contact and Follow-Up</h2>
+<p>Ruben works in our Assurance team from our London office. See the <a href="/web/20210412121001/https://www.contextis.com/contact/">contact page</a> for ways to get in touch.</p>
+</article>
+{% endraw %}

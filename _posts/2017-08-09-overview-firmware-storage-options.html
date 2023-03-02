@@ -1,0 +1,73 @@
+---
+layout: blogpost
+title: "An overview of firmware storage options"
+author: "Scott Lester and Steven Day"
+author_role: ""
+summary: "The security of a device’s firmware, as the first or an early part of a trusted chain, can have implications for the security of the whole system."
+tags: [Product Security]
+hero_banner: An_overview_of_firmware_storage_options_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>At Context we often obtain the firmware for a device so that we can extract it and take a good look at the underlying code for both the operating system and applications. For a recent example see <a href="https://www.contextis.com/en/blog/hacking-virgin-media-super-hub">our blog on the Virgin Media SuperHub</a>. </p>
+<p>This blog is the first in a series of blogs on how firmware is commonly stored on embedded devices, and the techniques for extracting it. This first blog covers how and where firmware can be stored on a device. Future blogs will focus on some of the cheap, and not-so-cheap, methods of extraction.</p>
+<h2>Identifying Components</h2>
+<p>Before we cover the kinds of components available for storing firmware, let's first discuss how to identify components on a printed circuit board (PCB). The obvious one is the markings on a chip; these can include the manufacturer name, the model number and the chip package description. Later sections cover the typical packages for different kinds of chips, which can help us guess at the chip's function.</p>
+<p>If you can’t read or look up the serial number on a chip, the circuit design can often give you a clue as to the chip’s functionality. For example, the photo below shows the PCB for a Siemens Programmable Logic Controller (PLC). Without looking up the chips we can instantly guess that the System-on-Chip (SoC) is on the right (it’s the biggest), the RAM is in the middle (the wiggly traces connecting it to the SoC are designed to be exactly the same length, because high-speed RAM needs accurate signal timing), and the Flash is on the left (the many parallel lines suggests lots of data signals).</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/PLC.width-800__800_315_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/PLC.width-800__800_315_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031756/https://www.contextis.com/media/images/content/PLC.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031756/https://www.contextis.com/media/images/content/PLC.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The above is a good example of how to identify the likely function of a chip based on its surroundings and connections, which can help with unmarked or unidentifiable chips. However, stating the obvious, in this case it is possible to fully identify all of the three chips by their markings.</p>
+<p>The large chip on the right can be identified from the part number and the Siemens logo. The logo on the other two devices indicates that they are both produced by Micron. Due to space constraints on smaller packages Micron do not print the part number, and instead print a FBGA marking which takes up less space.</p>
+<p>Fortunately Micron provides an <a href="https://www.micron.com/support/tools-and-utilities/fbga">online decoder</a> to obtain the full part number, which reveals that the chip on the left is an ECC NAND Flash (<a href="https://www.micron.com/parts/nand-flash/mass-storage/mt29f1g16abbdahc">MT29F1G16ABBDAHC</a>) and the one in the middle is a 512Mb SDRAM (<a href="https://www.micron.com/parts/dram/mobile-ddr-sdram/mt46h16m32lfb5-6-it">MT46H16M32LFB5-6</a>).</p>
+<h2>Possible Locations for Firmware</h2>
+<p>There are a number of places that firmware can be stored on a circuit board, and it may indeed be stored in more than one place on some devices. Assuming we can now locate and identify the likely memory chips on a board, let's cover the different types of storage, and what they are typically used for.</p>
+<h3>NOR Flash/EEPROM</h3>
+<p><img alt="" src="https://web.archive.org/web/20200424031756im_/https://www.contextis.com/media/images/content/EEPROM.width-500_.png" style="width: 155px; height: 210px; float: left; border-width: 0px; border-style: solid; margin-top: 0px; margin-bottom: 0px; padding: 0px 10px 0px 0px;">The terms NOR and EEPROM are often used interchangeably; what we mean here is low-density storage that may be integrated in System-on-Chips (SoC), or may be in its own chip package. There are many other sources that cover the differences between Flash storage types, but the main advantage of NOR Flash is that it is byte-addressable and erasable, which means you can execute code straight from NOR, one instruction at a time (eXecute in Place or XiP). This makes NOR Flash ideal for storing low-level, first stage code, as you don’t need any drivers or Flash management to read it.</img></p>
+<p>NOR Flash typically comes in one of two types: serial and parallel. Serial NOR Flash usually comes in small packages, such as SOIC-8, which look like the picture on the left.</p>
+<p>Other common package formats are WSON (package types often have great/tortured acronyms, in this case: Very Very Small Outline No-lead), DIP-8, SOIC-16 and BGA-24. These small chips are accessed by a serial protocol such as <a href="https://en.wikipedia.org/wiki/Serial_Peripheral_Interface_Bus">SPI</a> or <a href="https://en.wikipedia.org/wiki/I%C2%B2C">I2C</a>, and are often used to store small amounts of data, for example the system settings on a SoHo router.</p>
+<p>Large capacity NOR typically come in larger packages that have parallel data lines for increased speed. These devices are more likely to come on a <a href="https://en.wikipedia.org/wiki/Thin_Small_Outline_Package">Thin Small Outline Package (TSOP)</a> package with 48 or 56 pins, such as the Spansion chip shown below.</p>
+<p><img alt="" src="https://web.archive.org/web/20200424031756im_/https://www.contextis.com/media/images/content/NOR.width-800_.png" style="width: 306px; height: 213px;"/></p>
+<p>These, continuing our example, could be used to store the file-system image on a SoHo router.</p>
+<h3>NAND Flash</h3>
+<p><img alt="" src="https://web.archive.org/web/20200424031756im_/https://www.contextis.com/media/images/content/BGA.width-500_.png" style="float: left; width: 304px; height: 231px; padding: 0px 10px 0px 0px;">Whereas NOR is perfect for storing relatively small amounts of data, larger data storage is typically found on NAND Flash chips. NAND is block addressable (you read it a block at a time) and writes are much quicker than with NOR, but it is slower to read. As NAND isn’t byte addressable it cannot be used to execute code directly, and instead program code needs to be copied elsewhere (usually RAM) before it can be run.</img></p>
+<p>NAND is more complicated to interface with than NOR memory, and is normally accessed via a parallel interface. You would therefore want to use a standalone chip reader for reading or writing the contents when it isn’t in circuit.</p>
+<p>NAND flash commonly comes as a TSOP (either 48 or 56 pin) or <a href="https://en.wikipedia.org/wiki/Ball_grid_array">Ball Grid Array (BGA)</a> package, which makes removal from the PCB more challenging than with packages that have leads. It can sometimes be included in a Multi-Chip Package (MCP) along with RAM, which saves on PCB space when compared to having two discrete chip packages.</p>
+<h3>Managed NAND</h3>
+<p>Both NOR and NAND Flash require a lot of management to compensate for the limitations of their operation; specifically to implement error correction, wear leveling, performance optimisation, and to perform the translation of physical storage to logical storage. This can be implemented in the hardware that manages the Flash memory in a Flash controller, in the file system driver, or in some combination of the two. In addition, Flash chips from different manufacturers typically aren’t interchangeable, as they come in a range of sizes and pin configurations.</p>
+<p>To reduce this burden eMMC is a form of managed NAND memory, and consists of a MultiMediaCard (MMC) controller and some NAND Flash within the same physical package. They’re effectively an SD card in a chip package. They are also more interchangeable, with most conforming to the JEDEC standard pin-out and package sizes. This makes them more desirable to manufacturers, who can change to a different supplier without having to redesign anything.</p>
+<p>The photo of a BGA package above is of a Kingston eMMC chip, the <a href="https://www.kingston.com/en/embedded/emmc">KE4CN3H5A</a>, which is on an <a href="https://www.contextis.com/resources/blog/phwning-boardroom-hacking-android-conference-phone/">Android-based teleconferencing device</a> we looked at.</p>
+<p>The nicest thing about eMMC is that you can interface with a chip with only three connections: data0, clock and command. Plus most of them have a standard (JEDEC defined) pinout. As a <a href="https://www.blackhat.com/docs/us-17/wednesday/us-17-Etemadieh-Hacking-Hardware-With-A-$10-SD-Card-Reader-wp.pdf">recent BlackHat talk</a> showed, this means that if you can find those three signals on the PCB you can dump the chip in-circuit. More on this in a later blog.</p>
+<h3>Universal Flash Storage (UFS)</h3>
+<p>We were recently attempting to unbrick a Samsung Galaxy S6 (GT-i920F), and found some service manuals that mentioned it has a Samsung KLUBG4G1BD Flash memory chip. This, it turns out, uses UFS 2.0, which is a successor to eMMC. It uses a different physical interface that offers quicker speeds than eMMC. See this <a href="https://www.anandtech.com/show/9146/the-samsung-galaxy-s6-and-s6-edge-review/7">post on Anandtech</a> for a more detailed analysis on UFS compared to eMMC.</p>
+<h2>Mixing Storage Types</h2>
+<p>The above section introduces the different types of Flash storage media, and their relative advantages and disadvantages. Often a device will use one or more types of memory for different kinds of storage.</p>
+<p>Continuing our example of a SoHo router device, the diagram below shows how different storage locations can be used on a single device, and where they’re loaded in a generalised boot process. In this case there are three different storage locations that are used to store the Primary Boot Loader (PBL), the secondary bootloader, the program code and the system settings.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/1_Wt26GrG.width-800__800_655_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/1_Wt26GrG.width-800__800_655_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031756/https://www.contextis.com/media/images/content/1_Wt26GrG.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031756/https://www.contextis.com/media/images/content/1_Wt26GrG.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The following blogs in the series will show cheap and not-so-cheap ways of getting at the different storage types.</p>
+</article>
+{% endraw %}

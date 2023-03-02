@@ -1,0 +1,178 @@
+---
+layout: blogpost
+title: "Downgrade SPNEGO Authentication"
+author: "Carsten Sandker"
+author_role: "Security Consultant"
+summary: "How to attack a weak authentication protocol for offline password cracking."
+tags: [Vulnerabilities and exploits]
+hero_banner: Downgrade_SPNEGO_Authentication_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Microsoft’s SPNEGO protocol is a less well known sub protocol used by better known protocols to negotiate authentication. This blog post covers weaknesses Context have discovered in SPNEGO and leverages this to highlight an inconsistency in the SMBv2 protocol, both of which lead to user credentials being sent over the wire in a way which makes them vulnerable to offline cracking. Finally, we have released a <a href="https://github.com/csandker/spnegoDown" target="_blank">tool</a> to automate this downgrade process.</p>
+<p>The authentication landscape of Microsoft Windows domain networks is dominated by the two authentication schemes Kerberos and NTLM, of which Kerberos is usually the better security choice (more on this later, also see [1]). Because Kerberos is the preferred authentication scheme by Microsoft[1], but not the only choice available, a question that arises is: Who decides which authentication scheme is used in a conversation?<br/>
+This is where a sub-protocol called SPNEGO steps in: <a href="https://msdn.microsoft.com/en-us/library/cc247021.aspx" target="_blank">SPNEGO</a> is Microsoft’s extension to the ‘Generic Security Service Application Program Interface (GSS-API)’ and specified in <a href="https://tools.ietf.org/html/rfc4178" target="_blank">RFC4178</a>. The purpose of this protocol is to negotiate the authentication scheme (mostly Kerberos or NTLM) used between client and server. It does this by interchanging lists of supported authentication schemes (similar to SSL/TLS) from which the client and server can choose their preferred scheme. Or to say it with Microsoft’s words:</p>
+<blockquote>
+<p> ‘SPNEGO provides a framework for two parties that are engaged in authentication to select from a set of possible authentication mechanisms, in a manner that preserves the opaque nature of the <a href="https://msdn.microsoft.com/en-us/library/cc247023.aspx#gt_34425e1f-c291-4074-850c-ed13ae1509a7" target="_blank">security protocols</a> to the <a href="https://msdn.microsoft.com/en-us/library/cc247023.aspx#gt_7379f061-40b0-4919-9042-3f338e4db77f" target="_blank">application protocol</a> that uses SPNEGO’ <br/>
+[Taken from MS-SPNG 1.Introduction [2]]</p>
+</blockquote>
+<p>SPNEGO handles the negotiation for various other protocols, such as SMBv2, LDAP, RPC and DNS and as stated in Microsoft’s <a href="https://msdn.microsoft.com/en-us/library/cc247021.aspx" target="_blank">protocol documentation</a>: “The SPNEGO Extension is a <a href="https://msdn.microsoft.com/en-us/library/cc247023.aspx#gt_34425e1f-c291-4074-850c-ed13ae1509a7" target="_blank">security protocol</a>” [Taken from MS-SPNG 1.3.1 Security background [2]]</p>
+<p>Unfortunately for a security protocol SPNEGO lacks measures to check its data integrity. This means the SPNEGO protocol has no way to detect changes to messages during transit. Combining this with SPNEGO using a list of authentication schemes, the follow up question is: What stops an attacker in a Man-in-the-middle position from changing the list of proposed authentication schemes to the attacker’s preferred choice? The answer to this is simple: Absolutely nothing.</p>
+<p>The result of changing the authentication scheme, e.g. from Kerberos to NTLM, can, on the other hand, have high value for the attacker. An NTLM response hash, sent over the wire, is far more likely to be breakable than a Kerberos service ticket (TGS). The NTLM response contains a hash of the password chosen by the domain user, whereas the TGS contains an auto-generated service password.  An attacker capable of downgrading the authentication scheme to NTLM can therefore attempt to crack the user’s chosen password in an offline brute-forcing attack in order to gain access to the user’s system whereas this is considered implausible for a Kerberos ticket.</p>
+<p>In the rest of the post we look at successful downgrade attacks of this kind for various protocols.</p>
+<h2>Downgrading SMBv2</h2>
+<p>SMB version 2, here referred to as SMBv2, is omnipresent in Windows domain networks. Since it heavily relies on authentication it’s a good first target.</p>
+<p>Recall that SPNEGO is vulnerable to downgrade attacks due to its lack of data integrity checks. SMBv2 includes message signatures and should therefore mitigate this vulnerability. Unfortunately during this research Context found that SMBv2 only signs messages <strong>after</strong> an authenticated session is established. By monitoring SMBv2 traffic it can be seen that the first messages of the negotiation and session setup process are not signed. A proof of this is given with the screenshot of an example traffic dump below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication1_800_403_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication1_800_403_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication1_1033_520_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication1_800_403_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 1: Unsigned SMBv2 Negotiation and Session Setup Request</em></p>
+<p>A SMBv2 session is established with the server’s response to a session setup request. Only from this point on are SMBv2 messages signed, as is highlighted in the traffic dump below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication2_800_378_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication2_800_378_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication2_946_447_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication2_800_378_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 2: Signed SMBv2 Messags After the Session Setup</em></p>
+<p>For all negotiation messages the signature field in SMBv2 is blank. After the authentication handshake is completed a session is established and the SMBv2 messages are signed from then on. <br/>
+However, the negotiation of the authentication scheme is done within the first, unsigned part of the session setup process. This lack of message integrity checks leaves SMBv2 vulnerable to downgrade attacks.</p>
+<p>The authentication scheme, which shall be used in a SMBv2 conversation is chosen by the SPNEGO protocol based on a set of supported schemes (called ‘mechTypes’). In the SMBv2 protocol these mechTypes are interchanged between client and server within the server’s negotiation response and the client’s session setup request. In our first demonstration the list of supported mechTypes has been changed to only yield NTLM as valid authentication scheme. This change can be seen in the following traffic capture: </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication3_800_419_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication3_800_419_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication3_1250_655_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication3_800_419_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 3: SMBv2 MechType List Change</em></p>
+<p>The provided mechTypes have been changed in a way that only the NTLMSSP presents a valid authentication scheme (see 1.). This change of the mechType list leads the client and server to agree on NTLMSSP as the authentication provider and an NTLMv2 authentication process is started (see 2.). <br/>
+In the NLTMv2 authentication process that follows this traffic manipulation, the domain user’s password is hashed and sent over the wire unencrypted (due to the fact that the entire SMBv2 protocol is unencrypted). An attacker listening to the wire has now gained access to the user’s password hash and can attempt to crack this hash in an offline brute force attack.</p>
+<p>A last important side note to downgrading SMBv2: When downgrading SMBv2 connections we observed that SMBv2 ends up denying downgraded connections, whereas NTLM connections that have not been tampered with are successfully accepted. <strong>But</strong> – and this is the important aspect for this attack – the connection is again only refused <strong>after</strong> the authentication messages have been exchanged. For as yet unknown reasons, the SMBv2 protocol rejects downgraded connections, but lets the client and server nevertheless exchange their authentication data. From an attacker’s perspective this is a minor side affect, since the valuable NTLM response hashes can still be collected. </p>
+<h2>Downgrading LDAP and RPC</h2>
+<p>As mentioned before, various protocols rely on SPNEGO to choose their authentication scheme, and in addition to SMBv2 we have also looked at LDAP and RPC connections. In comparison to SMBv2 these two protocols are not capable of any data integrity checks via message singing or similar and as a result the SPNEGO authentication used is another good target for downgrading and offline password cracking attempts.</p>
+<p>Similar to SMBv2, SPNEGO makes use of a list of mechTypes in LDAP and RPC messages in order to negotiate the authentication scheme. As a proof of concept for a successful downgrade of the authentication scheme in LDAP and RPC messages, the list of mechTypes was manually manipulated in a way that only the NTLMSSP resulted as a valid authentication provider. A dump of the manipulated traffic is shown below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication4_800_389_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication4_800_389_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication4_979_476_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication4_800_389_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 4: LDAP MechType List Change</em></p>
+<p>The list of mechTypes has been manipulated (see 1.), which results in an NTLMSSP authentication process (see 2.). An attacker listening on the wire can now again capture the user’s NTLMv2 hash for offline cracking.</p>
+<p>At the network authentication level RPC is very similar to LDAP; the protocol has no built-in integrity checking and relies on SPNEGO to agree an authentication scheme. Once again this can be intercepted and changed by an attacker, resulting in a downgrade to NTLM v2 authentication and the exposure of hashed credentials.<br/>
+A proof of concept downgrade of the RPC protocol, analogous to the previous example, is shown below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication5_800_425_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication5_800_425_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication5_931_495_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication5_800_425_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 5: RPC  MechType List Change</em></p>
+<h2>The Tool: spnegoDown</h2>
+<p>So far it has been proven that the negotiated SPNEGO authentication schemes can be downgraded in the SMBv2, RPC and LDAP protocol. Up until this point the authentication downgrade of these protocols was proven by manually capturing and manipulating the individual protocol flows. <br/>
+But don’t worry there will be no need to manually do this as we are releasing a tool named ‘<a href="https://github.com/csandker/spnegoDown" target="_blank">spnegoDown</a>’ along with this blog post in [2] that does all the work for you.</p>
+<p>SpnegoDown automatically detects SPNEGO negotiation messages in SMBv2, RPC and LDAP and automatically attempts to downgrade the authentication scheme to NTLM and outputs the resulting NTLM user hash.</p>
+<p>A proof of concept downgrade attack of SPNEGO in SMBv2 and LDAP with spnegoDown is shown in the screenshots below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication6_800_246_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication6_800_246_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication6_1358_418_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication6_800_246_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 6: SPNEGO Downgrade in SMBv2 with spnegoDown</em></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication7_800_243_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication7_800_243_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication7_1361_413_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication7_800_243_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 7: SPNEGO Downgrade in LDAP with spnegoDown</em></p>
+<p>The tool also outputs a file that can directly be used by password cracking software like hashcat or John, for straight forward offline password cracking:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication8_800_380_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Downgrade_SPNEGO_Authentication8_800_380_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication8_936_445_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Downgrade_SPNEGO_Authentication8_800_380_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 8: Offline Password Cracking of Downgraded Authentications</em></p>
+<h2>Conclusion</h2>
+<p>The lack of data integrity checks in the SPNEGO protocol in combination with missing or failing data integrity checks in various application protocols leaves the authentication processes of those protocols vulnerable to downgrade attacks. By exploiting this weakness in application protocols, the agreed authentication scheme can be downgraded (for example to NTLM). A downgrade to a weaker authentication scheme, such as NTLM, can in turn be used for offline password cracking attempts.<br/>
+Communications of systems that support NTLM authentication in version 1 (which is configurable, see [4]), can be downgraded to expose the weak NTLMv1 user hashes, which can be efficiently broken, e.g. by using rainbow tables. Whereas well-configured systems can be downgraded to NTLMv2, which can still be broken in offline brute force attacks if the user’s chosen password is not sufficiently secure (see [5] for reference of sufficient password strength).</p>
+<p>In this blog post, Context has shown successful SPNEGO downgrade attacks in the SMBv2, LDAP and RPC protocol. In case of LDAP and RPC this downgrade is possible due to the lack of data integrity checks and in case of SMBv2 it has been found that the data integrity checks in place (SMBv2 signing) are failing to incorporate integrity checks in all messages, which leaves the protocol vulnerable to downgrade attacks.</p>
+<p>Context has reported the discovered weaknesses to Microsoft, in line with our disclosure policy. Since a custom protocol wrapper for data integrity checks based on the vulnerable protocols will be too much effort for most users, the only remaining fix to mitigate this attack is to disable NTLM authentication domain-wide. A further barrier to prevent exploitation of this attack can be built by disallowing NTLMv1 and enforcing strong password policies (see [5]).</p>
+<p><strong>Please note</strong>: Disabling NTLM domain-wide may cause significant side effects to your domain (mainly as not all software products and authentication processes support Kerberos and Kerberos does not support all processes, e.g. calling a service by its IP instead of FQDN). </p>
+<h2>References</h2>
+<p>[1] TechNet blogpost about Kerberos:<a href="https://technet.microsoft.com/en-us/library/cc780469(v=ws.10).aspx" target="_blank"> https://technet.microsoft.com/en-us/library/cc780469(v=ws.10).aspx</a><br/>
+[2] Microsoft’s Documentation of MS-SPNG: <a href="https://msdn.microsoft.com/en-us/library/cc247022.aspx" target="_blank">https://msdn.microsoft.com/en-us/library/cc247022.aspx</a><br/>
+[3] spnegoDown: <a href="https://github.com/csandker/spnegoDown" target="_blank">https://github.com/csandker/spnegoDown</a><br/>
+[4] LmCompatibilityLevel: <a href="https://technet.microsoft.com/en-us/library/cc960646.aspx" target="_blank">https://technet.microsoft.com/en-us/library/cc960646.aspx</a><br/>
+[5] OWAS Cheat Sheet For Proper Passwords: <a href="https://www.owasp.org/index.php/Authentication_Cheat_Sheet#Implement_Proper_Password_Strength_Controls" target="_blank">https://www.owasp.org/index.php/Authentication_Cheat_Sheet#Implement_Proper_Password_Strength_Controls</a></p>
+</article>
+{% endraw %}

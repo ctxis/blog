@@ -1,0 +1,389 @@
+---
+layout: blogpost
+title: "Testing Multi-Step Forms (Part 2)"
+author: "Michael Skiba"
+author_role: "Security Consultant"
+summary: "In the previous blog post, we discussed the general difficulties that come with scoping multi-step forms, e.g. a shopping cart process that asks for personal details first, then for payment details and in a last step prints out a summary. In this blog post we will discuss some techniques that can used to test a multi-step form."
+tags: [Web applications]
+hero_banner: Multi_Step_forms_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Let’s take the following multi-step form (fig.1) as the target. It’s a payment form divided into 3 pages – “Personal Details”, “Payment Details” and “Summary” page.  </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_01_800_301_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="A multi-step form with two input pages (8 + 5 = 13 input fields) and one result page" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_01_800_301_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_01_1241_467_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_01_800_301_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em><strong>Figure 1: A multi-step form with two input pages (8 + 5 = 13 input fields) and one result page</strong></em></p>
+<p>We elaborated in part 1 of this series on why a naïve approach of simply testing the input and output validation between the single pages is not enough; and, how one has to go all the way through the process, minding the different permitted workflows.</p>
+<p>For example, it might very well be possible that the output on the summary page (figure above) is properly escaped. But the process depicted above is not a one-way street, it is possible to go back and forth to make changes. Now when we go back from the summary page to page 2 an interesting thing happens in our sample application: The server sends us not only the input fields but already prefilled them with our previous input. Suddenly we got a new point of reflection that could be subject to Cross-Site Scripting (XSS). We would have missed that if we only ever went forward through the multi-step form.</p>
+<p>With this background in mind we will now discuss the how to test multi-step forms using standard penetration testing tools.</p>
+<h2>Multi-Step Fuzzing with Burp Macros</h2>
+<p>A popular tool among penetration testers (“pentesters”) is the multipurpose proxy Burp Suite (Burp), which among other things is used to intercept and modify HTTP(S) request and responses. Burp comes with a powerful Macro engine that can be utilised to automate the process of fuzzing multi-step forms.</p>
+<p>The Macro settings are tucked away under ‘Project options’ -&gt; ‘Session’. This ‘Session’ tab is split into three sections:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_02_800_429_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_02_800_429_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_02_1900_1018_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_02_800_429_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<ol>
+<li><strong>Session Handling Rules:</strong> This is probably the most important part, which among other things allows us to define when a macro is executed. </li>
+<li><strong>Cookie Jar:</strong> These settings allow us to control which Burp tools can use and modify cookies from the Cookie Jar. For our example, we don’t need to change anything here.</li>
+<li><strong>Macros:</strong> This is where we will define our Macros. A defined Macro will consist of an arbitrary amount of requests that will be issued sequentially. Burp is able to extract values from these responses and use them in a later request.</li>
+</ol>
+<h3>Step 0: Understanding the workflow</h3>
+<p>The very first step is to understand the actual workflow, discover its different options and possible decision branches, e.g. the input and output for a health insurance application might differ from that of a car insurance even if both policies can be requested in the same multi-step process. <br/>
+Hence, we will first follow the workflow from the beginning to the end, making sure we use valid data that will create a ‘known good’ result. In our example this is straight forward, there are only 3 requests (ignore the favicon.ico that Firefox tries to fetch for us).</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_03_800_742_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_03_800_742_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_03_1029_955_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_03_800_742_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The target for our test is the ‘sessiontoken’ which is issued by the server when visiting ‘Page1.php’:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_04_800_742_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_04_800_742_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_04_1029_955_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_04_800_742_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>To assess its validity and extent, we try modifying it before requesting ‘Page2.php’. We get an error message ‘Tampering detected!’ which suggests that the application is validating the ‘sessiontoken’ before processing ‘Page2.php’ and ‘Page3.php’:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_05_800_301_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_05_800_301_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_05_944_355_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_05_800_301_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>Step 1: Get Sessiontoken + Go to Fuzz point</h3>
+<p>Now that we’ve established how the application validates data within the multi-step form, we can start building our macro. First, we need to define a macro that will retrieve the ‘sessiontoken’ and moves us to the point where we can perform semi-automated input validation.<br/>
+To create the macro, click on ‘Add’ button of the Macro section:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_06_800_524_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_06_800_524_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_06_1011_662_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_06_800_524_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>A new window pops up, that’ll show the previous requests made in a fashion that is very similar to the Proxy history tab:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_07_800_684_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_07_800_684_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_07_1029_880_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_07_800_684_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Here select one or more requests that you want to use in the macro and click ‘OK’. In our case, we only need to use the first page as this will allow us to obtain a new ‘sessiontoken’ from the server, and also contains the input fields that we want to test.</p>
+<p>We are now in the main macro editor view. From here we can analyse and modify the individual requests we’ve selected previously. We can also specify custom parameters that Burp should extract for us from the response, although this is not something that we will cover in this particular guide.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_08_800_418_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_08_800_418_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_08_943_493_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_08_800_418_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Next, we can provide a descriptive name for the Macro and also make sure that burp does not use a cookie from the Cookie Jar for our initial request. This will make sure that the server will always issue a new and valid ‘sessiontoken’ for us.</p>
+<p>To configure this behaviour we select request #1 and click on Configure item’ in the macro editor (see above); in the new pop-up (see below) we uncheck the entry ‘Use cookies from the session handling cookie jar in requests’. Save the macro by clicking on ‘OK’ in both these windows.</p>
+<p>We will be redirected to the Session tab and  our first macro would have been successfully created.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_09_800_648_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_09_800_648_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_09_869_704_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_09_800_648_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>Step 2: End to End Fuzzing</h3>
+<p>Now, we will set up a second macro in a similar fashion to ‘walk’ through the rest of the multi-step process, after we have tested the input fields on Page 1.</p>
+<p><strong>Quick recap:</strong> Step 1 has shown how to create a macro that walks to the point where the fuzzing should take place. Here you can use your tool of choice (Intruder, Repeater, Scanner, etc.) later, but before there is a few more steps to set up. We will now discuss Step 2, which deals with navigating to the end of the multi-step form. In our example, Page3.php shows the summary page; keep in mind that the end could be any page, not necessarily the last one in the process.</p>
+<p><strong>Set to work:</strong> In the macro section click on ‘add’ once again. This time select the request which calls Page3.php (request #5 in the screenshot at the beginning) and click on ‘ok’. This will pop-up  the macro editor for this macro: <br/>
+ </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_10_800_418_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_10_800_418_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_10_943_493_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_10_800_418_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Give it a descriptive name so that it’s possible to identify the purpose of the macro. Ensure that Burp updates the Cookie jar within this macro (opposite of what we did in Step 1). This is actually the default state, so you shouldn’t need to change anything. But, for good measure we’ll click on ‘Configure item’ and make sure that both checkboxes are ticked:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_11_800_650_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_11_800_650_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_11_943_766_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_11_800_650_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Save the macro by clicking on ‘OK’</p>
+<h3>Step 3: Setting up a Session Handling Rule</h3>
+<p>We now have to tell Burp how best to use the two macros we created. Within the  ‘Sessions’ tab, click on the ‘Add’ button within the ‘Session Handling Rules’ section.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_12_800_616_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_12_800_616_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_12_920_708_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_12_800_616_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Provide an identifiable title for this rule, e.g. ‘Workflow 1 for multi-step example’.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_13_800_629_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_13_800_629_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_13_962_756_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_13_800_629_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Click on ‘Add’ in the ‘Rule Actions’ section and select ‘Run a macro’ from the dropdown list:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_14_800_625_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_14_800_625_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_14_964_753_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_14_800_625_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In the window that pops up, select ‘Get Session + Go To Fuzz Point’ (so that it is highlighted yellow – no need to click on ‘add’  as it would create a new macro altogether) as this is the macro we want to run before the actual fuzz request. The defaults on this page are fine for our example, so we click on ‘OK’.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_15_800_644_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_15_800_644_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_15_962_775_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_15_800_644_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Next, click ‘Add’ again and select the ‘Rule Actions’ section again. This time, select ‘Run a post-request macro’ and select the second macro that will take us to the end of the form, after the fuzzing request has been issued.<br/>
+ </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_16_800_630_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_16_800_630_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_16_960_756_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_16_800_630_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Select the second macro ‘Go From Fuzz Point to the End’ from the window that pops up and click on ‘OK’. Leave the rest of the settings in their default state:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_17_800_629_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_17_800_629_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_17_962_756_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_17_800_629_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Now that we’ve told Burp how the macros should be applied, next we need to specify when they should be applied. Click on the ‘Scope’ tab within the Session handling rule editor window:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_18_800_630_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_18_800_630_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_18_795_626_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_18_795_626_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_19_800_855_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_19_800_855_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_19_962_1028_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_19_800_855_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Specify which tools should utilise this particular session handling rule. The default tool selection is fine for our example. However, the macro should only be executed when a request is issued to shop.example.com application. Therefore adapt the scope accordingly. ‘Use custom scope’ and click on ‘Add’ under the ‘Include in scope’ heading, here set whatever fits your case. In this example any protocol, shop.example.com as host and port 80 will work fine. As file specify the part of the URL that is not part of the domain, in our case this could be ‘^/Page2.php$’ (without ‘ ’). Next, click ‘ok’ twice to first set the scope and then to finish the session handling rule.</p>
+<p>Please note, if the file parameter is not specified or the scope is otherwise too broad then burp will run the specified macro over and over again for every single request that matches the scope.  In the default settings this includes objects from the  ‘Target’, ‘Scanner’, ‘Repeater’, ‘Spider’ and ‘Intruder’ tool. Not only will this cause lots of traffic, but it will also take its toll on testing time and logs created. In worst-case scenario, this could interfere with the overall scope of the engagement. Imagine a scope where only the domain and port are specified:  The macro gets executed on every page visited on that domain. E.g. using the repeater to send a request to http://shop.example.com/robots.txt, will not respond with the robots.txt file as one might expect, but instead it will ‘walk’ to http://shop.example.com/Page1.php, then  issue a get request to http://shop.example.com/robots.txt and afterwards walk to the end of the macro, which is defined as http://shop.example.com/Page3.php. So instead of seeing the robots.txt burp will display the content of Page3.html. So care must be taken when setting the scope.</p>
+<h3>Step 4: Final run and Session Tracer</h3>
+<p>The session rule should now be in effect for the scope that we have defined. To test this we click on ‘Open session tracer’, which is a great tool to debug session rules. </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_20_800_442_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_20_800_442_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_20_944_521_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_20_800_442_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Leave the window open and head over to the Proxy History tab. Here, select the request for Page2.php and send it to the Repeater (Ctrl+r). Now, head over to the Repeater tab and click ‘Go’. Observe the changes:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_21_800_335_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_21_800_335_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_21_944_395_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_21_800_335_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_22_800_424_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_22_800_424_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_22_1505_797_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_22_800_424_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Observer that after sending a request to ‘Page2.php’ (from the Request section), both the Request (left) and Response (right) sections changes. Both sections now show the request and response of ‘Page3.php’ instead of ‘Page2.php’. This is because Burp automatically sent the request to ‘Page3.php’ as per the macro we previously configured.</p>
+<p>To debug the actions, open the Session tracer window we previously accessed. This window should now reveal the request that was modified using macros along with description of all the changes that were performed automatically:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_23_800_854_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Multi-Step-Forms-Part2-_23_800_854_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_23_986_1052_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Multi-Step-Forms-Part2-_23_800_854_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>Conclusion</h2>
+<p>We’ve successfully set up a session handling rule with two macros that will walk us to the point where we want to fuzz and walk us from there to the end. This will allow us to automate the fuzzing process for a multi-step form with minimal manual input.</p>
+<p>If you have read the first part of this blog entry  then you’ll know that we only tested one form page of a multistep form, several other exists for which we will have to fashion appropriate macros.</p>
+<p>We hope this blog has given you an insight into the intricacies of real world testing and how to overcome them (at least one small part of it). Happy testing :) </p>
+</article>
+{% endraw %}

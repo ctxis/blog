@@ -1,0 +1,454 @@
+---
+layout: blogpost
+title: "Don't Feed Them After Midnight: Reverse-Engineering the Furby Connect"
+author: "Context Research"
+author_role: ""
+summary: "With Christmas almost upon us and \"pester season\" in full swing, we thought it high time to have a prod at some of the connected toys that'll inevitably end up nestled beneath trees across the nation in just a few weeks time."
+tags: [Product Security, Reverse Engineering]
+hero_banner: Reverse_engineering_the_furby_connect.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>We've been working in collaboration with <a href="https://www.which.co.uk/reviews/smart-toys/article/smart-toys-should-you-buy-them">Which?</a> to review the <strong>Furby Connect</strong> from Hasbro, which is currently priced at around £32.00, and comes with a smartphone app that offers to "connect you to a world of surprises."</p>
+<p>The idea of Furbies being sold with companion apps is not a new one: the Furby Connect's predecessor, the Furby Boom, also featured an accompanying app, however communication between it and the Furby was accomplished by means of high-frequency audio. This time around, Hasbro have equipped the Furby Connect with a Bluetooth Low Energy (BLE) connection, allowing it to interface more reliably with its companion app - named "Furby Connect World" - available for both <a href="https://play.google.com/store/apps/details?id=com.hasbro.FurbyWorldAPPSTORE">Android</a> and <a href="https://itunes.apple.com/gb/app/furby-connect-world/id1102810225">iOS</a>.</p>
+<h2 class="section-title">Initial Observations</h2>
+<p>We powered up our Furby and installed the app on an Android device. Aside from offering a Tamagotchi-like experience raising "furblings" and providing several new ways to interact with your Furby Connect toy (the Food Cannon, for example, can be used to feed it snacks) the app also acts as an update client, querying Hasbro's AWS endpoints for new Furby downloadable content. This content is distributed in the form of proprietary DLC files, and seemed to contain new songs, dances, and actions for the Furby Connect to perform. If any new content is found, the associated DLC file is downloaded by the app, then pushed to the Furby Connect over its BLE connection. As DLC files can be as big as 2MB and BLE is characteristically slow, this can take a long time, however the app hides this fact by uploading DLC files in the background while the user plays in the game.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/connection_diagram2.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/connection_diagram2.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/connection_diagram2.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/connection_diagram2.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>By sniffing the BLE connnection during one such DLC update, we immediately discovered that the security situation was bad. Right off the bat, none of the standard Bluetooth LE security features (e.g. authenticated pairing or link encryption) were in use by either the app or the Furby Connect. This meant that anyone within range of the communication could intercept unencrypted packets, inject their own content, or establish their own connection with the toy - all without any physical interaction required on the part of the user or the attacker.</p>
+<p>Furthermore, we also observed that the Furby Connect was exposing a number of services in addition to those involved in receiving DLC updates, including one whose UUID matched with that normally associated with the Nordic Semiconductor Over-The-Air Direct Firmware Update service (DFU OTA.) This is typically used by Nordic Semiconductor devices to receive firmware updates over a BLE connection, and has a <a href="http://infocenter.nordicsemi.com/index.jsp?topic=/com.nordic.infocenter.sdk5.v11.0.0/bledfu_transport_bleservice.html&amp;cp=4_0_8_4_3_1_4_1">newer version</a> (which supports signature-based verification of firmware updates) and an older version (which doesn't.) The UID matched the <a href="http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v11.0.0%2Fbledfu_transport_bleservice.html&amp;cp=4_0_8_4_3_1_4_1">older version</a>, meaning that anyone within range could in theory connect to the device and push their own unsigned firmare updates to it.<br/>
+ </p>
+<h2 class="section-title">A Chilli Conundrum</h2>
+<p>Finding these vulnerabilities didn't take very long, so we started having a look at what a mischevious attacker could do to a Furby once connected. Thankfully, we soon found the excellent <a href="https://github.com/Jeija/bluefluff">bluefluff project</a> on GitHub (credit to <a href="https://github.com/Jeija">Florian Euchner</a> aka Jeija.) The project documents much of the <a href="https://github.com/Jeija/bluefluff/blob/master/doc/generalplus.md">Furby Connect's BLE protocol</a>, and has a tool for communicating with the Furby via its BLE connection. With a few modifications, the tool allowed us to flash the Furby Connect with a legitimate Hasbro DLC file and trigger the various animations contained in it by sending it 4-byte <a href="https://github.com/Jeija/bluefluff/blob/master/doc/actions.md">action commands</a>.</p>
+<p>However, our work was not done here. The bluefluff documentation identified the <a href="https://github.com/Jeija/bluefluff/blob/master/doc/dlcformat.md#audio-content">format used for audio data</a> within the DLC files, and provided a simple script for writing audio samples into existing Hasbro DLCs. However, much of the DLC format remained a mystery, and a means by which to reliably add variable-length audio data to a DLC - or to modify or remove existing audio data - had yet to be found. Jeija had also identified the existence of a single Furby eye animation involving a chilli within the DLC, which can be seen being played part-way through one of the Furby Connect <a href="https://youtu.be/9GEAIgOgy_o?t=1m1s">promotional videos</a>, but had not yet found a way to play back the chilli animation once it was loaded onto the Furby.</p>
+<p>We later found a <a href="https://github.com/swarley7/furbhax">second repository</a> on GitHub which seemed to show a Furby playing modified eye animations, however it appeared that this had been achieved by modifying the Furby's internal storage via a hardware hack, rather than by uploading and triggering a DLC.</p>
+<table border="0" cellpadding="1" cellspacing="1" style="width: 500px;">
+<tbody>
+<tr>
+<td><img alt="" src="/blog/assets/media/promo_chilli.png" style="width: 70vw;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli.png" style="width: 128px; height: 128px;"/></td>
+</tr>
+</tbody>
+</table>
+<p>If we were able to find a way to convince our Furby to play back the chilli animation, we'd have a means to create and upload our own animations, as we could then simply overwrite the chilli animation with one of our own choosing. Frustratingly, the chilli animation appeared to be the only one of its kind - no other DLCs seemed to contain custom eye animations, which is possibly why all the GitHub projects we'd seen had also identified the chilli animation as being important.</p>
+<p>We therefore set out our goals as follows:</p>
+<ul>
+<li>Reverse-engineer the Furby DLC file format</li>
+<li>Gain insight into how audio samples were packed into a DLC</li>
+<li>Gain insight into how commands sent over BLE could trigger these audio samples</li>
+<li>Understand the means by which a particular sequence of actions (involving eye animations, audio, and motion) was described within a DLC</li>
+<li>Find a way to modify one of these sequences to trigger the chilli animation</li>
+<li>Overwrite the chilli animation with an animation of our choosing</li>
+<li>Play back custom animations and audio on our Furby!</li>
+</ul>
+<h2 class="section-title">Great Hexpectations</h2>
+<p>The tools we used to reverse engineer Hasbro's Furby DLC files were:</p>
+<p>A hex editor. Nothing fancy; this was just the one that came bundled with my Linux distribution:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/hexeditor.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/hexeditor.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/hexeditor.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/hexeditor.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>A calculator:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/calc.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/calc.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/calc.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/calc.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>A Python interpreter, for writing up scripts to encapsulate understanding as and when we made progress:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/python.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/python.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/python.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/python.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>That's it.</p>
+<p>Once we'd gathered a small set of DLC files from Hasbro's AWS endpoints, we were ready to get started. One technique I find quite helpful when kicking off a file format reversing task is asking myself "if I was a file parser, how would I approach this?" Parsers often start reading files from the beginning, so that's exactly what we did.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/hexview_1.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/hexview_1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/hexview_1.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/hexview_1.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Here's the first few bytes of one of our DLCs, as seen in a hex editor. Just by eyeballing this bit of hex, a number of things spring out as interesting. The first 30 bytes here seem to form the word "FURBY" as a unicode string. This turned out to be true of all DLC files we observed, and appears to be the file signature for Furby Connect DLC files. Next, we see a couple of lines which clearly contain the word "DLC" followed by a string of zeroes, e.g. DLC_0000. It turned out that the spacing between each of these words was always a multiple of 38, which led us to believe that they were entries which could either be filled, or left empty (i.e. filled with null bytes.)</p>
+<p>The entries each seemed to take the following form:</p>
+<ul>
+<li> A unicode string containing the characters DLC_0000.</li>
+<li> A three-character identifier e.g. PAL, SPR</li>
+<li> A little-endian dword, whose value appeared to increment by 26 for each successive entry</li>
+<li> A second dword, of variable size</li>
+<li> Four null bytes.</li>
+</ul>
+<p>In the DLC shown above, a total of 9 entries were identified, containing the following 3-character identifiers:</p>
+<ul>
+<li>PAL</li>
+<li>SPR</li>
+<li>CEL</li>
+<li>XLS</li>
+<li>AMF</li>
+<li>APL</li>
+<li>LPS</li>
+<li>SEQ</li>
+<li>MTR</li>
+</ul>
+<p>It seemed that this initial section was something of a file header, which provided a limited description of the various sections within the DLC file. The "variable-length dword" noted earlier appeared to correspond to the length of each section, which we quickly confirmed by taking the length of this header, adding all of the values to it, and confirming that it matched the length of the file.</p>
+<p>But what did each section contain? At this stage we were unsure, but we could make some rough assumptions based on the 3-character identifiers.</p>
+<ul>
+<li>PAL - "Palettes" (colour maps?)</li>
+<li>SPR - "Sprites" (images?)</li>
+<li>CEL - "Cels" (animation frames?)</li>
+<li>XLS - "eXecution List" (command definitions?)</li>
+<li>AMF - "Audio Media Files" (audio samples?)</li>
+<li>APL - "Audio Player" (more audio samples?)</li>
+<li>LPS - "Lips" (mouth movement definitions?)</li>
+<li>SEQ - "Sequence" (?)</li>
+<li>MTR - "Motor" (servo movement definitions?)</li>
+</ul>
+<p>This didn't seem entirely right. Why would the mouth motion definitions be separate from the rest of the servo motion definitions? And why would there be two separate audio sections? Nonetheless, we now had a basic understanding how the file was structured: as a container, composed of a number of individual sub-sections, each describing a different part of the Furby's responses.</p>
+<h2 class="section-title">Nibbles and Bytes</h2>
+<p>Rather than just continuing sequentially through the file, we could now focus on specific sections of interest. The XLS ("eXecution List") section, though quite important-sounding, was probably also going to be quite complex. A good approach to reversing most things seems to be to start with the simplest parts, then build up to the more sophisticated parts from there, one piece at a time. Following this approach, we chose to leave the XLS section for later, and instead started out on the AMF ("Audio Media Files") section, which turned out to be arranged in the following rather straightforward format:</p>
+<ul>
+<li>A four-byte integer, giving the number of audio samples contained in the section.</li>
+<li>A sequence of four-byte integers, giving the offset to the start of each audio sample from the beginning of the section.</li>
+<li>A sequence of variable-length audio samples encoded with the GeneralPlus A1800 codec.</li>
+</ul>
+<p>This general format seemed to be replicated in the APL section, which turned out to contain sequences of ordered references to samples in the AMF section. We therefore started referring to this section as the "Audio Playlist" section. Its arrangement was as follows:</p>
+<ul>
+<li>A two-byte integer, giving the number of playlists contained in the section.</li>
+<li>Another two-byte integer, which seemed to be the number of entries plus the constant value 0x546, and likely referred to an area of memory into which audio samples were stored.</li>
+<li>A four-byte integer, which seemed to be a version number (normally 0x04)</li>
+<li>A sequence of four-byte integers, each giving the offset to the start each audio playlist from the beginning of the section.</li>
+<li>The audio playlist data itself. Each playlist consisted of an array of 2-byte integers, terminated by the value 0xf000, with odd-numbered (1st, 3rd, 5th...) elements referring to audio sample numbers (from the AMF section), and even-numbered (2nd, 4th, 6th...) elements giving the pause length between samples.</li>
+</ul>
+<p>We later found that quite a number of sections give offsets in words, hinting that the Furby might possibly be using a 16-bit processor under the hood. In fact, it turned out that the SEQ section - which we came to call the "Sequence" section - followed almost exactly the same format as the APL section:</p>
+<ul>
+<li>A two-byte integer, giving the number of "sequences" contained in the section.</li>
+<li>A four-byte integer, which seemed to be a version number (normally 0x04)</li>
+<li>A list of four-byte integers, each giving the offset to the start of each sequence in words from the beginning of the section.</li>
+<li>A collection of variable-length sequences, each terminated by the value 0x0000.</li>
+</ul>
+<p>Although at this stage we weren't entirely certain what each word in a "sequence" actually referred to, it was likely that, as in the APL section, each entry was a reference to another part of the file, given their markedly similar layouts and grammar.</p>
+<p>To better understand what role the SEQ section played, we modified a DLC file such that all the four-byte offsets at the beginning of the SEQ section were set to the same value, then uploaded this DLC to the Furby. The result was a Furby Connect which, regardless of the action command received over its BLE connection, would only play one sequence of motions, eye animations, and audio samples - but played that one sequence with no other irregularities. We therefore determined that the SEQ section was a sort of "tie-it-all-together" section, with each "sequence" entry describing a set of motions, audio, and eye animations that formed the complete response to a particular action command. With this additional insight, we were able to determine that one of the words in each sequence was being used to refer to a corresponding entry in the APL section.</p>
+<p>It seemed that SEQ referred to entries in APL, and APL referred to entries in AMF. But how did action commands translate into SEQ entries? The XLS ("eXecution List") section, as predicted, proved to be somewhat more complicated, but once its format had been determined (it was a four-deep tree of pointers,) it was found to provide a means of mapping action commands to SEQ entries. At this point, we had a working understanding of which action commands would trigger which audio tracks, and how the audio sample section was formatted, meaning that we could reliably alter a DLC to contain samples of our choosing, and predictably play them back by sending specific action commands via the BLE connection. Nice!</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/dlc_structure.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/dlc_structure.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/dlc_structure.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/dlc_structure.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">The Magic Word</h2>
+<p>Despite all this, we were still no closer to playing the chilli animation, which had evaded both our own efforts and those of our predecessors. We suspected that the SEQ section was somehow involved in selecting eye animations, but weren't entirely certain how. To try to bring clarity to the matter, we found a number of Furby actions that all had one infrequently-used eye animation in common - the pulsing exclamantion-mark eye animation, normally displayed when new a new DLC file had been downloaded by the app - then had a look at the SEQ entries that corresponded to them.</p>
+<p>We started by looking at just two of these SEQ entries. So that you can follow along with our reasoning, the two entries we looked at were as follows:</p>
+<ul>
+<li>Sequence A (SEQ entry number 16): 3000 454f e003 804b 1064 8068 1172 8051 0000</li>
+<li>Sequence B (SEQ entry number 31): 2000 455e e007 10a0 8005 115e 8068 0000</li>
+</ul>
+<p>We'd noticed earlier that all sequences seemed to start with either 0x03 or, less commonly, 0x02, and were terminated by the value 0x00. We'd also identified that the second word was used to refer to the particular playlist in the APL section that'd be played as part of the action, and the third word was used to control what the Furby's servos would do during the action (either by pointing into the MTR section, or to one of the sets of actions pre-programmed into the Furby.) The fourth through to the second-from-last word remained a mystery.</p>
+<p>These two sequences corresponded to the following eye animations:</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 250px; text-align: center;">
+<tbody>
+<tr>
+<td>Sequence A</td>
+</tr>
+<tr>
+<td><img alt="" src="/blog/assets/media/seq_A.gif" style="width: 250px; height: 225px;"/></td>
+</tr>
+</tbody>
+</table>
+<p> </p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 250px; text-align: center;">
+<tbody>
+<tr>
+<td>Sequence B</td>
+</tr>
+<tr>
+<td><img alt="" src="/blog/assets/media/seq_B.gif" style="width: 250px; height: 225px;"/></td>
+</tr>
+</tbody>
+</table>
+<p>If we look carefully at these two eye animations, you'll notice that they seem to be made up of a number of shorter eye animations played one after the other. We can pick out three distinct eye animations in A, and two distinct eye animations in B:</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px;">
+<thead>
+<tr>
+<td colspan="3" style="text-align:center">Sequence A</td>
+</tr>
+<tr>
+<th scope="col">Squint</th>
+<th scope="col">Exclamation Mark</th>
+<th scope="col">Happy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><img alt="" src="/blog/assets/media/A1.gif" style="width: 175px; height: 158px;"/></td>
+<td><img alt="" src="/blog/assets/media/A2.gif" style="width: 175px; height: 158px;"/></td>
+<td><img alt="" src="/blog/assets/media/A3.gif" style="width: 175px; height: 158px;"/></td>
+</tr>
+</tbody>
+</table>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px;">
+<thead>
+<tr>
+<td colspan="3" style="text-align:center">Sequence B</td>
+</tr>
+<tr>
+<th scope="col">Look About</th>
+<th scope="col">Exclamation Mark</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><img alt="" src="/blog/assets/media/B1.gif" style="height: 225px; width: 250px;"/></td>
+<td><img alt="" src="/blog/assets/media/B2.gif" style="height: 225px; width: 250px;"/></td>
+</tr>
+</tbody>
+</table>
+<p>Interestingly, there are also exactly three words starting with 0x8 in sequence A, and exactly two such words in sequence B, as shown below.</p>
+<ul>
+<li>Sequence A: 3000 454f e003 <strong>804b</strong> 1064 <strong>8068 </strong>1172 <strong>8051</strong> 0000</li>
+<li>Sequence B: 2000 455e e007 10a0 <strong>8005</strong> 115e <strong>8068</strong> 0000</li>
+</ul>
+<p>We might conjecture that these 0x8XXX words are used to select eye animations, but we'll need more proof to confirm this. If we look at these words again, do any of them share the same value? Indeed they do - the second word in the first sequence is the same as the second word in the second sequence (they're both 0x8068).</p>
+<ul>
+<li>Sequence A: 3000 454f e003 <strong>804b</strong> 1064 <span style="color:red"><b>8068</b></span> 1172 <strong>8051 </strong>0000</li>
+<li>Sequence B: 2000 455e e007 10a0 <strong>8005</strong> 115e <span style="color:red"><b>8068</b></span> 0000</li>
+</ul>
+<p>If these 0x8XXX words do in fact correspond to eye animations, we'd expect to see the same eye animation duplicated in both sequences, appearing at roughly the same point as the 0x8068 value.</p>
+<p>If we now look back at our eye animations, we'll see that the second eye animation in sequence A does indeed match the second eye animation in sequence B: both of them involve the pulsing yellow exclamation mark.</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px;">
+<thead>
+<tr>
+<th scope="col">Sequence A </th>
+<th scope="col">Sequence B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><img alt="" src="/blog/assets/media/A2.gif" style="width: 250px; height: 225px;"/></td>
+<td><img alt="" src="/blog/assets/media/B2.gif" style="width: 250px; height: 225px;"/></td>
+</tr>
+</tbody>
+</table>
+<p><br/>
+This seems like fairly convincing proof, but to confirm our theory, we should look at one last sequence:</p>
+<p>3000 4547 e00a <span style="color:blue"><b>8024</b></span> 106e <span style="color:blue"><b>8024</b></span> 1064 <span style="color:red"><b>8068</b></span> 0000</p>
+<p>This sequence is particularly interesting. Not only does this sequence feature the value 0x8086, which seemed to correspond to the pulsing yellow exclamation mark in the previous two sequences, but it also includes the value 0x8024 repeated twice. We would therefore expect this sequence to play an eye animation made up of a total of three shorter eye animations, with the first and second being identical, and the third being the pulsing yellow exclamation mark.</p>
+<p>Triggering this sequence causes the following eye animation to be displayed:</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 250px; text-align: center;">
+<thead>
+<tr>
+<th scope="col">Sequence C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><img alt="" src="/blog/assets/media/seq_C.gif" style="width: 250px; height: 225px;"/></td>
+</tr>
+</tbody>
+</table>
+<p><br/>
+As before, we can pick out the individual short eye animations that play in sequence:</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px;">
+<thead>
+<tr>
+<th scope="col">Pop</th>
+<th scope="col">Pop</th>
+<th scope="col">Exclamation Mark</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><img alt="" src="/blog/assets/media/C1.gif" style="height: 158px; width: 175px;"/></td>
+<td><img alt="" src="/blog/assets/media/C2.gif" style="height: 158px; width: 175px;"/></td>
+<td><img alt="" src="/blog/assets/media/C3.gif" style="height: 158px; width: 175px;"/></td>
+</tr>
+</tbody>
+</table>
+<p><br/>
+This is exactly as we'd expect, and confirms that the 0x8XXX words in each sequence are likely used to select which eye animations are displayed on the Furby.</p>
+<p>In order to get the chilli animation to play, we'd need to switch one of these 0x80XX words for the value corresponding to the chilli animation. But which value was that? All the other animations were stored within the Furby's on-board memory, and we hadn't yet been able to bring ourselves to take the (frankly adorable) toy apart.</p>
+<p>To solve the problem, we wrote a short script to pull out the set of all 0x8XXX words in the SEQ section of our DLC file that appeared to reference eye animations. We knew that none of the action commands we'd sent the Furby would trigger the chilli animation, so we modified our script to also pull out all that 0x8XXX words that <em>didn't</em> feature in a triggerable sequence. This set contained the following five values:</p>
+<ul>
+<li> 0x8076</li>
+<li> 0x8401</li>
+<li> 0x801d</li>
+<li> 0x8047</li>
+<li> 0x8025</li>
+</ul>
+<p>This set is small enough that we could have just tried each value in turn to see what animation they'd trigger, but the second entry in the set, 0x8401, looked particularly interesting, being as it was the only value we'd seen so far that started 0x84 rather than 0x80. We found a sequence we knew we could trigger, overwrote the 0x80XX values in it with 0x8401, then held our breath and sent the corresponding action command.<br/>
+ </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/chilli_great_success.jpg" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/chilli_great_success.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/chilli_great_success.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/chilli_great_success.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Success! We'd managed to trigger the chilli animation contained in our DLC file. All that was left to do was find a way to modify the animation to display graphics of our choosing.</p>
+<h2 class="section-title">Damien Furbst</h2>
+<p>We identified three sections that only appeared in DLC files with animations, named "PAL," "CEL," and "SPR." By eyeballing the CEL section in a hex editor, it was possible to see what looked like graphics, so we turned our attention there next.</p>
+<p>The CEL section in the DLC we'd been looking at was exactly 242,688 bytes in length, or 0x3b400 in hex. This so happened to divide perfectly by 0xc00 into 79 distinct regions, each of which appeared to contain some, but not all, of one of the various graphics we'd seen in the chilli animation - the chilli itself, for example, seemed to be stored as four quarter-images (top-left, top-right, bottom-left, and bottom-right,) which when displayed together, would form the whole chilli sprite.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/dlcimage.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/dlcimage.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/dlcimage.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/dlcimage.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>When we came to examine the SPR section, we found a number of sequential entries, each 8 words in length (plus a terminating 9th word.) The first, third, fifth, and seventh word in each sequence seemed to contain numbers from zero through to 79 - which seemed to hint that these were references to the quarter-images we'd seen in the CEL section. We concluded, therefore, that the SPR section essentially contained a description of "frames," with each individual "frame" composed of four quarter-images.</p>
+<p>Rather than storing an RGB value for each pixel in these graphics, the image format used in the DLC files appeared to use a separate colour palette, stored in the PAL section - likely to help reduce the overall size of the file. Although initially we weren't able to determine exactly how entries in the CEL section referenced into palettes in the PAL section, we were able to build some "colour test" images to display on the Furby's eyes, and see what colours we were able to display. These gave us insights into how the palettes in the PAL section were arranged, which eventually allowed us to not only read and interpret the colours described in a palette, but also to create and write back our own.</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px; align: center;">
+<tbody>
+<tr>
+<td><strong>Eye 1</strong></td>
+<td><strong>Eye 2</strong></td>
+<td><strong>Eye 3</strong></td>
+<td><strong>Eye 4</strong></td>
+</tr>
+<tr>
+<td><img alt="" src="/blog/assets/media/eye1.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/eye2.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/eye3.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/eye4.png" style="width: 128px; height: 128px;"/></td>
+</tr>
+</tbody>
+</table>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px; align: center;">
+<thead>
+<tr>
+<th scope="col">Chilli 1</th>
+<th scope="col">Chilli 2</th>
+<th scope="col">Chilli 3</th>
+<th scope="col">Chilli 4</th>
+</tr>
+<tr>
+<td><img alt="" src="/blog/assets/media/chilli0.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli1.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli2.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli3.png" style="width: 128px; height: 128px;"/></td>
+</tr>
+<tr>
+<th scope="col">Chilli 5</th>
+<th scope="col">Chilli 6</th>
+<th scope="col">Chilli 7</th>
+<th scope="col">Chilli 8</th>
+</tr>
+<tr>
+<td><img alt="" src="/blog/assets/media/chilli4.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli5.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli6.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli7.png" style="width: 128px; height: 128px;"/></td>
+</tr>
+<tr>
+<th scope="col">Chilli 9</th>
+<th scope="col">Chilli 10</th>
+<th scope="col">Chilli 11</th>
+<th scope="col">Chilli 12</th>
+</tr>
+<tr>
+<td><img alt="" src="/blog/assets/media/chilli8.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli9.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli10.png" style="width: 128px; height: 128px;"/></td>
+<td><img alt="" src="/blog/assets/media/chilli11.png" style="width: 128px; height: 128px;"/></td>
+</tr>
+</thead>
+</table>
+<p>At this point, in addition to being able to write audio and graphics into a DLC file, we also had a far better understanding of how the various sections within a DLC file related to one another. A full hierarchy diagram can be seen below.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/dlc_hierarchy.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/dlc_hierarchy.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/dlc_hierarchy.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/dlc_hierarchy.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2 class="section-title">Disclosure</h2>
+<p>Now that we had control of both the Furby's audio and graphics, our work was done, and we were able to put together a quick-and-dirty Python script that would chop up an official Hasbro DLC, reliably add, remove, and modify audio content, as well as adding our own eye animations.</p>
+<div class="video-wrapper">
+<iframe allowfullscreen="" frameborder="0" height="315" src="https://web.archive.org/web/20220604212722if_/https://www.youtube.com/embed/h2DY-VCtb54?rel=0" width="560"></iframe>
+</div>
+<p>Our research partner <a href="https://www.which.co.uk/reviews/smart-toys/article/smart-toys-should-you-buy-them">Which?</a> contacted Hasbro to let them know about the security problems we'd identified and demonstrated in the Furby Connect. Their response is quoted below.</p>
+<blockquote>
+<p>At Hasbro, children's privacy is a top priority, and that is why we carefully designed the FURBY CONNECT toy and the FURBY CONNECT WORLD app to comply with children's privacy laws. In support of this, we also engaged a third party to perform security testing on the FURBY CONNECT toy and FURBY CONNECT WORLD app.<br/>
+<br/>
+We carefully reviewed the report, and take this very seriously. While the researchers at Which? identified ways to manipulate the FURBY CONNECT toy, we believe that doing so would require close proximity to the toy, and that there are a number of very specific conditions that would all need to be satisfied in order to achieve the result described by the researchers at Which?, including reengineering the FURBY CONNECT toy, creating new firmware, and then updating the firmware, which requires being within Bluetooth range while the FURBY CONNECT toy is in a "woke" state. A tremendous amount of engineering would be required to reverse engineer the product as well as to create new firmware.<br/>
+<br/>
+We feel confident in the way we have designed both the toy and the app to deliver a secure play experience. The FURBY CONNECT toy and FURBY CONNECT WORLD app were not designed to collect users' name, address, online contact information (e.g., user name, email address, etc.) or to permit users to create profiles to allow Hasbro to personally identify them, and the experience does not record your voice or otherwise use your device's microphone.</p>
+</blockquote>
+<p>We've released some preliminary scripts that can decode and modify DLC files. If you're feeling adventurous, you can have a go at making and uploading your own Furby animations. Get the <a href="https://github.com/ctxis/Furby">code on GitHub</a>.</p>
+</article>
+{% endraw %}

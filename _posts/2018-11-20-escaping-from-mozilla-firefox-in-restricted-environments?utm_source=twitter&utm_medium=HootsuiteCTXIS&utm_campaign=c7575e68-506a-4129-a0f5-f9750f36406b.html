@@ -1,0 +1,170 @@
+---
+layout: blogpost
+title: "Escaping from Mozilla Firefox in Restricted Environments"
+author: "Bastian Kanbach"
+author_role: "Lead Consultant"
+summary: "How to execute operating system commands by leveraging legitimate functions of Mozilla Firefox."
+tags: [Vulnerabilities and exploits]
+hero_banner: Firefox_Breakout_1700x700_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Software environments in which users should only be able to perform a limited amount of tasks often use Kiosk applications to reduce the opportunities of a user to interact with the system. In many environments, only a few pre-defined applications are published to the user, like web browsers or POS software, depending on what the user needs to do.</p>
+<p>An attacker who targets such a restricted environment usually tries to find a way to bypass the boundaries of the published application, in order to execute commands on the underlying operating system. The overall goal of the attacker is usually to establish a foothold on the system and potentially compromise further systems that are connected to it. Consequences can vary between operational and financial damage, including the loss of sensitive data, depending on what the purpose of the attacked system is.</p>
+<p>In Windows there are many well-known ways for an attacker to create an interactive shell, such as Sticky Keys, “File open” dialogues, Typing commands in address bars, help menus etc. In Linux environments this is more complicated and it is not sufficient to just type a command in the address bar of a browser.</p>
+<p>The following write-up describes a technique than can be used to execute code on the underlying operating system by including a custom module for smartcard-based authentication (PKCS11) into Mozilla Firefox. The write-up focuses on Linux environments but the same can be achieved when the underlying operating system is Microsoft Windows.</p>
+<h2>Reconnaissance</h2>
+<p>When performing security assessments the first step is reconnaissance to discover as much about the target system as possible. If Firefox is the only available application, reconnaissance is more difficult, but not impossible. “File open” dialogues can be helpful to determine how the file system is structured. In some cases File open/File save dialogues can be locked down so that neither directories nor files are visible. However, Firefox allows any user to traverse the file system by using the “file:” protocol handler. The screenshot below shows the root directory of the underlying operating system after calling file:///</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Firefox_Breakout1_800_598_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Firefox_Breakout1_800_598_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Firefox_Breakout1_1027_768_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Firefox_Breakout1_800_598_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Examples for directories of interest are the /etc directory which could contain valuable information about the system’s configuration or the /tmp directory which is world-writable and could aid an attacker in dropping files on the system. Not only directories can be browsed, but also files like /etc/os-release that are readable by the current user:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Firefox_Breakout2_800_416_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Firefox_Breakout2_800_416_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Firefox_Breakout2_541_281_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Firefox_Breakout2_541_281_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Gathering some information about the operating system is important for all further steps. Further reconnaissance via the “Help” menu and the “About Firefox” view revealed that Firefox runs as a 32-bit process. This information is helpful, since the target architecture of the module has to match with the architecture of the process. </p>
+<h2>Breakout using a custom PKCS11 module</h2>
+<p>Options for spawning an interactive shell are limited, however the “Security Devices” feature in Mozilla Firefox allows to load *.so or *.dll files that are stored locally. This feature is mainly used to set up smartcard-based authentication, for example when a webserver requires a client certificate. The implementation is based on the PKCS11 standard that also defines an API to communicate with smartcards. <br/>
+ </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Firefox_Breakout3_800_597_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Firefox_Breakout3_800_597_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Firefox_Breakout3_1027_766_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Firefox_Breakout3_800_597_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Now that we have identified the architecture and a location to download files to, we have three steps to create a functional PKCS11 library that spawns a shell and is compatible with Mozilla Firefox: </p>
+<ol>
+<li>Find a suitable PKCS11 library</li>
+<li>Instrument and compile the PKCS11 library</li>
+<li>Adjust dynamic dependencies of the resulting library</li>
+</ol>
+<h2>Find a suitable PKCS11 library</h2>
+<p>A basis for such a module is the open-source middleware “OpenSC”, which is found on Github: <a href="https://github.com/OpenSC/OpenSC">https://github.com/OpenSC/OpenSC</a> </p>
+<p>A library capable to communicate with the PKCS11 API needs to have the following functions implemented: </p>
+<pre class="prettyprint">C_Initialize()
+C_GetInfo()
+C_GetSlotList()
+C_GetTokenInfo()
+C_OpenSession()
+C_GetMechanismList()</pre>
+<p>Implementing such a module from scratch would be very time consuming, however the existing OpenSC codebase can be leveraged to do the necessary customisations.</p>
+<h2>Instrument and compile the PKCS11 library</h2>
+<p>In order to understand the code flow, it is important to find some kind of “entry point” first. Of special interest is the file src/pkcs11/pkcs11-global.c: </p>
+<pre class="prettyprint">CK_RV C_Initialize(CK_VOID_PTR pInitArgs)
+{
+	CK_RV rv;
+#if !defined(_WIN32)
+	pid_t current_pid = getpid();
+#endif
+	int rc;
+	unsigned int i;
+	sc_context_param_t ctx_opts;</pre>
+<p>The snippet above shows the function C_Initialize that is automatically called once the PKCS11 module is loaded by the browser. This is a good start for some extra lines of code: </p>
+<pre class="prettyprint">CK_RV C_Initialize(CK_VOID_PTR pInitArgs)
+{
+    int res = system("/usr/bin/xterm");
+    printf("%d", res);
+	CK_RV rv;
+#if !defined(_WIN32)
+	pid_t current_pid = getpid();
+#endif
+	int rc;
+	unsigned int i;
+	sc_context_param_t ctx_opts;</pre>
+<p>A call of the system() command was inserted that invokes an external application, in this case /usr/bin/xterm, to spawn an interactive terminal. Please note that the call of “system()” in the code blocks the main thread of the Firefox process and keeps it unresponsive until xterm is closed. However for this Proof-of-concept it is adequate.</p>
+<p>For a simple Proof-of-concept this modification is sufficient. The OpenSC project now needs to be compiled for a 32-bit architecture, because the targeted Firefox instance was launched as a 32-bit process. After compiling the project, the resulting shared library that Firefox could open was created with the name "opensc-pkcs11.so" and can be found in src/pkcs11/.libs/. After hosting the file on an accessible web server, it needs to be downloaded to the target system, for example by using the browser’s “Save link as” function. Loading this file into Firefox usually initially fails, indicated by the error message "module load failed". This relates to a missing library that opensc-pkcs11.so depends on, which means the dynamic dependencies need to be adjusted.</p>
+<h2>Adjust dynamic dependencies of the resulting library</h2>
+<p>To find out which libraries are missing, the “ldd” command can be used: </p>
+<pre class="prettyprint"><a class="__cf_email__" data-cfemail="f88a97978cb89c9d9a919996" href="/web/20200424025229/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>:~/OpenSC/src/pkcs11/.libs# ldd opensc-pkcs11.so 
+	linux-gate.so.1 (0xb774b000)
+	libopensc.so.6 =&gt; /root/OpenSC/src/libopensc/.libs/libopensc.so.6 (0xb75a4000)
+	libdl.so.2 =&gt; /lib/i386-linux-gnu/libdl.so.2 (0xb758c000)
+	libpthread.so.0 =&gt; /lib/i386-linux-gnu/libpthread.so.0 (0xb756d000)
+	libc.so.6 =&gt; /lib/i386-linux-gnu/libc.so.6 (0xb73b6000)
+	/lib/ld-linux.so.2 (0xb774d000)</pre>
+<p>As shown above, the compiled module opensc-pkcs11.so depends on a library called “libopensc.so.6”, stored at /root/OpenSC/src/libopensc/.libs/libopensc.so.6. So far only opensc-pkcs11.so was downloaded to the target system and libopensc.so.6 cannot be found by the library, resulting in an error.</p>
+<p>The tool “patchelf” can be used to adjust the location, from which libopensc.so.6 is loaded. To change the search path from /root/OpenSC/src/libopensc/.libs/ to /tmp/ the following command can be used: <br/>
+ </p>
+<pre class="prettyprint">patchelf --set-rpath /tmp opensc-pkcs11.so</pre>
+<p>The command above changes the “rpath” to /tmp. To check if the modification was successful, the ldd command can be invoked again: </p>
+<pre class="prettyprint"><a class="__cf_email__" data-cfemail="e89a87879ca88c8d8a818986" href="/web/20200424025229/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>:~/OpenSC/src/pkcs11/.libs# ldd opensc-pkcs11.so 
+	linux-gate.so.1 (0xb774b000)
+	libopensc.so.6 =&gt; /tmp/libopensc.so.6 (0xb75a4000)
+	libdl.so.2 =&gt; /lib/i386-linux-gnu/libdl.so.2 (0xb758c000)
+	libpthread.so.0 =&gt; /lib/i386-linux-gnu/libpthread.so.0 (0xb756d000)
+	libc.so.6 =&gt; /lib/i386-linux-gnu/libc.so.6 (0xb73b6000)
+	/lib/ld-linux.so.2 (0xb774d000)</pre>
+<p>After modifying the shared object, all payloads are prepared. To spawn a shell, the following actions need to be performed: </p>
+<ol>
+<li>Download the modified version of libopensc.so.6 to /tmp/</li>
+<li>Download the modified version of opensc-pkcs11.so to an arbitrary location</li>
+<li>Add opensc-pkcs11.so as a security device in Firefox</li>
+</ol>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Firefox_Breakout4_800_595_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Firefox_Breakout4_800_595_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Firefox_Breakout4_1030_766_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Firefox_Breakout4_800_595_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>After specifying the path to the shared object, the PKCS11 module gets loaded by Firefox and the code is executed:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Firefox_Breakout5_800_556_75_s_c1.jpg"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Firefox_Breakout5_800_556_75_s_c1.jpg"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/Firefox_Breakout5_1027_714_75.jpg"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Firefox_Breakout5_800_556_75.jpg"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The screenshot above shows that xterm was successfully spawned. </p>
+<h2>Summary</h2>
+<p>The technique described can be used in situations when code needs to be executed and Firefox is published as a single Kiosk application.<br/>
+Although this method requires some effort in advance to create a shared object that executes custom code, it is cross-platform and very easy to invoke once the library is downloaded to the target system.</p>
+<h2>References:</h2>
+<p><a href="https://github.com/OpenSC/OpenSC">https://github.com/OpenSC/OpenSC</a><br/>
+<a href="https://docs.oracle.com/cd/E19120-01/open.solaris/819-2145/6n4f2qhp8/index.html">https://docs.oracle.com/cd/E19120-01/open.solaris/819-2145/6n4f2qhp8/index.html</a></p>
+</article>
+{% endraw %}

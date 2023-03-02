@@ -1,0 +1,146 @@
+---
+layout: blogpost
+title: "DNSWatch - When a full DNS tunnel is just too much"
+author: "Sven Schlueter"
+author_role: "Head of Assurance, Germany"
+summary: "During certain engagements it is a requirement to extract data from a network - or at least prove that it would be possible in different ways. One common and very well-known way to do this is to ex-filtrate data using DNS tunnels. Previously we’ve looked into options about how to quickly identify if DNS tunneling is possible during a penetration test."
+tags: [Security]
+hero_banner: DNS_Watch_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Later this became helpful with a wider range of our services too - like Red Team engagements. We reviewed several ideas and existing tools, but none of them were flexible enough to do what we needed and that's when I came up with the simple idea of DNSWatch. </p>
+<p>The concept behind DNS tunnels is not ground breaking and is very well known within the industry, but the following provides an insight into the work we did, and offers an example of how we turn ideas into developed services.</p>
+<p>In the following blog post I will explain how we set up our systems to support the potential identification of DNS tunnels, but also how this system can be used to help detect common vulnerabilities. </p>
+<p>While nothing is wrong with the known methods (or just starting a sniffer), our methodology becomes useful when initiating a DNS query and you would like to be notified quickly and easily if the name that was requested was resolved, maybe even with some content leaked from the target system.</p>
+<p>So this is how it works:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/dns_O0nVGsH.focus-none.width-800_800_746_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/dns_O0nVGsH.focus-none.width-800_800_746_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/dns_O0nVGsH.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/dns_O0nVGsH.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In the above example the "Target" would initiate a name resolution of the "Context DNS Tunnel" domain by requesting the record from its default name server. This "Target Nameserver" would then query the corresponding name server for a specific zone (1. Rootserver, 2. ".com Nameserver", 3. "Context Nameserver"). The Context name server delegates the control of the DNS subdomain to our DNS Tunnel-Server which contains the below script. We can now take the query that we have received and send it (in our case via email) to one of our consultants.</p>
+<p>Because we have many consultants at Context a key was used to provide each consultant with their own "DNS Token" (sub-domain) which is then mapped to the corresponding email address.</p>
+<p>The following is an example to generate this token:</p>
+<pre class="prettyprint">...
+# store everything before @domain.tld and cleanup
+name=email[:email.find('@')].replace('.','')
+# append 32 char long random token to email
+token=name+''.join(random.SystemRandom().choice(string.ascii_lowercase + string.digits) for _ in range(32))
+...</pre>
+<p>The script itself is straight forward:</p>
+<pre class="prettyprint">...
+PEOPLES=[]
+with open('consultants.csv') as csvfile:
+ reader = csv.reader(csvfile, delimiter=',', quoting=csv.QUOTE_NONE)
+ for row in reader:
+  PEOPLES.append([row[0].lower(),row[1],int(time.time())])
+
+def findConsultant(packet):
+ # save the IP as a string
+ SRCIP=str(packet.payload.src)
+ # save the query domain as a string
+ DSTDOMAIN=str(packet.payload.payload.payload.qd.qname).lower()
+ if TUNNELDOMAIN in DSTDOMAIN and not "polling" in DSTDOMAIN:
+  # loop through our people
+  for PEOPLE in PEOPLES:
+   # in case the domainname queried matches a defined record
+   if PEOPLE[0] in DSTDOMAIN:
+    # send email with the email address that macthes to that domain
+    if "burp" in DSTDOMAIN:
+     MSG="From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n" % (FROM, PEOPLE[1], SUBJB)
+     TEXT="Burp performed an injection which was used to resolve your personal unique domain name (%s). The origin IP is: %s\nYou should check the logs for the token to find the issue" % (DSTDOMAIN, SRCIP)
+    else:
+     MSG="From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n" % (FROM, PEOPLE[1], SUBJA)
+     TEXT="A system made an attempt to resolve your personal unique domain name (%s). The origin IP is: %s" % (DSTDOMAIN, SRCIP)
+    sendmymail(FROM, PEOPLE[1], MSG, TEXT)
+    # update the timestamp
+    PEOPLE[2]=int(time.time())
+...
+  failed = server.sendmail(FROM, TO, MSG+TEXT)
+...
+   res=sniff(filter="udp dst port 53", prn=findConsultant)
+...</pre>
+<p>The DNSWatch script listens for any content that arrives on UDP port 53 and then calls a function to process the content. We then loop through a defined list of tokens for the consultant group and see if the defined domain and token can be found. The final step is to collect the required information from the receiving packet and deliver the email to the correct consultant.</p>
+<p>Those are the basics of this simple script. To identify if a DNStunnel would be possible we just need to query our name and wait for an email to arrive. Of course, that could partially be completed by checking any domain name if the output can be seen. However, with the little bit extra code that we have added we can also extract bits of content by pre-adding it to our token, for example as an additional sub-domain. Additionally we can perform it blind. A sample email received looks like this:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424035738im_/https://www.contextis.com/media/images/content/samplemail.focus-none.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424035738im_/https://www.contextis.com/media/images/content/samplemail.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/samplemail.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/samplemail.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In this example the value:</p>
+<pre class="prettyprint">TGludXgga2FsaTEgMy4xNC1rYWxpMS02ODYtcGFlICMxIFNNUCBEZWJpYW4gMy4xNC41LTFrYWxpMSAoMjAxNC0wNi0wNykgaTY4NiBHTlUvTGludXgK</pre>
+<p>...is decoded as base64:</p>
+<pre class="prettyprint">Linux kali1 3.14-kali1-686-pae #1 SMP Debian 3.14.5-1kali1 (2014-06-07) i686 GNU/Linux</pre>
+<p>…and is an example of the output for the "uname -a" command on Unix. Please note that each sub-domain ("label") has a maximum length of 63 characters and in total a maximum of 253 characters is defined.</p>
+<p>We found the script useful on a number of occasions where a full backdoor won't be necessary to prove the potential for code execution or data ex-filtration, and also when it came to identifying or assisting in vulnerability testing. When performing an application test certain checks can be performed which will generate an email if the application is vulnerable. The following table provides an example overview about some of those simple checks:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/injectiontable.focus-none.width-800_800_357_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/injectiontable.focus-none.width-800_800_357_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/injectiontable.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/injectiontable.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>A new feature from “Burpsuite” is the “Burp Collaborator” (<a href="http://blog.portswigger.net/2015/04/introducing-burp-collaborator.html">http://blog.portswigger.net/2015/04/introducing-burp-collaborator.html</a>) which use DNS to detect otherwise undetectable injections (“super blind injections”) in an automated fashion. In fact it turns out that Portswigger used the same technique as a basis for the collaborator server. When an injection has been discovered an email with the “token” is generated. This token can be found in the burp log to analyse and verify the root cause. An example is provided below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424035738im_/https://www.contextis.com/media/images/content/burp-mail.focus-none.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424035738im_/https://www.contextis.com/media/images/content/burp-mail.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/burp-mail.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/burp-mail.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The corresponding request/response (from log) in Burpsuite is:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424035738im_/https://www.contextis.com/media/images/content/req.focus-none.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424035738im_/https://www.contextis.com/media/images/content/req.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/req.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424035738/https://www.contextis.com/media/images/content/req.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The log entry and retest showed that there is a command injection in the application which used the command “nslookup” to perform a DNS lookup in order to prove the vulnerability.</p>
+<p>Therefore you have two options here to use DNS to detect web application issues. Either automated testing via Burpsuite using “active scan” or via supporting your manual testing. The latter one has been used by Context for some years already where testing has been performed using a list of payloads which uses your domain name with some great success.</p>
+<p>Thanks to my colleague Jamie for setting up the DNS Server and Dan for adding the logging and daemon part to my script.</p>
+<p>The full version of the scripts can be found on our github: https://github.com/ctxis/DNSWatch</p>
+<h2>Contact and Follow-Up</h2>
+<p>Sven is a part of our Assurance team in Context's Essen office. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

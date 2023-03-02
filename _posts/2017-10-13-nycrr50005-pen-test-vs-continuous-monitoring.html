@@ -1,0 +1,35 @@
+---
+layout: blogpost
+title: "NYCRR500.05 – Pen test vs Continuous monitoring"
+author: "Ranulf Green"
+author_role: "Technical Lead, North America"
+summary: "The next deadline in the New York State Department of Financial Services’ NYCR500 regulation is coming up on 1st March 2018. This includes, amongst other things, the requirement to implement a “Penetration Test and Vulnerability Assessment” program, which will be focus of this blog post."
+tags: [Cyber strategy, Web applications]
+hero_banner: Pen_test_vs_Continuous_monitoring_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>We discuss the options set out within the regulation and why we believe manual penetration testing in combination with automated vulnerability scanning is an effective, as well as cost effective approach for vulnerability management and to comply with NYCRR500.</p>
+<p>500.05 outlines requirements for penetration testing and vulnerability assessments and provides a choice between either one of the two following options:</p>
+<p><strong>A. </strong>   Continuous monitoring of changes that could lead to vulnerabilities<br/>
+<strong>B. </strong>   Penetration testing and vulnerability assessment</p>
+<p>Let’s compare the two options and look at what they really mean in practical terms.  </p>
+<h4>Option 1 - Continuous monitoring</h4>
+<p>The DFS FAQ’s provides this definition of continuous monitoring:</p>
+<p><em>“Effective continuous monitoring generally has the ability to continuously, on an ongoing basis, detect changes or activities within a Covered Entity's Information Systems that may create or indicate the existence of cybersecurity vulnerabilities or malicious activity.”</em></p>
+<p>An effective continuous monitoring system would require multiple tools to achieve total coverage as it must both detect malicious activities AND <u>changes </u>that create vulnerabilities. Although are many tools available both for the network and for the host to detect malicious activity, detecting the changes that lead to vulnerabilities is much more challenging.</p>
+<p>At Context, we commonly identify vulnerabilities when conducting penetration testing within multiple layers of the network and operating system stack. For example, privilege escalation due to insecure file system permissions, network based compromise through server management software configured with default credentials, or application compromise through an application injection vulnerability. An effective monitoring capability would need to understand and track all of these factors and many more (i.e. scan file system permissions, monitor a user database or operating system user list for default credentials and scan code drops). For these reasons, it may well be more cost effective and easier to take the second option or to use a hybrid of the two.</p>
+<h4>Option 2 - Penetration testing and vulnerability assessment</h4>
+<p>The second option requires annual penetration testing as well as bi-annual vulnerability assessment (VA). Many organizations have mature penetration testing and VA programs borne from existing regulation and certification such as PCI-DSS and ISO27001. These existing programs may be sufficient to comply with NYCRR500 or may need extending as the definition given with NYCRR500 for penetration testing includes internal as well as external systems.</p>
+<p>Whilst bi-annual VAs are enough for the regulation, the pace of change within an organization’s IT infrastructure and to the threat landscape will commonly outstrip 6 month scan incriments leaving vulnerabilities open to exploitation for extended periods of time. For this reason, it would be prudent to consider monthly or greater frequency VA scanning.</p>
+<p>The logistical complexity of testing internal systems is higher than external. Systems that are not internet accessible will require either an internal team or external consultancy to attend the covered entities’ offices or data center facilities; or to be granted remote access to the internal network.</p>
+<p>The use of a manual penetration testing approach in conjunction with automated vulnerability assessment techniques is key for identifying and assessing false negatives (vulnerabilities not identified during automated scanning) and false positives (vulnerabilities identified by automated scanning that are not exploitable or incorrect).</p>
+<p>So what is a “manual penetration test”? This involved using a skilled consultant in combination with a suite of testing tools to investigate available functionality, identify vulnerabilities and verify the impact of exploitation by simulating an attack. </p>
+<p>Application vs infrastructure penetration testing? The regulation doesn’t specify that application layer testing should be conducted for 500.05; however, 500.08 requires procedures for “evaluating, assessing or testing the security of externally developed applications”. Often the source code or deployment packages are not available for third party applications; therefore, a common approach to evaluate third party applications is to conduct an application layer penetration test. This approach can also be used to evaluate in-house developed internal and external web and mobile applications. A successful attack against a vulnerable external or internal application can have a catastrophic impact on an organization. The recent Equifax breach provides a good justification for including application layer testing in an annual penetration testing program. A detailed manual penetration test would evaluate all accessible functionality to identify both well-known issues and those resulting from the specific context of the application.</p>
+<h4>CNYCRR500 - Context Services</h4>
+<p>Context offers a full range of advisory and assurance services which are directly required by NYCRR500, from security transformation and risk assessment through to penetration testing and incident response. </p>
+<p>Context has recently established a US office in the heart of the Financial Services District in downtown Manhattan. If your organization is interested in learning more about how we can assist and share some knowledge from our experience in complex vulnerability management programs then please drop us a line.</p>
+<p>If you would like to find out more about the process of manual penetration testing and why it should be a key part of your cyber security strategy, you might be interested in downloading this white paper <a href="https://www.contextis.com/en/resources/white-papers/penetration-testing-101-why-it-should-be-a-key-part-of-your-cyber-security-strategy">Pen Test 101</a>.</p>
+<p>Find out more about <a href="https://www.contextis.com/en/services/penetration-testing">Penetration Testing here</a>.</p>
+</article>
+{% endraw %}

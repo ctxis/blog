@@ -1,0 +1,130 @@
+---
+layout: blogpost
+title: "Understanding Defence in Depth"
+author: "Katherine Abercrombie"
+author_role: "Security Consultant"
+summary: "The world of cyber security can be a confusing place, filled with buzz-words and technical jargon which make it difficult to navigate. ‘Defence-in-Depth’ (DiD) is one such phrase that sees a lot of use and seems simple on the surface, but what does it really mean, and is it really necessary?"
+tags: [Security, Cyber strategy]
+hero_banner: Defence_in_Depth_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>As has been aptly stated by others, attackers in the cyber world are not werewolves and consequently there are “no silver bullets”<a href="#No Silver bullets">¹</a> when it comes to cyber security. There is no such thing as a “one size fits all” solution, “no single method for successfully protecting a computer network”<a href="#Sans">²</a> against insider or outsider threats. Anyone who tries to tell you differently is selling something, and it’s going to be about as effective as snake oil.</p>
+<p>So why is defence-in-depth considered to be the way to go? Simply put, DiD calls for security to be applied in multiple layers, working on the principle that each layer provides a different kind of protection to give us the best chance of stopping an attack from getting through. Think of it like winter clothes – if it’s snowing outside most people will apply layers, because that’s the best way to stay warm. And these layers may also protect against different problems – the thermal base layer will keep you warm, while the raincoat isn’t going to provide much warmth but will keep you nice and dry. The key point here is that while individually these layers offer some protection, by using several you get a much better end result; better all-round coverage against multiple different problems.</p>
+<p><img alt="" src="https://web.archive.org/web/20210209113056im_/https://www.contextis.com/media/images/content/DiD_Onion.jpg" style="width: 300px; height: 200px;"><br/>
+<em>Another common analogy for defence in depth is the layers of an onion. It has lots of layers, and may make you cry... </em></img></p>
+<p>So how do we apply these ‘winter clothes’ in the context of cyber security? Simply put, we group different security measures into different functional categories and apply them. This isn’t hugely different from the way this might be done or grouped for physical security; some examples of this are shown below:</p>
+<table border="1" cellpadding="1" cellspacing="1" style="width: 500px;">
+<thead>
+<tr>
+<th scope="col">Category</th>
+<th scope="col">Cyber security example</th>
+<th scope="col">Physical security example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Perimeter security</td>
+<td>Firewall</td>
+<td>Gates and walls</td>
+</tr>
+<tr>
+<td>Access Control</td>
+<td>Usernames and passwords</td>
+<td>Locked doors</td>
+</tr>
+<tr>
+<td>Monitoring</td>
+<td>Traffic logging</td>
+<td>CCTV or guards</td>
+</tr>
+<tr>
+<td>User Education</td>
+<td>Security awareness</td>
+<td>Security awareness</td>
+</tr>
+</tbody>
+</table>
+<h2>What's the Catch? </h2>
+<p>As was mentioned before, there is no single method that adequately protects your computer network. In fact, any security professional worth their salt will tell you that, categorically, there is <em>no way</em> to one hundred percent secure your IT network against all possible threats. All you can really do is work out what level of risk you are willing to live with, and take steps to counter the rest.</p>
+<p>DiD works by making sure there’s no single point of failure and applying different protections at different levels to protect against different things; after all, not all attackers are created equal.</p>
+<p>For this reason, the drawback is that having multiple layers of security means everything gets more complicated for the person(s) managing it. Rather like having a million and one passwords for a million and one different accounts, this can lead to shortcuts or things being forgotten. Security is a balancing act; getting the mix of security and usability correct is a difficult task, and once again comes back to working out what level of risk you’re willing to accept and how hard you want to make your security team’s job.</p>
+<p>Some of this complexity can be managed by using a suite of products from a single vendor, but this comes with its own downsides. As mentioned in an article by The Register, “On one hand, it’s great if you can get a suite of products that you can manage from a central console and report on in a single hit. But on the other hand, adopting a single vendor runs the risk of restricting your defences."<a href="#The Register">³</a> The best example of this is with AV products – different vendors will likely be able to identify most of the same viruses, but there will be some level of variation. Having two different anti-virus solutions minimizes the chance of something slipping through the cracks unnoticed, but means two sets of products to keep up to date and check up on. And, to make life more complicated, sometimes these different products won’t work well together.</p>
+<p>The other consideration is that there really isn’t a single list of what measures you should and shouldn’t apply to protect your IT network, because this depends on the size of your organisation, budget, nature of the data you’re trying to protect, the type of attacks your organization is likely to be targeted by, and what degree of risk you’re willing to live with. The sections below will talk about what the different layers of a defence-in-depth solution might include, and give some guidance on what sort of measures can be included in each layer, but this is not a comprehensive guide to how to secure your organisation as that’s always going to be a unique requirement; although that is something <a href="https://www.contextis.com/en/contact">Context can certainly help with</a>.</p>
+<h2>Who are we Keeping Out? </h2>
+<p>A key factor in deciding what security measures to implement for an IT system is having an understanding of who you are up against; as Sun Tzu said in the Art of War, “Know your enemy”<a href="#field_id_257[blocks_block_id_4124][values][The Art of War]"><sup>4</sup></a>.</p>
+<p>For example, a shopkeeper is likely to mostly be worried about shoplifting, and therefore will likely use measures such as cameras or mirrors to give them a view of the shop floor, while a bank may be more concerned with armed robbery and so will invest in an alarm system, security personnel and physical measures such as vault doors. In much the same way, the threat to an IT system should, at least in part, influence what sort of digital security measures are best for a particular system, because we can then tailor these methods towards the specific abilities, capabilities and goals of the attacker.</p>
+<p>In the world of computer security, the types of adversary an organisation is likely to encounter are commonly broadly categorized as follows, each with distinct motivations and capabilities:</p>
+<ul>
+<li>Script Kiddies – typically unskilled individuals who rely on publically available tools to conduct attacks, generally for the thrill or to boost their reputation;</li>
+<li>Insiders / Employees - people with legitimate access to the IT network and are therefore considered ‘trusted’, who are often financially or revenge driven (e.g. overworked and undervalued); </li>
+<li>Hacktivists - individuals or groups with an ideology or political view point which they are trying to promote, e.g. Anonymous and LulzSec;</li>
+<li>Organised Crime – responsible for a lot of the email spam and common malware seen today, mostly financially driven and have resources to dedicate to attacks; and</li>
+<li>Nation State – typically highly disciplined groups with access to the time and resources needed to conduct sophisticated attacks.</li>
+</ul>
+<p>IT systems for entities or companies working with Government or tied to Critical National Infrastructure may be a tempting target for all of the above, but particularly Script Kiddies, Hacktivists and Nation State Actors. Financial Institutes may be more likely to find that they are facing attacks from Organised Crime. Understanding where the threat is coming from can help organisations to direct their resources and plan their security more effectively, and hopefully helps to show why ‘one size fits all’ is not a sensible approach; the specifics of each type of attacker and the best form of defence is explored further by SANS in their ‘Defence in Depth’ white paper<a href="#SANS"><sup>5</sup></a>. </p>
+<p>With that in mind, let’s take a look at a small section of some of the different components that make up a defence in depth security solution.</p>
+<p><img alt="" src="https://web.archive.org/web/20210209113056im_/https://www.contextis.com/media/images/content/DiD_CyberSecurity.jpg" style="width: 500px; height: 153px;"/></p>
+<h2>Perimeter Defence</h2>
+<p>Whether it’s physical or cyber security, this is one of the most important principles; stop the bad guys from getting in. In the physical world this is often achieved by things like gates, doors, fences and walls, maybe even guards, all designed to keep anyone out who isn’t supposed to be on the premises. In the world of cyber security the general principle is the same, and quite often is achieved using what’s known as a firewall.</p>
+<p>A firewall is basically a gateway for all of your digital traffic which can be set up to make sure only the right information is allowed to enter and leave your network and get to the wider world. As long as it’s set up correctly this forms an important cornerstone for the rest of your security defences. It won’t stop every attack, but a well-configured firewall should be sufficient to keep the more opportunistic attackers out of your network; everyone else will hopefully get caught by the remaining security layers.</p>
+<p>Unfortunately setting up a firewall so that it allows your employees to do their jobs without letting the bad guys in can be quite a tricky business. It’s easy to make a mistake which can expose your entire network; yet another reason why a firewall shouldn’t be your only line of defence, and why it’s worth having an <a href="https://www.contextis.com/en/services/build-and-configuration-review">outside entity take a look at how it’s set up</a> just to be sure everything is as it should be.</p>
+<p>Another common solution used in perimeter defence, often within networks already protected by a firewall, is an Intrusion Detection System or IDS. Rather than blocking attacks, an IDS watches your IT system and identifies anything that doesn’t look right; essentially it’s an early warning system, to allow you to take action as soon as something suspicious is detected and hopefully before any damage is done. This can be done by either watching the network as a whole, or by focusing on individual computers; or a mix of both.</p>
+<p>At a glance, using either or both of the above (firewall and IDS) might seem like the only solution you need to keep your network secure, but sadly this isn’t the case<a href="#Perimeter Security"><sup>6</sup></a>. As mentioned above, the number of ways to set up a firewall incorrectly, invoking a false sense of security, is almost infinite<a href="#Permissive Access Controls"><sup>7</sup></a>.</p>
+<h2>Monitoring </h2>
+<p>This largely boils down to one thing; keeping logs. Logs can be generated for just about any and every action that occurs within your IT network; logging everything can therefore generate a large amount of data that needs to be stored somewhere, and may seem intimidating for anyone wanting to look through it all to find something specific.</p>
+<p>However it’s worth the storage space and the effort. You don’t need to necessarily log everything that happens, however the more you can the better for a number of reasons:</p>
+<ul>
+<li>Aids incident identification; and</li>
+<li>Aids incident response.</li>
+</ul>
+<p>Keeping logs is pointless, however, if you do nothing with them. Much like asking a colleague to take notes for you on a meeting – if you don’t read them you’ll still have no idea what went on. Logs can be invaluable as long as they’re being monitored, because they can tell you a lot about what is happening on the network. They can help you identify any suspicious behaviour, anything that isn’t working correctly or even which parts of the network need tighter security controls. And when someone does successfully attack your network (which should be considered a certain eventuality rather than a hypothetical scenario), logs can help you to work out how they managed it and how to prevent it from happening again.</p>
+<h2>System Hardening </h2>
+<p>System hardening is the processes of, in essence ‘battening down the hatches’ to make sure there’s as little opportunity for an attacker to find an opening as possible. After all, in real-world terms your six foot barbed wire fence is only useful if you don’t leave the gates open and unguarded.</p>
+<p>In terms of securing a network, what this means is going through and making sure unnecessary programs are not running, making sure the system has all the latest security updates installed, and making sure that system access is locked down to only those that need it, to name but a few steps in the hardening process.</p>
+<p>Think of it like a campus with multiple buildings; if you aren’t using one, lock the doors and don’t put anything sensitive inside. If one of the buildings has all of your company secrets, make sure the doors and windows are secured, and that only the people you trust can get in and out. Make sure the alarm is armed, and that people are ready to respond if it goes off. </p>
+<p>This is a good step for reducing any residual risk once other layers of ‘winter clothes’ have been applied.</p>
+<p>As has been stated before, every IT system is different, and so the exact mechanism by which you should harden your system will vary, so using guidance provided by organisations such as NCSC<a href="#NCSC"><sup>8</sup></a>;or CIS<a href="#CIS Benchmarks"><sup>9</sup></a>, and having an outside entity such as Context come in to assist or review, is a good way to be confident that the steps you have taken are the right ones.</p>
+<h2>Policies and Procedures</h2>
+<p>Employees, employers, managers; everyone is aware of the concept of policies and procedures which dictate a variety of things. For example how to respond to a fire alarm, what the dress code in the office is or how many people are allowed to be on holiday at the same time.</p>
+<p>The line between cyber and physical security policies is fairly blurred, as they are both intended to govern employee actions reactively or pre-emptively. The goal is to ensure that everyone knows how to behave in the event of a suspected compromise, limit the opportunities for malicious or accidental disruption, and to maximise the chance to quickly identify any security breach. <br/>
+A number of different approaches that are worth considering fall under this section, although these are far from exhaustive:</p>
+<ul>
+<li>Employee screening; to allow a reasonable level of confidence that staff can be trusted;</li>
+<li>Least Privilege; only allowing the minimum level of access to systems and assets that is required for someone to perform their assigned role. For example, there is no reason for the janitor to have access to the CCTV system, or for the Security Guard to have a computer account that allows them to reconfigure your network.</li>
+<li>Separation of duties; This entails making sure that sensitive processes or privileges are not assigned to a single person, and in doing so helps to prevent fraud and errors by implementing checks and balances. A good example is in hospitals, where before medicine can be given the amount and type needs to be double checked by a second person to prevent errors.</li>
+<li>Implementing an exit policy, such as immediately revoking any IT or physical access the employee had to minimise the opportunity for harmful reactions. </li>
+</ul>
+<h2>Awareness</h2>
+<p>Something to consider, and which goes almost hand-in-hand with using policies and procedures to reduce deliberate or accidental threats to your organisation, is <a href="https://www.contextis.com/en/services/user-awareness-training">staff training and awareness</a>. For example, forcing staff to change their passwords every few weeks, and making them use a different password for each system they need to use, is likely to result in shortcuts if people do not understand the reasons and simply view it as a barrier to their job.</p>
+<p>This goes for any security policies which, by their nature, make someone’s job a little more difficult. It’s not uncommon to see post-it notes with passwords or passcodes stuck to monitors or doors with passcode locks, or to see pass-activated doors propped open so that things can be carried in and out without having to fumble for a pass. Understanding why these measures are in place is the best way to encourage compliance.</p>
+<p>Likewise, awareness of the threats an organisation faces can promote buy-in from employees to report security incidents so that they can be responded to swiftly. However, as with every other section described in this post, awareness isn’t enough on its own. It does not matter how careful your employees are to use secure passwords and ensure no one tailgates them into a building, if there is no firewall in place to stop an attacker from accessing the network from the internet, for example.</p>
+<h2>Physical Security</h2>
+<p>Although the focus of this blog is on the different layers involved in safeguarding IT systems, it would not be complete without mentioning physical security measures. After all, monitoring logs and using AntiVirus on your computers will not help if someone simply picks up your laptop and walks away unchecked.</p>
+<p>The physical security measures required for any individual company will vary widely based on a huge number of factors, such as size, location, nature of the business, to name but a few. But where IT equipment is concerned there are a few basic ones that should be considered at a minimum:</p>
+<ul>
+<li>Secure doors and windows to prevent casual theft;</li>
+<li>Lock away sensitive or portable equipment when not in use;</li>
+<li>Consider CCTV for any particular areas of concern.</li>
+</ul>
+<p>These will by no means prevent theft or physical tampering, but they should be sufficient to deter casual attacks; businesses that think they may specifically be targeted should give serious consideration to implementing more robust physical security mechanisms.</p>
+<h2>Disaster Recovery / Backups</h2>
+<p>Disaster recovery is exactly what it sounds like – making sure your organisation has mechanisms in place to recover should the worst happen. In terms of IT system this often boils down to having a secure backup somewhere, ideally off-site, and making sure that this is maintained on an appropriate time-scale. Can you afford to lose the last hours’ worth of data? The last day? The last week? Assuming you have this backup, the next step is to ensure that it works by carrying out disaster recovery testing periodically; after all, if it doesn’t work it’s not going to be any use when you really need it.</p>
+<p>No one wants the worst-case scenario to become the reality, but being prepared to recover from that worst case can make the difference between survival and going under for an organisation.</p>
+<h2>Summary and Conclusions</h2>
+<p>“Defence in depth will definitely save your bacon one day. It’s rather like insurance, though: the value is hard to demonstrate until the day your house burns down<a href="#Defence in Depth"><sup>10</sup></a>.</p>
+<p>Hopefully this post has shown that, although there are a multitude of ways to protect a computer network, and that each has merit, any single solution will leave gaps that can open you up to attack. Attacks, and attackers, come in a variety of flavours that require different layers of defence in order to be effectively defended against.</p>
+<p><a href="https://www.contextis.com/en/services/penetration-testing">Penetration testing</a> can form part of this layers approach as an effective tool in determining what gaps may be present, but in order for this to be of value those gaps then need to be acted upon and fixed. Even then the journey to a secure system is not complete, nor will it ever be. Security may not be a department that generates revenue, nor is it a ‘fire and forget’ activity. It should be a topic of constant focus, always evolving as your network and organisation evolves, in order to offer the best possible assurance that your assets are protected.</p>
+<h2>References</h2>
+<p><a id="No Silver bullets" name="field_id_257[blocks_block_id_4124][values][field_id_257][blocks_block_id_4124][values][No Silver bullets]">(1) </a><a href="https://arcanum-cyber.com/no-silver-bullets/">https://arcanum-cyber.com/no-silver-bullets/</a></p>
+<p><a name="field_id_257[blocks_block_id_4124][values][field_id_257][blocks_block_id_4124][values][Sans]">(2) </a><a href="https://www.sans.org/reading-room/whitepapers/basics/paper/525">https://www.sans.org/reading-room/whitepapers/basics/paper/525</a></p>
+<p><a name="field_id_257[blocks_block_id_4124][values][field_id_257][blocks_block_id_4124][values][The Register]">(3) </a><a href="https://www.theregister.co.uk/2017/03/23/protect_your_digital_enterprise_defence_in_depth/">https://www.theregister.co.uk/2017/03/23/protect_your_digital_enterprise_defence_in_depth/</a></p>
+<p><a id="The Art of War" name="field_id_257[blocks_block_id_4124][values][field_id_257][blocks_block_id_4124][values][The Art of War]">(4) The Art of War, Sun Tzu</a></p>
+<p><a id="SANS" name="field_id_257[blocks_block_id_4124][values][SANS]">(5) </a><a href="https://www.sans.org/reading-room/whitepapers/basics/paper/525">https://www.sans.org/reading-room/whitepapers/basics/paper/525</a></p>
+<p><a id="Perimeter Security" name="field_id_257[blocks_block_id_4124][values][Perimeter Security]">(6) </a><a href="https://www.optiv.com/blog/top-10-network-security-mistakes-3-belief-in-perimeter-security">https://www.optiv.com/blog/top-10-network-security-mistakes-3-belief-in-perimeter-security</a></p>
+<p><a id="Permissive Access Controls" name="field_id_257[blocks_block_id_4124][values][Permissive Access Controls]">(7) </a><a href="https://www.optiv.com/blog/top-10-network-security-mistakes-7-permissive-access-controls">https://www.optiv.com/blog/top-10-network-security-mistakes-7-permissive-access-controls</a></p>
+<p><a id="NCSC" name="field_id_257[blocks_block_id_4124][values][NCSC]">(8) </a><a href="https://www.ncsc.gov.uk/">https://www.ncsc.gov.uk/</a></p>
+<p><a id="CIS Benchmarks" name="field_id_257[blocks_block_id_4124][values][CIS Benchmarks]">(9) </a><a href="https://www.cisecurity.org/cis-benchmarks/">https://www.cisecurity.org/cis-benchmarks/</a></p>
+<p><a id="Defence in Depth" name="field_id_257[blocks_block_id_4124][values][Defence in Depth]">(10) https://www.theregister.co.uk/2017/03/23/protect_your_digital_enterprise_defence_in_depth/</a></p>
+</article>
+{% endraw %}

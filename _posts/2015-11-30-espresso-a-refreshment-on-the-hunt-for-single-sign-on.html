@@ -1,0 +1,134 @@
+---
+layout: blogpost
+title: "EsPReSSO a refreshment on the hunt for Single Sign-On"
+author: "Tim Guenther"
+author_role: "Security Consultant"
+summary: "EsPReSSO was developed as a Bachelor thesis in IT-Security by Tim Guenther, at Ruhr-University Bochum, and is based on the \"BurpSSOExtension\" by Christian Mainka. Context has supported Tim during this time."
+tags: [Tools]
+hero_banner: Espresso_on_the_hunt_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>EsPReSSO is an acronym for <strong>E</strong>xten<strong>s</strong>ion for <strong>P</strong>rocessing and <strong>Re</strong>cognition of <strong>S</strong>ingle <strong>S</strong>ign-<strong>O</strong>n Protocols. The Tool is the first attempt to add support to the analysis of the current Single Sign-On (SSO) solutions. EsPReSSO is integrated  with <a href="https://portswigger.net/burp/">PortSwigger's Burp Suite</a>, the famous HTTP Proxy. A common task during the research on SSO is the identification of the underlying protocol.</p>
+<p>To simplify and automate the identification process EsPReSSO has the ability to recognize SAML, OpenID, BrowserID (aka. Mozilla's Persona) and the OAuth-Family Protocols OpenID Connect, Facebook Connect and Microsoft Account.</p>
+<h2>EsPReSSO</h2>
+<p>EsPReSSO consists of two core components, the Scanner and the Attacker. The Scanner identifies and categorises the different protocols and protocol steps. With the Attacker it is possible to modify intercepted messages and run attacks against the Services. In the following we take a closer look on the user interface of both.</p>
+<p><strong>Burp Suite</strong><br/>
+Since EsPReSSO is a Burp Suite extension, the integration was designed to be as close as possible to the look and feel of Burp Suite. Therefore the design is oriented towards the already existing components of Burp Suite.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/proxy.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/proxy.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/proxy.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/proxy.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Burp Suite’s Proxy HTTP history is a tab which enables the user to review all processed HTTP messages which have been intercepted. The image above shows Burp Suite’s Proxy window. If EsPReSSO has already been loaded by Burp Suite, then a new tab, called EsPReSSO (1.), is attached to the top row. All recognised Single Sign-On protocols are highlighted in yellow (2.). The comment table column shows additional information about the recognised protocol (3.). Burp Suite’s Request/Response viewer (4.) displays information such as raw HTTP message, parsed parameters and headers. New tabs of EsPReSSO are integrated into this view. For example (5.) shows, the SAML tab which decodes the SAML message.</p>
+<h3>The Scanner</h3>
+<p><strong>SSO History</strong></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/fullhistory.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/fullhistory.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/fullhistory.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/fullhistory.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The SSO History is based on the layout of Burp Suite’s Proxy history (1.). In addition to the typical table entries, the columns titled SSO Protocol and Token are added. SSO Protocol describes the recognised protocol and Token displays an identifier of the protocol message.</p>
+<p><strong>Editors</strong></p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/samleditor.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/samleditor.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/samleditor.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/samleditor.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Editors are a way to integrate features in Burp Suite’s Request/Response viewer. In this thesis a JSON, a JWT and a SAML Editor were created. The editors attach themselves once the specific content is recognised in the request or response. In the case of the SAML Editor the editor is integrated as soon as a message includes the parameters <em>SAMLRequest</em> or <em>SAMLResponse</em>.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/jsoneditor.width-800_800_403_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/jsoneditor.width-800_800_403_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/jsoneditor.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/jsoneditor.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The JSON Editor (see above) displays beautified JSON code. The tab is attached if JSON was identified as the MIME-type in use. The JWT Editor is attached if a parameter known for JWT (see image below) is present in the message.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/jwteditor.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/jwteditor.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/jwteditor.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/jwteditor.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h3>The Attacker</h3>
+<p>The Attacker tab (see image below) is only enabled during the interception of a message. While a message is intercepted, it is possible to modify the message and run attacks against the server. The Attacker functionality is only available within the SAML Editor. To start an attack click on the tab (1.) and choose between the possible attacks (2.). The easiest attack to configure is the Signature Faking attack, where the signature elements in the message are replaced with a new generated signature. Simply click on Modify (3.) and the message is altered into a message with a fake signature. To run the attack, press the Forward button in order to send the message to the server.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/attacker_sigfake.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/attacker_sigfake.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/attacker_sigfake.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/attacker_sigfake.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The Signature Wrapping attack, shown below, is more complex. If this type of attack was selected via the drop-down menu, then a possible payload is presented in the text area (5.). To generate possible attack vectors hit Update Oracle (6.). The vectors are selected using the slider (7.), a description on what is modified is presented below (8.). The final manual modifications of the attack are made in the last text area (9.), and all modifications can be applied to the message by selecting the Modify button (10.).</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/attacker_sigwrap.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20200424031707im_/https://www.contextis.com/media/images/content/attacker_sigwrap.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/attacker_sigwrap.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20200424031707/https://www.contextis.com/media/images/content/attacker_sigwrap.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The Attackers business logic is based on the libraries of the <a href="https://github.com/RUB-NDS/WS-Attacker">WS-Attacker</a> tool.</p>
+<h2>Conferences</h2>
+<p>A lightning Talk about EsPReSSO will be held on the <a href="https://www.owasp.org/index.php/German_OWASP_Day_2015">OWASP Day Germany 2015</a>. A more detailed talk on the general recognition and distinction of Single Sign-On Protocols was held with Vladislav Mladenov from the Chair for Data and Network Security, Ruhr-University Bochum, at Open Identity Summit 2015 in Berlin.</p>
+<h2>Contribute</h2>
+<p>The source code of EsPReSSO is available on <a href="https://github.com/RUB-NDS/BurpSSOExtension">GitHub</a>. Feel free to fork the project and develop EsPReSSO with us.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Tim is a part of our Assurance team in Context's Essen office. See the <a href="https://www.contextis.com/en/contact">Contact</a> page for how to get in touch.</p>
+</article>
+{% endraw %}

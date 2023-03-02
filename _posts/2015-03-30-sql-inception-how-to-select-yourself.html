@@ -1,0 +1,136 @@
+---
+layout: blogpost
+title: "SQL Inception: How to select yourself | Context Information Security US"
+author: "Aaron Devaney"
+author_role: "Security Consultant"
+summary: "In this blog post I will describe a few ways to view the whole SQL statement being executed as part of a SQL injection attack. Currently, unless the vulnerable page returns the SQL statement in an error message, performing an attack involves an amount of guesswork by the attacker. The more complicated the original SQL statement, the more difficult it can become to extract data using faster UNION based techniques."
+tags: [Vulnerabilities and exploits]
+hero_banner: CodeBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>If the type of injection is blind then this can take time to perform and cause a lot of traffic to be generated, especially when extracting a significant amount of data from the database. This prompted the question - “Wouldn’t this be a lot easier if I could see the SQL being executed?”</p>
+<h2 class="section-title">Databases Store Queries in Tables</h2>
+<p>The SQL queries that I used to extract the current running query for these two databases are as follows:</p>
+<pre class="prettyprint">Postgres(*)         Select current_query from pg_stat_activity
+
+MySQL               Select info from information_schema.processlist</pre>
+<p>(*) – For Postgres, the column name is different depending on the version used. If ‘current_query’ doesn’t work try just ‘query’.</p>
+<p>When extracting information from these tables it is important to consider what is happening. The database itself will be trying to use these tables at the same time as the web application that we are injecting so occasionally it may report as empty. In my use of this so far, most of the time the query has worked fine in the real world.</p>
+<p>To test these new techniques, I created a vulnerable web application with a needlessly complicated query and used the above as custom queries in a popular SQL injection tool called SQLMap.</p>
+<p>In the following example, the vulnerable application is a single web page with a MySQL backend.</p>
+<pre class="prettyprint">http://localhost/test/vuln.aspx?album=1465</pre>
+<p>We can confirm that it is injectable by using payloads like:</p>
+<ul>
+<li>1466-1</li>
+<li>1465 order by 1</li>
+<li>1465 order by 2</li>
+</ul>
+<p>Furthermore, we know from using ‘order by 3’ that there are only two columns being returned however the following only returns our original row:</p>
+<ul>
+<li>1465 union all select null,null</li>
+</ul>
+<p>We can still use SQLMap to extract data from the database, as it will find that blind Boolean and time based techniques are working but if we want to extract a lot of data quickly we will need to find out what else the query is doing. For this we can use SQLMap to execute one of the above queries using the --sql-query switch which will return the full SQL statement that is being executed.</p>
+<pre class="prettyprint">sqlmap –u “http://localhost/test/vuln.aspx?album=1465” 
+       –-sql-query=”select info from information_schema.processlist”</pre>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-1.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-1.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/SQLInception-Fig-1.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/SQLInception-Fig-1.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Fig .1 - SQLMap output showing the original query on MySQL database</em></p>
+<p>Removing the SQL that SQLMap injects we can see the following statement which is being executed by the application including a SQL comment that was left in for demonstration purposes.</p>
+<pre class="prettyprint">Select title from (
+	select asin,title 
+	from album 
+	where rank = 1465) as test 
+where asin like 'B0000%' -- Misc Comment</pre>
+<p>With the query visible, we can see that it is checking the first column in the outer select for a value like ‘B0000%’ so if we use the following as a payload, we should be able to extract data much faster.</p>
+<ul>
+<li>1465 union all select ‘B00000’,TABLE_NAME from INFORMATION_SCHEMA.TABLES</li>
+</ul>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-2.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-2.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/SQLInception-Fig-2.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/SQLInception-Fig-2.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Fig.2 - List of table names from the database appended to the normal results</em></p>
+<h2 class="section-title">MS SQL and Oracle</h2>
+<p>Both MS SQL and Oracle store cached queries that can be accessed by high privilege accounts. For an attacker, this allows us to not only select the current query, but also allows us to access other queries that have been executed as well. This could reveal credentials, function names, stored procedures as well as scheduled jobs that are being executed by the application. For the purpose of this blog however, I will focus on the ability to retrieve the current query.</p>
+<pre class="prettyprint">MS SQL 2005+        SELECT st.text from sys.dm_exec_cached_plans
+                    cp cross apply sys.dm_exec_sql_text(cp.plan_handle) st
+
+Oracle              select SQL_TEXT from v$sql</pre>
+<p>It’s important to note that both of these resources will have more than one row and in particular when using blind SQL injection each row could correspond to a variation on the injection.</p>
+<p>For example, if SQLMap were to send 500 requests to retrieve the current query then these cache tables will at least contain these 500 SQL queries. This poses a problem when performing blind SQL injection because the number of rows will increase with each request. A technique that we can use would be to include criteria in the custom sql-query search terms so that we only select one row which contains something that we are expecting such as a particular ID.</p>
+<p>To test this I changed the database in my application to Oracle and together with the vulnerable parameter we can craft a SQLMap command as follows.</p>
+<pre class="prettyprint">sqlmap –u “http://localhost/test/vuln.aspx?album=513” 
+       -–sql-query=”SELECT SQL_TEXT from v$sql 
+                    where SQL_TEXT like '%513%' 
+                          and SQL_TEXT not like '%v$sql%' and ROWNUM = 1”</pre>
+<p>Here we attempt to select just the one row from the cache tables that contain our ID 513 but which doesn’t contain references to the cache table such as v$sql. This is so that we don’t select all of the queries that SQLMap will perform which could be 100’s or even 1,000’s. The result is similar to the earlier examples, except we are now able to retrieve the original query without returning the injection SQL statements that SQLMap executes.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-3.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-3.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/SQLInception-Fig-3.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/SQLInception-Fig-3.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Fig.3 - SQLMAP output showing the extracted query</em></p>
+<p>This produces the following result:</p>
+<pre class="prettyprint">select title from (
+	select asin,title 
+	from album 
+	where rank=513)
+where asin like ‘B0000%’ – Misc Comment</pre>
+<p>With both MS SQL and Oracle, we can go a step further and select other queries that have been executed which can allow us to examine the other database calls that an application makes. This can include the use of stored procedures, functions, and scheduled tasks as well as the possibility to retrieve information such as credentials for an application if they are selected from a table.</p>
+<p>Knowing how to perform the UNION ALL on this vulnerable web page and with the following payload, we can query the Oracle v$sql table to return all of the queries that have been executed recently. Since this application is quite simple there isn’t much that stands out however on a real application this table would contain a lot of different queries possibly dating back days, weeks or even months.</p>
+<pre class="prettyprint">http://localhost/test/vuln.aspx?album513+union+all+select+’B000000’,SQL_TEXT+FROM+v$sql</pre>
+<p>As we can see from the results below, there is quite a lot of potentially useful information here and the queries seem to persist for quite some time.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-4.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/SQLInception-Fig-4.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/SQLInception-Fig-4.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/SQLInception-Fig-4.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Fig.4 - Contents of the v$sql table on an Oracle DB.</p>
+<h2 class="section-title">Future Research</h2>
+<p>As well as enabling a greater understanding of SQL injection vulnerabilities, I hope that this technique may also enhance the current SQL injection tools available. Using these methods, it may be possible for a tool to extract the query first and use the results to modify the behaviour of the tool making them more efficient.</p>
+<p>I intend to do more research to try and identify other methods of retrieving this information with lower privilege accounts and also to extend the list of databases to gain a more  complete coverage of this technique.</p>
+<h2 class="section-title">Contact and Follow-Up</h2>
+<p>Aaron is part of our Assurance team in Context's London office. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

@@ -1,0 +1,210 @@
+---
+layout: blogpost
+title: "Linux Privilege Escalation via Dynamically Linked Shared Object Library"
+author: "Context"
+author_role: "Leading cyber security consultancy"
+summary: "How RPATH and Weak File Permissions can lead to a system compromise."
+tags: [Vulnerabilities and exploits]
+hero_banner: Linux_Prvilege_Escalation_via_Dynamically_Linked_Shared_Object_Library_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Linux applications may make use of dynamically linked shared object libraries (let’s just call them shared libraries from now on) to provide application functionality without having to re-write the same code over and over - a bit like a .DLL in Windows applications. Like in a <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff919712(v=vs.85).aspx">DLL planting attack</a> on windows, Linux shared Libraries combined with weak file permissions can be used to execute arbitrary code and compromise Linux system.</p>
+<h2>How Does the OS Find a Shared Library? </h2>
+<p>When an application that uses shared libraries runs, the OS searches for the library in the following order (taken from <a href="https://linux.die.net/man/1/ld">https://linux.die.net/man/1/ld</a>):</p>
+<ol>
+<li>Any directories specified by rpath-link options (directories specified by rpath-link options are only effective at link time)</li>
+<li>Any directories specified by –rpath options (directories specified by rpath options are included in the executable and used at runtime)</li>
+<li>LD_RUN_PATH</li>
+<li>LD_LIBRARY_PATH</li>
+<li>Directories in the DT_RUNPATH or DT_RPATH. (DT_RPATH entries are ignored if DT_RUNPATH entries exist</li>
+<li>/lib and /usr/lib</li>
+<li>Directories within /etc/ld.so.conf</li>
+</ol>
+<h2>How can we get Root?</h2>
+<p>If an attacker can replace a shared library with a malicious one, then - when the application runs - it will load the malicious code and run it with the executing owner’s permissions. If an application is run as the Root super user, this would result in a full compromise of the host. </p>
+<p>An attacker may need to be patient and wait for the application to be run by a user, or use an element of social engineering to trick a system administrator into executing the application that runs their malicious code. If the application is called at system start up, by a cron job, or by a process, exploitation could be quicker. </p>
+<p>To identify a binary that uses shared libraries the <a href="http://man7.org/linux/man-pages/man1/ldd.1.html">ldd</a> tool can be used:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library1_800_179_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library1_800_179_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library1.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library1.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The following attack paths can be followed to identify if a binary that uses shared libraries is going to be vulnerable to attack:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library02_800_862_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library02_800_862_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library02.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library02_800_862.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>Example Time! </h2>
+<p>I am going to demonstrate an example whereby a binary compiled with an RPATH combined with weak file permissions can result in root privileges being gained. <br/>
+Running ldd on the binary tells us that is uses shared libraries:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library3_800_179_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library3_800_179_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library3.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library3.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>When objdump is run you can see that it has been compiled with a static RPATH pointing at /tmp/program/main:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library4_800_149_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library4_800_149_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library4.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library4.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>The /tmp partition is by default world writeable and if it has been created without the NOEXEC flag will allow an attacker to write a malicious shared library here which will execute when the “contextBinary” is run. On the server in question, there is a root cronjob that just so happens to execute the vulnerable binary:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library5_800_327_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library5_800_327_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library5.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library5_800_327.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>In this example we’re going to use the metasploit framework to create a shared library that we can plant on the system.  First a handler is set up on the attacker’s host:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library6_800_629_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library6_800_629_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library6.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library6.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Then the malicious library is created. As we are exploiting the first place the OS will look for a shared library we can imitate any of the libraries that the application uses:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library7_800_179_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library7_800_179_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library7.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library7.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>I’ve used msfvenom to create a shared library with the same payload as my handler:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library8_800_179_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library8_800_179_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library8.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library8_800_179.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>On the vulnerable host, the directory structure is created and the library is made world writeable:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library9_800_145_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library9_800_145_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library9.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library9_800_145.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Once the cronjob runs, the malicious library is executed and in our metasploit console we have a shell session successfully running as root:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library010_800_212_s_c1.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library010_800_212_s_c1.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library010.png"></a>
+<a class="modal-img visible-xs" href="/web/20210413201237/https://www.contextis.com/media/images/content/Linux_Privilege_Escalation_via_Dynamically_Linked_Shared_Object_Library010.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<h2>How do I defend against this?</h2>
+<p>Ok so that’s the offensive side of the blog post over with if you’re on the other side of the story you can harden your Linux host to defend from this attack. <br/>
+As a systems administrator: <br/>
+The attack comes down to weak file permissions so ensuring that low privileged users cannot write to:</p>
+<ul>
+<li>Locations specified in RPATH or RUNPATH</li>
+<li>Locations specified in LD_RUN_PATH and LD_LIBRARY_PATH environment variables</li>
+<li>/lib or /usr/lib</li>
+<li>Locations specified in /etc/ld.so.conf</li>
+</ul>
+<p>As a developer: <br/>
+If a library has to be compiled with RPATH or RUNPATH then specify the directory to be one that only the binary owner or root can write to. Alternatively specify the $ORIGIN variable which will resolve to wherever the binary is at runtime. <br/>
+Alternatively, the libraries can be moved to /lib or /ur/lib and then the RPATH or RUNPATH removed from a compiled binary by using the <a href="https://linux.die.net/man/1/chrpath">chrpath</a> tool. <br/>
+Other things to be aware of:</p>
+<ul>
+<li>Execute applications with the least privileges needed. A malicious binary that is called by Root will result in a full compromise of your host</li>
+<li>Consider setting the NOEXEC option on the /tmp partition</li>
+</ul>
+<h2>Summary/Conclusions</h2>
+<p>In this blog post we have demonstrated a way of escalating privileges on a Linux host by weak file permissions and hardcoded RPATHs. There are other ways that shared libraries could be exploited not mentioned here. <br/>
+- - -<br/>
+Context can help you identify if your Linux host is vulnerable to such an attack by performing a review of a host or your organisations standard build. </p>
+<h2>References</h2>
+<p><a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff919712(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/windows/desktop/ff919712(v=vs.85).aspx</a><br/>
+<a href="https://linux.die.net/man/1/ld">https://linux.die.net/man/1/ld</a><br/>
+<a href="http://man7.org/linux/man-pages/man1/ldd.1.html">http://man7.org/linux/man-pages/man1/ldd.1.html</a><br/>
+<a href="https://github.com/rapid7/metasploit-framework">https://github.com/rapid7/metasploit-framework</a><br/>
+<a href="https://github.com/rapid7/metasploit-framework/wiki/How-to-use-msfvenom">https://github.com/rapid7/metasploit-framework/wiki/How-to-use-msfvenom</a><br/>
+<a href="http://man7.org/linux/man-pages/man8/ld.so.8.html">http://man7.org/linux/man-pages/man8/ld.so.8.html</a> <br/>
+<a href="https://linux.die.net/man/1/chrpath">https://linux.die.net/man/1/chrpath</a> </p>
+</article>
+{% endraw %}

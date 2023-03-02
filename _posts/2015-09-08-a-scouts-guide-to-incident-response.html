@@ -1,0 +1,54 @@
+---
+layout: blogpost
+title: "A Scout’s Guide to Incident Response"
+author: "Nick Mazitelli"
+author_role: "Security Consultant"
+summary: "This part of our blog series, covering the recent work we have done with the Institution of Engineering and Technology, looks at incident response, drawing on the article we contributed to the Engineering and Technology Reference."
+tags: [Incident Response]
+hero_banner: A_scouts_guide_to_incident_response_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Driven by a rapidly developing threat landscape, effective <a href="https://www.contextis.com/en/services/incident-response-and-planning">cyber incident response</a> is now a mainstay of rigorous cyber security programmes -although it remains an area that even many seasoned information security specialists struggle to come to grips with. While it is seen as a dark art by many, incident response need not be an overly complex subject, and there are a number of relatively straight-forward measures and well-defined approaches that can assist an organisation’s preparation for delivering well executed and effective incident response.</p>
+<p><a href="https://www.contextis.com/en/">Context</a> have a strong track record of incident response within the UK and elsewhere, a history and competency that is demonstrated by accolades such as our inclusion on the <a href="https://www.cpni.gov.uk/advice/cyber/cir/">CESG/CPNICyber Incident Response (CIR) scheme</a>. It is this history dealing with some of the most sophisticated threats that we have drawn on to produce the proven and actionable guidance that the IET article is based on.</p>
+<h2>A few fundamentals</h2>
+<p>As a starting point, standards such as <a href="http://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-61r2.pdf">NIST Special Publication 800-61</a> or <a href="http://www.iso.org/iso/catalogue_detail?csnumber=44379">ISO 27035</a>, or methodologies such as those developed by the SANS Institute provide a good foundation to approach incident response in a methodical manner. Building on this there are a few core approaches that are emphasised in current best-practice,and that are particularly important when addressing the modern sophisticated threat.</p>
+<p>Perhaps the most important of these is that incident response should be approached in an iterative and intelligence led manner. While many of the standard methodologies present incident response as a series of phases, this phase-based approach should not be considered as a linear process. Good incident response takes the investigative findings as they come to light, and feeds them back into the investigation in order to increase the chances of detection and map out the full extent of an attack. In this way, while an organisation may be moving to contain, eradicate and recover from an attack, the process of detection and analysis will be ongoing and thereby increase the likelihood of effective and complete removal of the threat.</p>
+<p>As well as understanding what you will do during an incident response scenario, it is also increasingly important to understand the lifecycle of an attack and the behaviour and capabilities that various actors are likely to exhibit. This approach has been well addressed over the last few years through models such as attack tree or kill-chain analysis, and pays good dividends in the areas of prevention and network security monitoring, as well as incident response. Good incident response is not just about understanding how you will react in the event of a breach; it is also equally important to understand what the attackers are likely to do.</p>
+<h2>Incident readiness</h2>
+<p>With these areas of emphasis in mind, perhaps the single greatest determinant as to the effectiveness of an incident response effort is the level and quality of preparation that preceded it. Once an incident occurs it is often too late to meaningfully address the issues encountered in a retrospective manner, particularly during the high pressure circumstances of a live incident response scenario. Therefore, incident readiness preparations are of prime importance.</p>
+<p>Adequate preparation will ensure that the necessary policy, structure, processes and materials are in place to deal with an incident prior to one arising, which will thereby serve to increase the quality and effectiveness of response efforts by ensuring that fundamental decisions about how to handle an incident are not being made in the midst of a high pressure and time constrained situation. This process will also ensure the availability of the sources of information upon which the investigative process relies, as well as the tools, capability and skills necessary to exploit this information to the full.</p>
+<p>While incident readiness is a topic that could be discussed at great length as a standalone topic, there are four core tasks that must be addressed that will vastly increase an organisation's ability to respond effectively. Good incident response preparation requires:</p>
+<ul>
+<li><a href="https://www.contextis.com/en/blog/why-an-incident-response-plan-helps-to-take-the-sting-out-of-a-cyber-incident">Preparation of an Incident Response plan</a></li>
+<li>Identification and retention of information sources</li>
+<li>Identification and acquisition of the required capability and skills</li>
+<li>An understanding of the threat landscape with specific regard to the organisation of interest</li>
+</ul>
+<p>The key point is that an organisation must know how and what it is going to do during an incident response situation, as well as ensure it has the necessary information, materials, skills and capabilities available to do this effectively.</p>
+<p>We will look into the areas of incident response planning and information source management in a bit more detail below.</p>
+<h2>The incident response plan</h2>
+<p>The Incident Response plan is generally part of a larger body of interrelated policy, procedures and guidelines that combine to address all facets of the security and risk function within an organisation. For example a key component of this policy framework will be the organisational Cyber Security Strategy, or equivalent work, which provides the overarching direction and reference for the full range of security work across an organisation. Similarly, areas such as the organisational risk management framework, or even change management policies, are important parts of the same policy ecosystem.</p>
+<p>The Incident Response plan may be a single document or itself broken out into interrelated policy, plan and procedures, but regardless of the format it takes at a minimum an incident response plan should:</p>
+<ul>
+<li>Identify and delegate the roles, responsibilities and levels of authority required during Incident Response</li>
+<li>Identify the lines of communication, both inside and outside the organisation, including formal points of contact within the relevant teams and stakeholders</li>
+<li>Outline how communications will be managed, including formal reporting requirements</li>
+<li>Define the structure and composition of the incident response team</li>
+<li>Define, at a relatively high level, how the organisation will perform and manage incident response efforts</li>
+<li>Provide a means for assessing, prioritising and describing events and incidents</li>
+</ul>
+<p>At a lower level the production of a set of standard operating procedures for common incident response tasks, including investigation, containment and eradication actions are also beneficial and should be considered in the longer term.</p>
+<h2>Information sources</h2>
+<p>The availability of the information necessary to investigate and fully map out an incident is a fundamental precondition of effective Incident Response; however it is something that is largely missing in many organisations, even those with nominal Incident Response plans in place.</p>
+<p>While there are many systems available that assist in the collection and analysis of this information, most notably in the area of Security Information and Event Management (SIEM) systems, a large scale implementation of these types of systems is often not necessary in the first instance for incident response purposes, as long as the relevant sources of information have been identified and are being managed appropriately.</p>
+<p>There is a great wealth of information available on most networks that is valuable during incident response investigations but is often overlooked. Some of the more obvious examples include firewall connection logs, proxy logs, web server logs, information  from configuration and systems management solutions, DNS logs, antivirus systems and information from enterprise archiving solutions to name a few.</p>
+<p>A concerted effort should be undertaken to identify and manage these sources as part of Incident Response preparations. This should include a review of the information being logged from these sources, format of the information, retention periods and accessibility. For systems such as antivirus consideration should also be given to the preservation of artefacts, for example from an Incident Response perspective it is preferable to quarantine malicious files rather than delete them so that further analysis can be performed by Incident Responders as necessary.</p>
+<p>In conjunction with CPNI we have produced a guide to <a href="https://www.cpni.gov.uk/advice/cyber/Log-File-Management/">Effective Log Management</a> that provides a light-weight approach to address these information requirements.</p>
+<h2>Conclusion</h2>
+<p>The investigation and handling of an incident is invariably a high pressure situation more akin to a marathon than a sprint. The overarching goal of any response effort should be to enable recovery in the shortest possible time while providing the highest level of assurance. However, in the high pressure circumstances of live incident response an adequate level of assurance is something that is often dangerously disregarded in the sprint for the finish. Investigative efforts should be undertaken in an iterative fashion, maximising the benefit of available information and turning the tables on the attacker. Similarly every effort should be made to capitalise on the valuable lessons and insights provided by an incident response effort and a thorough post incident process is indispensable.</p>
+<p>There is much more to incident response and preparation that we haven’t been able to cover in this post. If you would like further information or assistance then please get in contact.</p>
+<h2>Contact and Follow-Up</h2>
+<p>Nick is a part of our Response team in Context's London office. See the Contact page for how to get in touch.</p>
+</article>
+{% endraw %}

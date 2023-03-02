@@ -1,0 +1,91 @@
+---
+layout: blogpost
+title: "Phwning the boardroom: hacking an Android conference phone"
+author: "Tom Moreton"
+author_role: "Lead Consultant"
+summary: "At Context we’re always on the lookout for interesting devices to play with. Sat in a meeting room one day, we noticed that the menus on the conference phone, a Mitel MiVoice Conference/Video Phone, had a very familiar Android style. We’re doing more and more product security evaluations on devices just like this device, and Android is a topic of interest for me, so this looked like the perfect device to investigate further."
+tags: [Product Security, Vulnerabilities and exploits]
+hero_banner: Phwning_the_boardroom_1010_350_75_s_c1.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Conference phones are ubiquitous in modern offices, and they present an interesting attack surface. The devices are often in less secure areas of the building, places like meeting rooms where guests are allowed, and they’re often privy to very sensitive discussions, whether hosting a call or just sat on the table. They’re also the kind of device that may be missed when security testing; they often present very few listening services and may be placed in segregated VLANs that aren’t visible to an infrastructure penetration test.</p>
+<p><img alt="" src="https://web.archive.org/web/20201111220418im_/https://www.contextis.com/media/images/content/Mitel_Blog_2.width-800.jpg" style="width: 445px; height: 327px;"/></p>
+<p>This blog post will go through some of the issues we discovered with the Mitel MiVoice Conference/Video Phone. We didn’t perform a full security review of the device; instead, we thought it would be interesting to see what could be achieved by someone sat briefly in a meeting room with the device. Ultimately, we discovered that under these circumstances it would be possible to gain full control of the device, adding weight to the idea that physical access is generally game-over, and that organisations should ensure strong physical security around any devices on their networks.</p>
+<h2>Analysis</h2>
+<h3>Abusing Debug Access</h3>
+<p>After scanning for open ports and finding a limited network attack surface, we set about trying to gain further access to the phone to get a better idea of the device’s potential weaknesses. Conveniently, the device offers “Ethernet Debugging”, which is basically Android Debug Bridge (ADB) over the network. Through the device’s admin menu, which is password protected, we could enable this setting and start exploring with the ADB shell.</p>
+<p>The device allowed us to connect to ADB without the authorisation prompt seen in Android versions above 4.2.2. Combined with the style of the Android menus, it was clear that the device was using an older version of Android. In fact, it’s based on Android 2.3, which has known vulnerabilities and lacks security protections we’ve grown accustomed to in later versions of the Android operating system. That being said, we won’t focus on these issues in this blog post, we’re more interested in weaknesses specific to this device.</p>
+<p>With a low privilege shell, it was time to try and gain root access. On initial inspection it looked like the ADB daemon was configured to provide root shells already. The following options were present in the device’s properties:</p>
+<pre class="prettyprint">ro.secure = 0
+ro.debuggable = 1</pre>
+<p>These settings are normally present in development firmwares (or the emulator) and mean that the “adb root” command will put the ADB daemon into a configuration that doesn’t drop privileges; the “adb shell” command will then provide a shell running as the root user. In this case, the daemon continued to issue shells with the “shell” user, indicating that there was a further proprietary setting blocking the process. Decompiling the Mitel system applications and searching for ‘ADB’ resulted in the following lines of code, which gave a big hint as to the required property:</p>
+<pre class="prettyprint">msg = msg + "Will enable adb root access. ";
+SystemProperties.set("persist.sys.mitel.adb.insecure", "1");</pre>
+<p>On Android, the “persist.sys” properties can only be set by the system user (generally system applications). We could have used a Mitel application to set the property, but it’s not possible to reach this code in a default configuration. Essentially, the setting allows escalation of privileges from system to root, but to exploit, we needed a way to run code as the system user. Further investigation identified a number of issues that allowed escalation to system. The majority of these issues stemmed from the firmware being in a development/testing state:</p>
+<ul>
+<li>The firmware used the publicly available Android test-keys for signing system applications,</li>
+<li>The update process used a static encryption key and the test-keys for signing,</li>
+<li>A number of system applications were marked as “debuggable”.</li>
+</ul>
+<p>So there were three possible methods to escalate privileges:</p>
+<ul>
+<li>Installing an application signed with the platform key, with the system “sharedUserId” declared in its manifest,</li>
+<li>Installing a malicious update and executing commands during the update process,</li>
+<li>Attaching to a “debuggable” system application using Java Debug Wire Protocol (JDWP) over ADB and executing code within the context of the application.</li>
+</ul>
+<p>These methods required ADB to be enabled or an update to be applied, both of which required access to the password-protected admin menu. In a securely configured environment, the admin password shouldn’t be something an attacker can guess while left alone in a meeting room. For a viable attack, we needed a way to change settings without the admin menu.</p>
+<h3>DHCP Config</h3>
+<p>The documentation indicated that some configuration could be specified via DHCP. Option 43 in DHCP is for vendor-specific options, and for this device it allows a configuration server to be specified. If an attacker-controlled server is specified, the device will download an XML configuration file, which can enable Ethernet debugging.</p>
+<p>So putting this all together, an attacker left alone in a meeting room can do the following:</p>
+<ul>
+<li>Plug the Mitel MiVoice Conference/Video Phone into an attacker-controlled device (the conference phone will reboot, because it uses power over Ethernet).</li>
+<li>Use DHCP option 43 to set the configuration URL.</li>
+<li>Serve a malicious configuration to enable Android Debug Bridge (ADB).</li>
+<li>Install an application that is signed with the platform key and gains system permissions.</li>
+<li>Set ‘persist.sys.mitel.adb.insecure’ to 1.</li>
+<li>Restart ADB as root.</li>
+<li>Gain a root shell.</li>
+</ul>
+<p>This can all be automated, but requires approximately 90 seconds because the device waits before applying the configuration:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source media="(min-width: 768px)" srcset="/web/20201111220418im_/https://www.contextis.com/media/images/content/mitel2.width-800.png"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/web/20201111220418im_/https://www.contextis.com/media/images/content/mitel2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/web/20201111220418/https://www.contextis.com/media/images/content/mitel2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/web/20201111220418/https://www.contextis.com/media/images/content/mitel2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Once root access is achieved the device is under the attacker’s full control. Some of our favourite attack ideas include:</p>
+<ul>
+<li>Listening into meetings, without alerting the room’s occupants</li>
+<li>Disabling the mute button, so that private discussions are heard by everyone on the call</li>
+<li>Maintaining a remote backdoor into the environment </li>
+</ul>
+<h2>Mitigations</h2>
+<p>We reported these issues to Mitel, along with a remote exploit that caused the device to reboot, and they’ve been quick to respond with their analysis, proposed mitigations and long term fixes (e.g. removing ADB access from the production build).  Mitel has posted a security advisory <a href="http://www.mitel.com/services-support/security-advisories">here</a>.</p>
+<p>At present, we suggest the following mitigations to prevent the attacks described:</p>
+<ul>
+<li>Configure static configuration and software URLs, which are not overridden by DHCP.</li>
+<li>Ensure Ethernet Debugging is disabled.</li>
+<li>Configure a strong admin password to prevent access to the admin menu.</li>
+</ul>
+<h2>Timeline</h2>
+<p>The following shows the disclosure timeline, excluding occasional chasers from both sides.</p>
+<p>7/10/2016 Context disclose issues to Mitel using details provided on their <a href="http://www.mitel.com/mitel-product-security-policy">website</a>.</p>
+<p>7/10/2016 Mitel reply with request for any proof-of-concepts</p>
+<p>12/10/2016 Context reply with proof-of-concepts</p>
+<p>28/11/2016 Mitel reply with full analysis of reported issues, including assessed issue severity and mitigations</p>
+<p>09/12/2016 Context reply with agreement on majority of issues, one concern</p>
+<p>10/01/2017 Telephone call to discuss issue severity, mitigations and coordinated disclosure</p>
+<p>15/02/2017 Coordinated release of publications</p>
+<h2>Contact and Follow Up</h2>
+<p>Tom works in our Research team, from our London office. See the <a href="/web/20201111220418/https://www.contextis.com/contact/">contact us</a> page for ways to get in touch.</p>
+</article>
+{% endraw %}

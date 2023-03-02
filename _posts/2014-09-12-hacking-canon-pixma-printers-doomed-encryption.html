@@ -1,0 +1,161 @@
+---
+layout: blogpost
+title: "Hacking Canon Pixma Printers - Doomed Encryption"
+author: "Michael Jordon"
+author_role: "Security Consultant"
+summary: "This blog post is another in the series demonstrating current insecurities in devices categorised as the ‘Internet of Things’.  This instalment will reveal how the firmware on Canon Pixma printers (used in the home and by SMEs) can be modified from the Internet to run custom code."
+tags: [Product Security, Vulnerabilities and exploits, Reverse Engineering]
+hero_banner: Hacking_Canon_Pixma_Printers.jpg
+---
+{% raw %}
+<article class="article-content">
+<p>Canon Pixma wireless printers have a web interface that shows information about the printer, for example the ink levels, which allows for test pages to be printed and for the firmware to be checked for updates.</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/1_1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/1_1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/1_1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/1_1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 1 - Web Interface Pixma MG6450</em></p>
+<p>This interface does not require user authentication allowing anyone to connect to the interface.  At first glance the functionality seems to be relatively benign, you could print out hundreds of test pages and use up all the ink and paper, so what?  The issue is with the firmware update process.  While you can trigger a firmware update you can also change the web proxy settings and the DNS server.  If you can change these then you can redirect where the printer goes to check for a new firmware.  So what protection does Canon use to prevent a malicious person from providing a malicious firmware?  In a nutshell - nothing, there is no signing (the correct way to do it) but it does have very weak encryption. I will go into the nuts and bolts of how I broke that later in this blog post.  So we can therefore create our own custom firmware and update anyone’s printer with a Trojan image which spies on the documents being printed or is used as a gateway into their network.  For demonstration purposes I decided to get Doom running on the printer (Doom as in the classic 90s computer game).  It was not straight forward due to it needing all the operating system dependences to be implemented in Arm without access to a debugger, or even multiplication or division. But that's a blog for another day. Here’s the video (sorry the colours aren't perfect): </p>
+<div class="video-wrapper">
+<iframe allowfullscreen="" frameborder="0" height="315" src="https://web.archive.org/web/20220417175847if_/https://www.youtube.com/embed/5RS4myPuUn8" width="560"></iframe>
+</div>
+<p>But would anyone put their printer’s web interface on the Internet? Well we sampled 9000 of the 32000 IPs that Shodan (http://www.shodanhq.com) indicated may have a vulnerable printer. 1822 of those IPs responded and 122 we believe have a vulnerable firmware version (around 6%). We therefore estimate there are at least 2000 vulnerable models connected directly to the Internet.<br/>
+Even if the printer is not directly accessible from the Internet, for example behind a NAT on a user’s home network or on an office intranet, the printer is still vulnerable to remote attack. The lack of authentication makes it vulnerable to a cross-site request forgery attacks (CSRF) that modify the printer’s configuration. A colleague (thanks Paul Stone) demonstrated this by making a web page that first scans the local network for vulnerable printers (using a technique called JavaScript port scanning). Once the printer’s IP address has been found, the web page sends a request to the web interface to modify the proxy configuration and trigger a firmware update. Although the printer is not actually on the Internet, this is possible because the malicious web page initiates requests from the user’s browser which is on the same network as the printer.</p>
+<p>Context contacted Canon back in March of this year and we provided them with the information about this issue.  They have informed us that future versions of the printer will have username and password authentication on the web interface.  See at the end of the blog for their full response.</p>
+<p>This blog post contains a description of how the encryption was broken.  I will follow this blog up with a description of how I went from the ability to modify the firmware, to actually running custom code which could use the wireless network stack, manipulate the memory and update the screen as shown in the video.  The firmware does not run an operating system but is a single lump of compressed ARM code which makes for an interesting reverse engineering challenge, particularly with no debugger or console and when it takes 10 minutes to update the printer, which we don’t want to brick.</p>
+<h2>How the encryption was broken</h2>
+<p>In this section of the blog I will go into the nerdy details of how the encryption was broken.</p>
+<p>Let’s start by looking at the encrypted firmware, it looks like this:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/2_2.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/2_2.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/2_2.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/2_2.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 2 - Encrypted Firmware</em></p>
+<p>You can see repeating patterns (one pattern highlighted above) in the encrypted firmware meaning that the encryption is not industry best practice.  The repeating pattern gives us a clue as to the length of the key.  In this case the pattern is 0x30 long; therefore the key is either 0x30 or a factor of it.  Also by looking at the character frequency it is clear that this is not good crypto:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/Figure_4.focus-none.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/Figure_4.focus-none.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/Figure_4.focus-none.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/Figure_4.focus-none.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 4 - Basic XOR Encryption</em></p>
+<p>If this is the case then the blocks are as follows:</p>
+<pre class="prettyprint">P0 ^ K = C0
+P1 ^ K = C1
+Pn ^ K = Cn</pre>
+<p>While we don’t know what the key is, what we can do is remove the key from the encrypted data by XORing the first line of the data with the rest of the data.  Therefore:</p>
+<p>P0 ^ K ^ C0 = 0<br/>
+P1 ^ K ^ C0 = P1 ^ P0<br/>
+Pn ^ K ^ C0 = Pn ^ P0</p>
+<p>This means that the first block is zero and the rest of the blocks are its original plain text XORed with the plain text of the first block, hence no key.  If we can work out the plain text of the first block then we will get the full decryption.  If we look at the results we get his:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/5_1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/5_1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/5_1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/5_1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 5 - Encrypted firmware with first block XORed with the rest</em></p>
+<p>The graph looks neater but the resulting text is still gibberish.  What we need to do is to work out what the first block of data is and then we can use that to return the original data.  After a lot of playing around with different options, I found that older firmwares for Canon printers did not have this ‘encryption’ and use the SRecord format (http://en.wikipedia.org/wiki/SREC_%28file_format%29).  This is a format that is commonly used for writing to the memory of embedded devices.  The format that the file takes is ASCII for example:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/6.width-800_.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/6.width-800_.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/6.width-800_.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/6.width-800_.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 6 - SRecord example (source Wikipedia)</em></p>
+<p>The format only uses ASCII hex digits, newlines and the ‘S’ at the start of each line.  This provides a very useful crib into what will be at the start of the Canon’s firmware (I assuming they are using SRecords).  The first character must be an ‘S’ followed by a series of ASCII hex numbers.  So if we make a guess at what the first line might be, for example:</p>
+<p>S00000000000000000000000000000000000000000000000</p>
+<p>And see the resulting decryption:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/7_1.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/7_1.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/7_1.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/7_1.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p><em>Figure 7 - First attempt at decryption</em></p>
+<p>The shape of the graph fits in roughly with ASCII text (values being mainly between 0x30-0x7f) and we can see that the first column (highlighted in green) only contains ASCII values which is confirmation that we have the first byte correct for the SRecord format.  However the second column has characters which are not valid for the file format (highlighted in blue) and therefore the second character of the plain text is not a zero.  The third column (in orange) has a correct value as all the characters are valid; including the 0xd line feed character.  We can automate the brute forcing of the characters at this point because we know the subset of possible characters and then can validate the column to ensure that no invalid characters are decrypted.  After this process we find that the key length is actually 0x10 and we have a valid SRecord, SRecords have checksums which helps us ensure we have the valid key, the file looks like this:</p>
+<figure class="img-width-2-3">
+<div class="modal-img-container">
+<picture>
+<!--[if IE 9]><video style="display: none;"><![endif]-->
+<source height="auto" srcset="/blog/assets/media/_image_800_auto/8.width-800.png" style="min-width:768px"/>
+<!--[if IE 9]></video><![endif]-->
+<img alt="" srcset="/blog/assets/media/_image_800_auto/8.width-800.png"/>
+</picture>
+<div class="modal-hover">
+<a class="modal-img hidden-xs" href="/blog/assets/media/_image_1900_auto/8.width-800.png"></a>
+<a class="modal-img visible-xs" href="/blog/assets/media/_image_800_auto/8.width-800.png"></a>
+</div>
+</div><!-- /modal-img-container -->
+</figure>
+<p>Figure 8 - Plain text firmware</p>
+<p>There is no other protection in the firmware file.  SRecords have a checksum on each line but there is no signing of the firmware and therefore because we can decrypt the firmware we can modify the SRecords and then re-encrypt the file and update the printer with our own custom firmware.</p>
+<h2>Vendor Response Timeline </h2>
+<ul>
+<li>14th March 2014 – Canon notified of the issue.</li>
+<li>18th March 2014 – Canon request further information.</li>
+<li>19th May 2014 – Canon escalated the issue.</li>
+<li>29th May 2014 – Request permission to publish this blog post.</li>
+<li>5th June 2014 – Canon acknowledges the issue.</li>
+<li>9th June 2014 – Canon visit Context to discuss this release.</li>
+<li>12th Sept 2014 – Blog release in conjunction with a presentation at 44Con.</li>
+</ul>
+<p>Canon provided the following statement regarding this issue:</p>
+<p><em>“We thank Context for bringing this issue to our attention; we take any potential security vulnerability very seriously.  At Canon we work hard at securing all of our products, however with diverse and ever-changing security threats we welcome input from others to ensure our customers are as well protected as possible.</em></p>
+<p><em>We intend to provide a fix as quickly as is feasible.  All PIXMA products launching from now onwards will have a username/password added to the PIXMA web interface, and models launched from the second half of 2013 onwards will also receive this update, models launched prior to this time are unaffected. This action will resolve the issue uncovered by Context.”  </em></p>
+<h2>Recommendations</h2>
+<p>Context recommends that you do not put your wireless printers on the Internet, or any other ‘Internet of Things’ device.  To defend against the CRSF attack, well don’t follow any dodgy links is the best advice I can come up with.  Context is not aware of anyone in the wild actively using this type of attack, but hopefully we can increase the security of these types of devices before the bad guys start to. Finally, make sure that you always apply the latest available firmware to your devices. This is often not an automatic process and may require checking on the manufacturer’s website for updates.</p>
+</article>
+{% endraw %}
