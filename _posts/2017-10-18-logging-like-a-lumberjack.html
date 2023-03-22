@@ -1,0 +1,461 @@
+---
+layout: blogpost
+title: "Logging Like A Lumberjack"
+author: "Damien King"
+author_role: "Senior Security Consultant"
+summary: "Many tools that are built specifically for pen-testing, such as BURP suite, already have automatic logging built in. However as a lot of the tools we use are native operating system utilities or custom scripts, they often don’t have logging incorporated. This blog covers how to effectively log such tools from the command shell."
+tags: [Security, Tools]
+hero_banner: WoodBanner.jpg
+---
+{% raw %}
+<article class="article-content">
+                            
+    <p><strong>This blog was originally published on 18 October, 2017 and was subsequently updated on 13 January, 2021.</strong></p>
+
+<p>When you’re trying to move swiftly, recording what you’re doing can be a bit of a drag – this post will cover semi-automating it, freeing you up to focus on the good stuff.</p>
+
+<h2>Why Bother</h2>
+
+<p>First of all, why might we want to do it in the first place? Here are a few reasons.</p>
+
+<h3>Reporting&nbsp;</h3>
+
+<p>Logs can be a helpful reference when reporting after a test to remember what order you did something in, or for extracting exact command snippets to add into a report.&nbsp;</p>
+
+<h3>Accountability</h3>
+
+<p>If your client’s SOC detects an attack during the engagement, you can quickly verify whether it was you, or someone else e.g. your friendly neighbourhood nation-state (and we have encountered this on a couple of engagements!).</p>
+
+<p>Similarly, if your client’s server goes down during the test, it can be easy to blame the pen-testers. Just because you were blasting packets at the time, it doesn’t necessarily mean it was you that torched the friendly neighbourhood Windows 2000 box. Your logs can help verify this.</p>
+
+<h3>Recreating</h3>
+
+<p>A fellow tester on a re-test of your engagement, or QA-ing your work, wants to piece together how exactly you tested it the first time. With your detailed notes and logs they can do this independently. The same may be true if the client wishes to recreate.</p>
+
+<h3>Contractual</h3>
+
+<p>It may be a contractual requirement to provide your test logs and data to a client for audit purposes. This is certainly the case on CBEST Red teaming engagements. It would be very difficult and time consuming to recreate these from scratch, if logging was not enabled from the start.&nbsp;</p>
+
+<h3>Thought process</h3>
+
+<p>It’s considered good practice to note down your epic-hack ideas and observations during the test, even if they seem like nothing at the time. These notes can be handy when revisiting your attack path, especially when you hit the wall and you feel like you’re out of ideas. Alternatively, your fellow testers could go through your attack path and may recommend a new vector you hadn’t considered.</p>
+
+<h2>Key Info to Capture</h2>
+
+<p>There are multiple ways to record data automatically, which we’ll explore later in this post. But first, we must identify valid information to be captured.</p>
+
+<h3>Unique identifiers&nbsp;</h3>
+
+<p>Identifiers can differentiate you from other machines on a client’s network. For example, ifconfig/ipconfig output. Yes, you could argue that IP and MAC info are not truly unique; but if recorded with the current date and time then that will reduce the randomness.&nbsp;<br>
+Also, it is a good idea to uniquely identify the targets where possible. For example, firmware versions of routers, App build version identifiers.</p>
+
+<h3>Timeline&nbsp;</h3>
+
+<p>Record date and time of key actions performed/occurred relating to the overall project. For example, when you: were collected from reception; received connection details; first connected to the network; executed certain commands and in what order, etc.<br>
+By the way, in Onenote you can quickly insert a time/date stamp using ALT+SHIFT+F, or in CherryTree with CTRL+ALT+M.&nbsp;</p>
+
+<h3>Visuals</h3>
+
+<p>A picture says a thousand words. You might want to capture screenshots of the App, RDP login or other visuals that don't capture well as text. This can really help jog your memory when revisiting an engagement. For example, when a client requires clarification weeks, months or a year later, visuals can help prove that a certain version of the App looked a certain when tested.</p>
+
+<p>I generally use Onenote’s &nbsp;WINDOWSKEY+S screen clipping function for this, although recently I’ve started using Greenshot, which makes it a breeze to rapidly screenshot a particular screen region e.g. when moving through a Web App, and save directly to a file auto-named with timestamp and browser window name.</p>
+
+<p>Sometimes a video or screencast is the most efficient way of capturing and demonstrating an end-to-end attack path. Also makes great footage which can be distributed internally amongst peers.</p>
+
+<h3>Humans</h3>
+
+<p>It’s also a good idea to capture non-technical/project details relating to the overall engagement. For example, key personnel involved, contact details, location, meeting minutes, requests or deviations from scope and the time they were agreed.&nbsp;<br>
+Now let’s look at how best to configure our systems and various tools-of-the-trade in order to log like a lumberjack.</p>
+
+<h2>Linux-based Systems</h2>
+
+<h3>Time-Stamping on your Terminal</h3>
+
+<p>Configure the terminal prompt to include a time and date stamp.</p>
+
+<p>Edit your .bashrc file:</p>
+
+    <pre class="prettyprint">vim ~/.bashrc</pre>
+
+    <p>Edit your PS1 variable to:</p>
+
+    <pre class="prettyprint">PS1='[`date  +"%d-%b-%y %T"`] &gt; '</pre>
+
+    <p>Then it will look like:</p>
+
+    <pre class="prettyprint">[11-Aug-17 13:48:49] &gt;</pre>
+
+    <p>Additional tweaks you might like to use include:</p>
+
+<ul>
+	<li>Current IP address
+	<ul>
+		<li>Handy, so later you can say 'at this time, my IP was ' ,&nbsp;</li>
+		<li>and also for copy-pasting into a tool for a reverse connect</li>
+	</ul>
+	</li>
+	<li>Show current folder name only&nbsp;
+	<ul>
+		<li>Rather than a full directory path than an absolute path - to keep the prompt shorter and still useful.</li>
+	</ul>
+	</li>
+</ul>
+
+<p>To do this, edit your PS1 to:</p>
+
+    <pre class="prettyprint">PS1='[`date  +"%d-%b-%y %T"`]\[\033[01;31m\] `ifconfig eth1 2&gt;/dev/null | sed -n 2,2p | cut -d" " -f 10`\[\033[00m\] \[\033[01;34m\]\W\[\033[00m\] &gt; '</pre>
+
+    <p>Alternatively, if your ifconfig output uses colons:</p>
+
+    <pre class="prettyprint">PS1='[`date  +"%d-%b-%y %T"`]\[\033[01;31m\] `ifconfig eth0 2&gt;/dev/null | sed -n 2,2p | cut -d":" -f 3| cut -d" " -f 1`\[\033[00m\] \[\033[01;34m\]\W\[\033[00m\] &gt; '</pre>
+
+    <p>Substitute 'eth1' &nbsp;for your favourite NIC.&nbsp;</p>
+
+<p>Then your prompt will look something like [when in /usr/bin/ directory]:</p>
+
+    <pre class="prettyprint">[11-Aug-17 13:58:55] 10.0.0.257 bin &gt;</pre>
+
+    <p>Doing this has the handy side effect of capturing your IP at the time/date a command was run at when you paste a snippet into your testing notes.<br>
+&nbsp;<br>
+Now that we’ve tied together ‘when who did what from where’, we’ll automatically record it to scale up the handiness.&nbsp;</p>
+
+<h3>Update: January 2021</h3>
+
+<p>After seeing <a href="https://www.youtube.com/watch?v=DYHadkG9iFg&amp;list=UU3s0BtrBJpwNDaflRSoiieQ ">Hak5 Mubix’s great walk-through video on logging</a> I realised my blog post could do with an update.</p>
+
+<p>The following snippet will make use of the more modern ‘ip’ command rather than ‘ifconfig’, and - IF you have a default route; get the IP address of the interface using it, ELSE find the interface with the fastest speed and use that IP address:</p>
+
+    <pre class="prettyprint">PS1='[`date  +"%d-%b-%y %T"`]\[\033[01;31m\] `DGTWINT=$(ip route get 1.1.1.1 | grep via | cut -f 5 -d " ") &amp;&amp; FASTINT=$(grep ^ /dev/null  /sys/class/net/*/speed 2&gt; /dev/null | sort -t: -k 2 | tail -1 | cut -f 5 -d "/") &amp;&amp; if [ -n "${DGTWINT}" ] ; then TESTINT="${DGTWINT}"; else TESTINT="${FASTINT}"; fi &amp;&amp; IPADDR=$(ip addr show dev "${TESTINT}" | grep "inet " | sed -e "s/.*inet //" | cut -f 1 -d "/") &amp;&amp; echo "${TESTINT:0:1}:${IPADDR}"`\[\033[00m\] \[\033[01;34m\]\W\[\033[00m\] &gt; '</pre>
+
+    <p>RESULT</p>
+
+    <pre class="prettyprint">[12-Jan-21 14:52:27] t:123.123.123.123 git &gt; $</pre>
+
+    <p>Where:</p>
+
+<ul>
+	<li>‘t:’ = first letter of default interface e.g. tap/tun, ‘w:’ for wlan etc</li>
+	<li>‘git’ = the current directory</li>
+</ul>
+
+<p>Massive thanks to Si Clow for his Bash-fu wisdom here!</p>
+
+    <h3>Chronicling Your Commands with Script</h3>
+
+<p>There are a couple of options here. You could use the 'script' tool from bsdutils:</p>
+
+    <pre class="prettyprint">[11-Aug-17 13:30:49]  ~ &gt; script test.log
+Script started, file is test.log
+[11-Aug-17 13:31:22]  ~ &gt; echo this is my log file
+this is my log file
+[11-Aug-17 13:31:31]  ~ &gt; 
+[11-Aug-17 13:31:33]  ~ &gt; #rm -rf /
+[11-Aug-17 13:31:48]  ~ &gt; 
+[11-Aug-17 13:31:49]  ~ &gt; exit
+Script done, file is test.log
+[11-Aug-17 13:31:51]  ~ &gt;</pre>
+
+    <p>To automatically create a new log file each time you start a new terminal, add this to your .bashrc:</p>
+
+    <pre class="prettyprint">test "$(ps -ocommand= -p $PPID | awk '{print $1}')" == 'script' || (script -f $HOME/$(date +"%d-%b-%y_%H-%M-%S")_shell.log)</pre>
+
+    <p>Starting a new terminal, you’ll get a message like this:</p>
+
+    <pre class="prettyprint">Script started, file is /data/home/24-Jan-17_11-31-13_shell.log</pre>
+
+    <p>Script will capture all keypresses and terminal colour codes, so when cat-ing the log file later it will appear exactly the same as when you recorded – colour-coding an all.<br>
+&nbsp;<br>
+The downside is that it looks like barf when you view the log in a text editor..</p>
+
+    <pre class="prettyprint">Script started on Fri 20 Jan 2017 13:31:21 GMT
+[11-Aug-17 13:31:22]^[[01;31m ^[[00m ^[[01;34m~^[[00m &gt; echo this is my log file^M
+this is my log file^M
+[11-Aug-17 13:31:31]^[[01;31m ^[[00m ^[[01;34m~^[[00m &gt; ^M
+[11-Aug-17 13:31:33]^[[01;31m ^[[00m ^[[01;34m~^[[00m &gt; #rm -rf /^M
+[11-Aug-17 13:31:48]^[[01;31m ^[[00m ^[[01;34m~^[[00m &gt; ^M
+[11-Aug-17 13:31:49]^[[01;31m ^[[00m ^[[01;34m~^[[00m &gt; exit^M
+ 
+Script done on Fri 20 Jan 2017 13:31:51 GMT</pre>
+
+    <p>This is not very copy-paste-reporting friendly, so you’ll need to ‘cat’ it to your terminal before you copy-paste it.</p>
+
+<p>Or, pipe it through ‘aha’ to produce a nice looking HTML version of your log, complete with colour coding:</p>
+
+    <pre class="prettyprint">[11-Aug-17 13:52:14] 10.32.64.255 ~ &gt; cat test.log  | aha  &gt; test.html</pre>
+
+    <p>Result:&nbsp;</p>
+
+    <figure class="img-width-2-3">
+        <div class="modal-img-container">
+            <picture>
+                <!--[if IE 9]><video style="display: none;"><![endif]-->
+                <source srcset="/blog/assets/media/Logging_like_a_lumberjack1_new.png" height="auto" style="min-width:768px">
+                <!--[if IE 9]></video><![endif]-->
+                <img srcset="/blog/assets/media/Logging_like_a_lumberjack1_new.png" alt="">
+            </picture>
+            <div class="modal-hover">
+                <a class="modal-img hidden-xs" href="/blog/assets/media/Logging_like_a_lumberjack1_new.png"></a>
+                <a class="modal-img visible-xs" href="/blog/assets/media/Logging_like_a_lumberjack1_new.png"></a>
+            </div>
+        </div><!-- /modal-img-container -->
+   </figure>
+
+    <h3>GNU Screen&nbsp;</h3>
+
+<p>This is my preferred way of logging terminal output.</p>
+
+<p>Screen is a full-screen window manager that multiplexes a physical terminal between several processes, typically interactive shells. It’s particularly handy when SSH’d into a server for leaving commands running when you (intentionally or unintentionally!) disconnect.&nbsp;</p>
+
+<p>You can enable terminal logging with CTRL+A,H. It will automatically be saved to a file named screenlog.X (where X is a number) in the directory you launched your terminal from.</p>
+
+<p>You can configure Screen to auto-log for each new window started, by adding the "deflog on" to your screenrc file .<br>
+&nbsp;<br>
+More details can be found here: <a href="https://www.gnu.org/software/screen/manual/screen.html#Logging">https://www.gnu.org/software/screen/manual/screen.html#Logging</a></p>
+
+<h3>Metasploit</h3>
+
+<h4>Personalise that Prompt&nbsp;</h4>
+
+<p>In Metasploit, you can add extra info to your prompt with the following command:</p>
+
+    <pre class="prettyprint">setg prompt [%T] %L (s:%S j:%J)</pre>
+
+    <p>Where:<br>
+%S = number of active shell sessions.<br>
+%J = number of active background jobs.<br>
+%L= IP address<br>
+%T=Time/date<br>
+&nbsp;<br>
+To make it look like:</p>
+
+    <pre class="prettyprint">[2017-01-20 14:34:45 +0000] 10.0.2.3 (s:99 j:0) &gt;</pre>
+
+    <p>The above example shows that, “I got 99 sessions but a job ain’t one”.</p>
+
+<p>To auto-set the prompt each time Metasploit loads, just add the set prompt command into ~/.msf4/msfconsole.rc. &nbsp;You’ll need to create this file if it does not exist already.&nbsp;</p>
+
+<h4>Chronicling Commands with Spool</h4>
+
+<p>Metasploit’s (MSF) Spool function is similar to Script for the terminal. Spool will only record actions within MSF, so it’s good if you want a dedicated MSF log, rather than carving it out of your Script log file later.</p>
+
+<p>To enable spool, run spool <logfile>:&nbsp;</logfile></p>
+
+    <pre class="prettyprint">[2017-01-20 14:34:52 +0000] 10.0.2.3 (s:100 j:0) &gt; spool msf.log
+[*] Spooling to file msf.log…
+
+[2017-01-20 14:43:21 +0000] 10.0.2.3 (s:1101 j:0) &gt; use exploit/multi/handler</pre>
+
+    <p>To disable spool, run spool off</p>
+
+    <pre class="prettyprint">[2017-01-20 14:43:50 +0000] 10.0.2.3 (s:7657 j:0) exploit(handler) &gt; spool off
+[*] Spooling is now disabled</pre>
+
+    <p>Note that, if you’re already running a ‘Script’ log in the parent terminal, then all your MSF actions will be automatically captured.</p>
+
+<h4>Exporting History &nbsp;</h4>
+
+<p>To export the command history for your current MSF session, run makerc<filename>:</filename></p>
+
+    <pre class="prettyprint">[2017-01-20 14:45:50 +0000] 10.0.2.3 (s:-0 j:0) exploit(handler) &gt; makerc  commands.rc
+[*] Saving last 4 commands to commands.rc ...</pre>
+
+    <p>Commands.rc looks like:</p>
+
+    <pre class="prettyprint">spool msf.log
+use exploit/multi/handler 
+spool off</pre>
+
+    <p>As you can see, this lists only the commands – no module output.&nbsp;</p>
+
+<p>This can be handy for extracting the list of commands you used to load and configure a Metasploit module. Which you can stick in an .rc file, and load into Metasploit either on start like this:</p>
+
+    <pre class="prettyprint">msfconsole –r resource.rc</pre>
+
+    <p>or, ‘in-flight’ like this:</p>
+
+    <pre class="prettyprint">resource resource.rc</pre>
+
+    <h2>Windows-based&nbsp;</h2>
+
+<h3>Cmd.exe</h3>
+
+<p>Add a timestamp to cmd.exe with the following command:</p>
+
+    <pre class="prettyprint">prompt $D$S$T$S$P$G</pre>
+
+    <p>To make it look like:</p>
+
+    <figure class="img-width-2-3">
+        <div class="modal-img-container">
+            <picture>
+                <!--[if IE 9]><video style="display: none;"><![endif]-->
+                <source srcset="/blog/assets/media/Logging_like_a_lumberjack2.png" height="auto" style="min-width:768px">
+                <!--[if IE 9]></video><![endif]-->
+                <img srcset="/blog/assets/media/Logging_like_a_lumberjack2.png" alt="">
+            </picture>
+            <div class="modal-hover">
+                <a class="modal-img hidden-xs" href="/blog/assets/media/Logging_like_a_lumberjack2.png"></a>
+                <a class="modal-img visible-xs" href="/blog/assets/media/Logging_like_a_lumberjack2.png"></a>
+            </div>
+        </div><!-- /modal-img-container -->
+   </figure>
+
+    <h3>UPDATE: January 2021</h3>
+
+<h3>PowerShell</h3>
+
+<p>Add a timestamp to powershell.exe with the following command:</p>
+
+    <pre class="prettyprint">function prompt { write-host $(get-date)$(pwd)'&gt;' -nonewline ; return " "}</pre>
+
+    <p>To automatically apply the prompt customisation on each new session, add the command to your PowerShell profile (create it if it doesn’t exist):</p>
+
+<ul>
+	<li>Result:&nbsp;C:\Users\\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1</li>
+</ul>
+
+    <pre class="prettyprint">12/01/2021 16:33:21 C:\Users\Context &gt;</pre>
+
+    <h3>PuTTY</h3>
+
+<p>PuTTY is a free SSH and Telnet client for Windows and Unix platforms. If you’re accessing servers via SSH from Windows, then this is a pretty common tool to use.&nbsp;</p>
+
+<p>To configure logging of your session, see the Session&gt;Logging menu:</p>
+
+<ul>
+	<li>Set ‘Session Logging’ to ‘Printable output’.</li>
+	<li>‘Always append to end of an already existing log file’</li>
+	<li>Set ‘Log file name’ to ‘&amp;Y&amp;M&amp;D_%T_<project name="">_putty.log’ (or, whatever you like).</project></li>
+</ul>
+
+    <figure class="img-width-2-3">
+        <div class="modal-img-container">
+            <picture>
+                <!--[if IE 9]><video style="display: none;"><![endif]-->
+                <source srcset="/blog/assets/media/Logging_like_a_lumberjack3.jpg" height="auto" style="min-width:768px">
+                <!--[if IE 9]></video><![endif]-->
+                <img srcset="/blog/assets/media/Logging_like_a_lumberjack3.jpg" alt="">
+            </picture>
+            <div class="modal-hover">
+                <a class="modal-img hidden-xs" href="/blog/assets/media/Logging_like_a_lumberjack3.jpg"></a>
+                <a class="modal-img visible-xs" href="/blog/assets/media/Logging_like_a_lumberjack3.jpg"></a>
+            </div>
+        </div><!-- /modal-img-container -->
+   </figure>
+
+    <p>Pro-Tip: This can be handy when manually dumping a plain text Cisco config.&nbsp;</p>
+
+<h3>Registry Recover Recent IP&nbsp;</h3>
+
+<p>Perhaps you’ve already disconnected from your target network and forgot to note down your IP? Good news! &nbsp;You might be able to grab it from the registry (if you haven’t connected to a new network yet).<br>
+&nbsp;<br>
+Pop open regedit.exe (or cmd line alternative) and browse to:</p>
+
+    <pre class="prettyprint">HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\services\Tcpip\Parameters\Interfaces\&lt;Interface unique identifier&gt;</pre>
+
+    <figure class="img-width-2-3">
+        <div class="modal-img-container">
+            <picture>
+                <!--[if IE 9]><video style="display: none;"><![endif]-->
+                <source srcset="/blog/assets/media/Logging_like_a_lumberjack4.png" height="auto" style="min-width:768px">
+                <!--[if IE 9]></video><![endif]-->
+                <img srcset="/blog/assets/media/Logging_like_a_lumberjack4.png" alt="">
+            </picture>
+            <div class="modal-hover">
+                <a class="modal-img hidden-xs" href="/blog/assets/media/Logging_like_a_lumberjack4.png"></a>
+                <a class="modal-img visible-xs" href="/blog/assets/media/Logging_like_a_lumberjack4.png"></a>
+            </div>
+        </div><!-- /modal-img-container -->
+   </figure>
+
+    <h2>Multi-platform</h2>
+
+<h3>Wireshark</h3>
+
+<p>Wireshark is a packet capture and protocol analysis tool. You could run it on the interface you’re testing to record all your traffic during a test. Beware, PCAPs can get big really fast.</p>
+
+<p>In the interests of not using up all your hard drive space, we can use capture filters to trim the traffic to only the hosts in scope.&nbsp;<br>
+&nbsp;<br>
+For example, if you were doing a web application test, then you could use the following filter to only capture traffic between your source IP, the destination IP in scope, and on port 80:</p>
+
+    <pre class="prettyprint">host &lt;target&gt; and (port 80 or port 443)</pre>
+
+    <p>Something to keep in mind is Wireshark, by default, doesn’t auto-save as you’re going along. So if it crashes you might lose the whole capture.<br>
+&nbsp;<br>
+To protect against this, you can configure a permanent file to log to, under capture interfaces&gt;Output:</p>
+
+    <figure class="img-width-2-3">
+        <div class="modal-img-container">
+            <picture>
+                <!--[if IE 9]><video style="display: none;"><![endif]-->
+                <source srcset="/blog/assets/media/Logging_like_a_lumberjack5.png" height="auto" style="min-width:768px">
+                <!--[if IE 9]></video><![endif]-->
+                <img srcset="/blog/assets/media/Logging_like_a_lumberjack5.png" alt="">
+            </picture>
+            <div class="modal-hover">
+                <a class="modal-img hidden-xs" href="/blog/assets/media/Logging_like_a_lumberjack5.png"></a>
+                <a class="modal-img visible-xs" href="/blog/assets/media/Logging_like_a_lumberjack5.png"></a>
+            </div>
+        </div><!-- /modal-img-container -->
+   </figure>
+
+    <p>You can also configure a ring buffer of files split by size and/or time. More info here:<br>
+<a href="https://www.wireshark.org/docs/wsug_html_chunked/ChCapCaptureFiles.html">https://www.wireshark.org/docs/wsug_html_chunked/ChCapCaptureFiles.html</a></p>
+
+<h3>Git</h3>
+
+<p>Git is a version control system for tracking changes in computer files and coordinating work on those files among multiple people.</p>
+
+<p>How can it help us during an engagement?</p>
+
+<ul>
+	<li>Keeping ‘checkpoints’ of your test data that can be restored to when, for example, Word eats your homework. Or when you delete a database of scrape data that you just spent a day collecting… ahem.</li>
+	<li>Collaborating with colleagues on the same test e.g. making edits to the same report</li>
+	<li>Logging – commits are timestamped. If commits are done every minute then you’re effectively logging changes to all files in your repo/engagement folder at once!&nbsp;</li>
+</ul>
+
+<h4>Local Repo</h4>
+
+<p>Create a local git repo for current test, called ‘pentest’:</p>
+
+    <pre class="prettyprint">mkdir –p /data/Engagement/pentest &amp;&amp; cd /data/Engagement/pentest &amp;&amp; git init</pre>
+
+    <p>Now it’s ready to store files and stuff.</p>
+
+<h4>Auto-committing</h4>
+
+<p>First of all, cheers to Simon Clow for this idea.</p>
+
+<p>Create a script, /data/Engagement/pentest/gitcommit.sh, to commit the changes to your repo:</p>
+
+    <pre class="prettyprint">#!/bin/bash
+cd /data/Engagement/pentest/ &amp;&amp; git add . &amp;&amp; git commit -m “`date`”</pre>
+
+    <p>Ensure it has permissions to run:</p>
+
+    <pre class="prettyprint">chmod 700 /data/Engagement/pentest/gitcommit.sh</pre>
+
+    <p>Create crontab entry to run the script on a schedule (every minute in this case):</p>
+
+    <pre class="prettyprint">crontab -e</pre>
+
+    <p>Contents:</p>
+
+    <pre class="prettyprint"># m h  dom mon dow   command
+* * * * * /data/Engagement/pentest/gitcommit.sh &gt;/dev/null 2&gt;1</pre>
+
+    <h2>Manual Logging</h2>
+
+<p>Now that we’ve covered our bases with the automatic logging, a final point on keeping a hand-written/typed log of key events that happen outside of the computer.&nbsp;</p>
+
+<p>Last year a colleague and I were on a job where we couldn’t start our test until more than half way through the 1st day, which meant there wouldn’t be enough time to fully test everything originally agreed. We raised this with the client so that everyone was on the same page.&nbsp;</p>
+
+<p>A couple of weeks later, there was a dispute about why XYZ wasn’t tested, followed by a rather imaginary timeline. Thanks to manual logs of who said what and when, we were able resolve the dispute very quickly and accurately.</p>
+
+<p>We hope that you enjoyed this post and that it will help you&nbsp;in the field.</p>
+
+                        
+
+                        
+
+</article>
